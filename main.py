@@ -29,12 +29,12 @@ import personas
 parser = argparse.ArgumentParser(description="T-AIRS Red-Team Lab")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
+parser.add_argument("--gcp-project", help="GCP Project ID for Vertex AI", required=True) # <-- ADD THIS
 args, _ = parser.parse_known_args()
 
 AIRS_KEY = args.airs_key
 AIRS_PROFILE_NAME = args.airs_profile
-AIRS_CONFIGURED = False
-airs_error_msg = "Not Configured"
+PROJECT_ID = args.gcp_project
 
 # GLOBAL STATE
 validated_models = []
@@ -42,14 +42,11 @@ ai_profile_obj = None
 PERSONAS = personas.PERSONAS
 
 # 2. VERTEX AI SETUP
-def get_project_id():
-    try:
-        return subprocess.check_output(['gcloud', 'config', 'get-value', 'project'], encoding='utf-8').strip()
-    except:
-        return "sase-product-discovery-project"
-
-PROJECT_ID = get_project_id()
-client = genai.Client(vertexai=True, project=PROJECT_ID, location="us-central1")
+try:
+    client = genai.Client(vertexai=True, project=PROJECT_ID, location="us-central1")
+except Exception as e:
+    print(f"CRITICAL: Failed to initialize Vertex AI with project {PROJECT_ID}. Error: {e}")
+    client = None
 
 # --- INITIALIZATION LOGIC ---
 
