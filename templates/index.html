@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T-AIRS Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .chat-container::-webkit-scrollbar { width: 6px; }
+        .chat-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .log-hidden { width: 0 !important; opacity: 0; pointer-events: none; border-left: none !important; }
+        #log-panel { transition: all 0.3s ease; }
+        #model-select option.local-option { background-color: #1e293b; color: #60a5fa; font-weight: bold; }
+        #persona-context-display::-webkit-scrollbar { width: 4px; }
+        #persona-context-display::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .sidebar-section {
+            background-color: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 h-screen flex overflow-hidden font-sans">
+
+    <aside class="w-80 bg-slate-900 text-white p-5 flex flex-col shadow-xl shrink-0 border-r border-slate-800">
+        <div class="flex items-center gap-3 mb-10 px-1">
+            <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
+            <h1 class="text-xl font-black tracking-tighter text-white uppercase italic">T-AIRS</h1>
+        </div>
+
+        <div class="flex flex-col gap-8 flex-1 min-h-0">
+            <div class="sidebar-section">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-blue-400"></i>
+                        <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">AIRS Protection</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="airs-toggle" class="sr-only peer" checked>
+                        <div class="w-8 h-4 bg-slate-600 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4 shadow-sm"></div>
+                    </label>
+                </div>
+                <div id="airs-status-light" class="w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
+                    <div id="status-bar" class="w-0 h-full bg-slate-500 transition-all duration-700"></div>
+                </div>
+                <div class="flex flex-col gap-1 overflow-hidden">
+                    <span id="airs-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
+                    <span id="airs-profile-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter">NO_PROFILE</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-blue-400"></i>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LLM Engine</p>
+                </div>
+                <select id="model-select" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
+                    <option value="">Discovering models...</option>
+                </select>
+                <p class="text-[8px] text-blue-400/80 mt-2 font-bold tracking-tight italic">* Blue models are local (Ollama)</p>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="bot" class="w-3.5 h-3.5 text-blue-400"></i>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target Chatbot Type</p>
+                </div>
+                <nav class="space-y-2">
+                    <label class="flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-slate-800 transition has-[:checked]:bg-blue-600 group">
+                        <input type="radio" name="persona" value="banking" class="hidden" checked>
+                        <i data-lucide="landmark" class="w-4 h-4 text-slate-400 group-hover:text-white"></i>
+                        <span class="text-sm font-medium">Banking</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-slate-800 transition has-[:checked]:bg-blue-600 group">
+                        <input type="radio" name="persona" value="travel" class="hidden">
+                        <i data-lucide="plane" class="w-4 h-4 text-slate-400 group-hover:text-white"></i>
+                        <span class="text-sm font-medium">Travel</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-slate-800 transition has-[:checked]:bg-blue-600 group">
+                        <input type="radio" name="persona" value="eshop" class="hidden">
+                        <i data-lucide="shopping-bag" class="w-4 h-4 text-slate-400 group-hover:text-white"></i>
+                        <span class="text-sm font-medium">E-Shop</span>
+                    </label>
+                </nav>
+            </div>
+
+            <div class="sidebar-section flex-1 flex flex-col min-h-0 mb-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="binary" class="w-3.5 h-3.5 text-orange-400"></i>
+                    <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">System Prompt Information</p>
+                </div>
+                <div class="flex-1 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex flex-col">
+                    <div id="persona-context-display" class="p-3 text-[9px] font-mono text-slate-400 overflow-y-auto leading-relaxed break-all whitespace-pre-wrap selection:bg-orange-500/30 h-full">
+                        Loading context data...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col bg-white relative">
+        <header class="px-8 py-4 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0 z-20 shadow-sm">
+            <div>
+                <h2 id="current-persona-title" class="font-bold text-slate-800 mb-0.5 tracking-tight text-lg">Banking Assistant</h2>
+                <div class="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase" id="engine-tag">-</div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="reset-session" class="flex items-center gap-2 px-4 py-2 rounded-full border border-red-200 text-xs font-bold text-red-600 shadow-sm hover:bg-red-50 transition-all">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> New Session
+                </button>
+                <button id="toggle-logs" class="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-xs font-bold text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
+                    <i data-lucide="terminal" class="w-4 h-4"></i> Inspector Logs
+                </button>
+            </div>
+        </header>
+
+        <div id="chat-box" class="chat-container flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/30"></div>
+
+        <footer class="p-6 border-t border-slate-100 bg-white">
+            <form id="chat-form" class="max-w-3xl mx-auto relative shadow-sm">
+                <input type="text" id="msg" autoComplete="off" class="w-full bg-slate-100 rounded-2xl py-4 pl-6 pr-16 outline-none focus:ring-2 focus:ring-blue-500 border border-transparent transition-all" placeholder="Enter attack vector or prompt..." required>
+                <button type="submit" class="absolute right-2 top-2 bottom-2 bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </form>
+        </footer>
+    </main>
+
+    <aside id="log-panel" class="w-[500px] bg-slate-900 flex flex-col border-l border-slate-800 log-hidden shadow-2xl">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest italic">Prisma AIRS Metadata Trace</h3>
+            <button onclick="document.getElementById('log-container').innerHTML=''" class="text-[10px] text-slate-500 hover:text-white uppercase font-bold">Clear</button>
+        </div>
+        <div id="log-container" class="flex-1 overflow-y-auto p-4 font-mono text-[10px] space-y-4"></div>
+    </aside>
+
+    <script>
+        lucide.createIcons();
+        let sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+        const chatForm = document.getElementById('chat-form');
+        const chatBox = document.getElementById('chat-box');
+        const logContainer = document.getElementById('log-container');
+
+        async function updatePersonaDisplay(personaId) {
+            const display = document.getElementById('persona-context-display');
+            try {
+                const res = await fetch(`/get-persona-context/${personaId}`);
+                const data = await res.json();
+                display.innerText = data.context;
+                display.scrollTop = 0;
+            } catch (e) { display.innerText = "Error loading context."; }
+        }
+
+        async function fetchModels() {
+            try {
+                const res = await fetch('/models');
+                const data = await res.json();
+                const select = document.getElementById('model-select');
+                if (data.models && data.models.length > 0) {
+                    select.innerHTML = data.models.map(m => {
+                        const isLocal = m.startsWith('local-');
+                        return `<option value="${m}" class="${isLocal ? 'local-option' : ''}">${isLocal ? '🏠 ' + m + ' (Local)' : '☁️ ' + m}</option>`;
+                    }).join('');
+                    select.value = data.models[0];
+                    document.getElementById('engine-tag').innerText = select.value;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function checkAirsHealth() {
+            try {
+                const res = await fetch('/health-airs');
+                const data = await res.json();
+                const bar = document.getElementById('status-bar');
+                const statusText = document.getElementById('airs-status-text');
+
+                if (data.status === "connected") {
+                    bar.className = "w-full h-full bg-green-500 shadow-[0_0_8px_#22c55e]";
+                    statusText.innerText = "CONNECTED Prisma AIRS profile";
+                    statusText.className = "text-[9px] font-bold text-green-400 uppercase tracking-tight";
+                    document.getElementById('airs-profile-text').innerText = data.profile;
+                } else {
+                    bar.className = "w-full h-full bg-red-500 shadow-[0_0_8px_#ef4444]";
+                    statusText.innerText = data.reason;
+                    statusText.className = "text-[8px] font-mono text-red-400 leading-tight break-all";
+                    document.getElementById('airs-profile-text').innerText = "ERROR";
+                }
+            } catch (e) {}
+        }
+
+        document.querySelectorAll('input[name="persona"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const val = e.target.value;
+                document.getElementById('current-persona-title').innerText = e.target.parentElement.innerText.trim() + " Assistant";
+                updatePersonaDisplay(val);
+            });
+        });
+
+        document.getElementById('model-select').addEventListener('change', (e) => {
+            document.getElementById('engine-tag').innerText = e.target.value;
+        });
+
+        document.getElementById('toggle-logs').addEventListener('click', () => document.getElementById('log-panel').classList.toggle('log-hidden'));
+
+        document.getElementById('reset-session').addEventListener('click', () => {
+            if(confirm("Start a fresh session? This clears chat and generates a new session ID.")) {
+                sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+                chatBox.innerHTML = '';
+                logContainer.innerHTML = '';
+            }
+        });
+
+        function appendMessage(role, text) {
+            const isBot = role === 'bot';
+            const html = `<div class="flex gap-3 ${isBot ? '' : 'flex-row-reverse ml-auto'} max-w-[85%] animate-in fade-in slide-in-from-bottom-2">
+                <div class="w-8 h-8 rounded-full ${isBot ? 'bg-slate-100 border' : 'bg-blue-600'} flex items-center justify-center shrink-0 shadow-sm transition-transform hover:scale-110">
+                    <i data-lucide="${isBot ? 'bot' : 'user'}" class="w-4 h-4 ${isBot ? 'text-slate-500' : 'text-white'}"></i>
+                </div>
+                <div class="${isBot ? 'bg-white text-slate-700 rounded-tl-none' : 'bg-blue-600 text-white rounded-tr-none'} p-4 rounded-2xl shadow-sm border text-sm leading-relaxed border-slate-200/50">
+                    ${text.replace(/\n/g, '<br>')}
+                </div>
+            </div>`;
+            chatBox.insertAdjacentHTML('beforeend', html);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            lucide.createIcons();
+        }
+
+        chatForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const msgInput = document.getElementById('msg');
+            const message = msgInput.value;
+            const persona = document.querySelector('input[name="persona"]:checked').value;
+            const airsEnabled = document.getElementById('airs-toggle').checked;
+            const modelId = document.getElementById('model-select').value;
+
+            appendMessage('user', message);
+            msgInput.value = '';
+
+            const loadId = 'l-' + Date.now();
+            chatBox.insertAdjacentHTML('beforeend', `<div id="${loadId}" class="text-[10px] text-slate-400 ml-11 italic flex items-center gap-2"><div class="w-1 h-1 bg-slate-400 rounded-full animate-ping"></div>Processing Request...</div>`);
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({
+                        'message': message, 'persona': persona, 'session_id': sessionId,
+                        'airs_enabled': airsEnabled, 'model_id': modelId
+                    })
+                });
+                const data = await res.json();
+                if (document.getElementById(loadId)) document.getElementById(loadId).remove();
+
+                if (data.bot) {
+                    appendMessage('bot', data.bot);
+                    const isBlocked = data.logs.security_scan.includes('BLOCK');
+                    const logHtml = `
+                        <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${isBlocked ? 'border-l-red-500' : 'border-l-green-500'} transition-all hover:bg-slate-800/60">
+                            <div class="flex justify-between text-[9px] text-blue-400 mb-2 border-b border-slate-700/50 pb-1 font-bold">
+                                <span>MODEL: ${modelId.toUpperCase()}</span>
+                                <span>${new Date().toLocaleTimeString()}</span>
+                            </div>
+                            <div class="mb-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${isBlocked ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}">Prisma AIRS status: ${data.logs.security_scan}</span></div>
+                            <div class="text-[9px] text-green-400 font-bold mb-1 uppercase tracking-tighter italic">Prisma AIRS Raw Trace:</div>
+                            <pre class="bg-black/60 p-3 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${data.logs.raw_response}</pre>
+                        </div>`;
+                    logContainer.insertAdjacentHTML('afterbegin', logHtml);
+                }
+            } catch (err) {
+                if (document.getElementById(loadId)) document.getElementById(loadId).remove();
+                appendMessage('bot', "⚠️ Backend connection error.");
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchModels();
+            checkAirsHealth();
+            const activePersona = document.querySelector('input[name="persona"]:checked').value;
+            updatePersonaDisplay(activePersona);
+        });
+    </script>
+</body>
+</html>
