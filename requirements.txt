@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+requests
+google-genai
+jinja2
+python-multipart
+pan-aisecurity
