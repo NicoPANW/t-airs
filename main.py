@@ -120,11 +120,11 @@ if AIRS_KEY and AIRS_PROFILE_NAME:
             airs_error_msg = match.group(1) if match else raw_error
             print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}")
 
-    print("Performing Deep Model Discovery...")
-    validated_models = discover_all_models()
-    print(f"READY: {len(validated_models)} models loaded into memory.")
-    print("="*40 + "\n")
-    yield
+print("Performing Deep Model Discovery...")
+validated_models = discover_all_models()
+print(f"READY: {len(validated_models)} models loaded into memory.")
+print("="*40 + "\n")
+yield
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
