@@ -38,6 +38,9 @@ AIRS_PROFILE_NAME = args.airs_profile
 PROJECT_ID = args.gcp_project
 REGION = args.gcp_region
 
+AIRS_CONFIGURED = False
+airs_error_msg = "Not initialized"
+
 # GLOBAL STATE
 validated_models = []
 ai_profile_obj = None
@@ -98,20 +101,24 @@ async def lifespan(app: FastAPI):
     print("="*40)
 
     if AIRS_KEY and AIRS_PROFILE_NAME:
-        print(f"Handshaking with Prisma AIRS: {AIRS_PROFILE_NAME}...")
-        try:
-            aisecurity.init(api_key=AIRS_KEY)
-            # Using the pre-imported AiProfile class
-            ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-            Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
-            AIRS_CONFIGURED = True
-            airs_error_msg = "Connected"
-            print("RESULT: ✅ AIRS ONLINE")
-        except Exception as e:
-            raw_error = str(e)
-            match = re.search(r'HTTP response body: (\{.*\})', raw_error)
-            airs_error_msg = match.group(1) if match else raw_error
-            print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}")
+    print(f"Handshaking with Prisma AIRS: {AIRS_PROFILE_NAME}...")
+    try:
+        aisecurity.init(api_key=AIRS_KEY)
+        # Using the pre-imported AiProfile class
+        ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
+        Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
+        
+        # Overwrite defaults on success
+        AIRS_CONFIGURED = True
+        airs_error_msg = "Connected"
+        print("RESULT: ✅ AIRS ONLINE")
+        
+    except Exception as e:
+        # Overwrite defaults on failure
+        raw_error = str(e)
+        match = re.search(r'HTTP response body: (\{.*\})', raw_error)
+        airs_error_msg = match.group(1) if match else raw_error
+        print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}")
 
     print("Performing Deep Model Discovery...")
     validated_models = discover_all_models()
