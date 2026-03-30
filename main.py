@@ -181,19 +181,26 @@ async def chat(
     selected_prompt = PERSONAS.get(persona, PERSONAS["banking"])
     security_status = "Bypassed"
     raw_sec_log = "{}"
+    ingress_data = {}
+
     try:
+        # --- 1. INGRESS SCAN (Check the User's Prompt) ---
         if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-            # Using the pre-imported Scanner and Content classes
             scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message))
             res_data = scan_response.to_dict()
-            data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
-            action = str(data.get("action", "pass")).lower()
-            raw_sec_log = json.dumps(data, indent=2)
+            ingress_data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
+            
+            action = str(ingress_data.get("action", "pass")).lower()
+            
             if action == "block":
-                block_txt = f"🛡️ Prisma AIRS Blocked: {data.get('category')} violation."
-                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "BLOCK", "raw_response": raw_sec_log}}
-            security_status = f"Passed ({action})"
+                block_txt = f"🛡️ Prisma AIRS Blocked Input: {ingress_data.get('category', 'Policy')} violation."
+                raw_sec_log = json.dumps(ingress_data, indent=2)
+                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK", "raw_response": raw_sec_log}}
+            
+            security_status = "Passed Input"
+            raw_sec_log = json.dumps(ingress_data, indent=2)
 
+        # --- 2. GENERATE LLM RESPONSE (The core AI engine) ---
         active_model = model_id if model_id in validated_models else (validated_models[0] if validated_models else "gemini-2.5-flash-lite")
         if active_model.startswith("local-"):
             bot_response = chat_local_ollama(active_model, selected_prompt, message)
@@ -201,7 +208,26 @@ async def chat(
             chat_session = client.models.generate_content(model=active_model, contents=message, config=types.GenerateContentConfig(system_instruction=selected_prompt))
             bot_response = chat_session.text
 
+        # --- 3. EGRESS SCAN (Check the LLM's Answer) ---
+        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+            out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=bot_response))
+            out_res_data = out_scan_response.to_dict()
+            out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
+            
+            out_action = str(out_data.get("action", "pass")).lower()
+            
+            if out_action == "block":
+                block_txt = f"🛡️ Prisma AIRS Blocked Output: The LLM generated a {out_data.get('category', 'Policy')} violation."
+                raw_sec_log = json.dumps(out_data, indent=2)
+                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "EGRESS BLOCK", "raw_response": raw_sec_log}}
+            
+            # If both passed, we bundle the logs together so your dashboard sees both!
+            security_status = "Passed Input & Output"
+            raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
+
+        # --- 4. RETURN SAFE RESPONSE ---
         return {"bot": bot_response, "output": bot_response, "logs": {"security_scan": security_status, "raw_response": raw_sec_log}}
+
     except Exception as e:
         return {"bot": f"Error: {str(e)}", "output": f"Error: {str(e)}", "logs": {"security_scan": "Error", "raw_response": raw_sec_log}}
 
