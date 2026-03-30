@@ -29,12 +29,14 @@ import personas
 parser = argparse.ArgumentParser(description="T-AIRS Red-Team Lab")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
-parser.add_argument("--gcp-project", help="GCP Project ID for Vertex AI", required=True) # <-- ADD THIS
+parser.add_argument("--gcp-project", help="GCP Project ID for Vertex AI", required=True)
+parser.add_argument("--gcp-region", help="GCP Region for Vertex AI", default="us-central1")
 args, _ = parser.parse_known_args()
 
 AIRS_KEY = args.airs_key
 AIRS_PROFILE_NAME = args.airs_profile
 PROJECT_ID = args.gcp_project
+REGION = args.gcp_region
 
 # GLOBAL STATE
 validated_models = []
@@ -43,9 +45,10 @@ PERSONAS = personas.PERSONAS
 
 # 2. VERTEX AI SETUP
 try:
-    client = genai.Client(vertexai=True, project=PROJECT_ID, location="us-central1")
+    # Swap "us-central1" for the dynamic REGION variable
+    client = genai.Client(vertexai=True, project=PROJECT_ID, location=REGION)
 except Exception as e:
-    print(f"CRITICAL: Failed to initialize Vertex AI with project {PROJECT_ID}. Error: {e}")
+    print(f"CRITICAL: Failed to initialize Vertex AI in {REGION}. Error: {e}")
     client = None
 
 # --- INITIALIZATION LOGIC ---
