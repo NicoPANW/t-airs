@@ -228,7 +228,7 @@
             lucide.createIcons();
         }
 
-        chatForm.onsubmit = async (e) => {
+chatForm.onsubmit = async (e) => {
             e.preventDefault();
             const msgInput = document.getElementById('msg');
             const message = msgInput.value;
@@ -256,17 +256,39 @@
 
                 if (data.bot) {
                     appendMessage('bot', data.bot);
-                    const isBlocked = data.logs.security_scan.includes('BLOCK');
+                    
+                    // --- NEW DYNAMIC COLOR LOGIC ---
+                    const statusText = data.logs.security_scan || "";
+                    let borderColor = "border-l-slate-500";
+                    let badgeColor = "bg-slate-900/50 text-slate-400";
+                    
+                    if (statusText.includes("INGRESS BLOCK")) {
+                        borderColor = "border-l-red-500";
+                        badgeColor = "bg-red-900/50 text-red-400";
+                    } else if (statusText.includes("EGRESS BLOCK")) {
+                        borderColor = "border-l-orange-500";
+                        badgeColor = "bg-orange-900/50 text-orange-400";
+                    } else if (statusText.includes("Passed")) {
+                        borderColor = "border-l-green-500";
+                        badgeColor = "bg-green-900/50 text-green-400";
+                    }
+                    // -------------------------------
+
                     const logHtml = `
-                        <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${isBlocked ? 'border-l-red-500' : 'border-l-green-500'} transition-all hover:bg-slate-800/60">
+                        <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${borderColor} transition-all hover:bg-slate-800/60">
                             <div class="flex justify-between text-[9px] text-blue-400 mb-2 border-b border-slate-700/50 pb-1 font-bold">
                                 <span>MODEL: ${modelId.toUpperCase()}</span>
                                 <span>${new Date().toLocaleTimeString()}</span>
                             </div>
-                            <div class="mb-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${isBlocked ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}">Prisma AIRS status: ${data.logs.security_scan}</span></div>
+                            <div class="mb-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}">
+                                    Prisma AIRS status: ${statusText}
+                                </span>
+                            </div>
                             <div class="text-[9px] text-green-400 font-bold mb-1 uppercase tracking-tighter italic">Prisma AIRS Raw Trace:</div>
                             <pre class="bg-black/60 p-3 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${data.logs.raw_response}</pre>
                         </div>`;
+                    
                     logContainer.insertAdjacentHTML('afterbegin', logHtml);
                 }
             } catch (err) {
