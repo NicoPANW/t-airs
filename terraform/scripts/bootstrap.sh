@@ -118,9 +118,9 @@ EOF
 
 # 2. Safely append the exact ExecStart line using Terraform variables natively
 if [ "${target_cloud}" == "aws" ]; then
-    echo "ExecStart=/opt/t-airs/src/venv/bin/python3 main.py --target-cloud aws --aws-region ${aws_region} --bedrock-model-id ${bedrock_model_id} --airs-key ${airs_key} --airs-profile ${airs_profile} --local-llm ${enable_local_llm}" >> /etc/systemd/system/t-airs.service
+    echo "ExecStart=/opt/t-airs/venv/bin/python3 main.py --target-cloud aws --aws-region ${aws_region} --bedrock-model-id ${bedrock_model_id} --airs-key ${airs_key} --airs-profile ${airs_profile} --local-llm ${enable_local_llm}" >> /etc/systemd/system/t-airs.service
 else
-    echo "ExecStart=/opt/t-airs/src/venv/bin/python3 main.py --target-cloud gcp --gcp-project ${gcp_project} --gcp-region ${gcp_region} --airs-key ${airs_key} --airs-profile ${airs_profile} --local-llm ${enable_local_llm}" >> /etc/systemd/system/t-airs.service
+    echo "ExecStart=/opt/t-airs/venv/bin/python3 main.py --target-cloud gcp --gcp-project ${gcp_project} --gcp-region ${gcp_region} --airs-key ${airs_key} --airs-profile ${airs_profile} --local-llm ${enable_local_llm}" >> /etc/systemd/system/t-airs.service
 fi
 
 # 3. Write the bottom half of the file
