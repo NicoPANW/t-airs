@@ -303,6 +303,38 @@ chatForm.onsubmit = async (e) => {
             const activePersona = document.querySelector('input[name="persona"]:checked').value;
             updatePersonaDisplay(activePersona);
         });
+
+        // Save Persona Logic
+        document.getElementById('save-persona-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('save-persona-btn');
+            const newContext = document.getElementById('persona-context-display').value;
+            const activePersona = document.querySelector('input[name="persona"]:checked').value;
+            
+            btn.innerText = "SAVING...";
+            btn.classList.add("text-white", "bg-orange-500");
+            
+            try {
+                const res = await fetch('/update-persona', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({'persona_id': activePersona, 'new_context': newContext})
+                });
+                
+                if (res.ok) {
+                    btn.innerText = "SAVED ✓";
+                    btn.classList.replace("bg-orange-500", "bg-green-500");
+                }
+            } catch (e) {
+                btn.innerText = "ERROR";
+                btn.classList.replace("bg-orange-500", "bg-red-500");
+            }
+            
+            // Reset button visually after 2 seconds
+            setTimeout(() => {
+                btn.innerText = "SAVE";
+                btn.className = "text-[9px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded hover:bg-orange-500/40 transition font-bold tracking-widest cursor-pointer";
+            }, 2000);
+        });
     </script>
 </body>
 </html>
