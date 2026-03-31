@@ -149,9 +149,9 @@
             try {
                 const res = await fetch(`/get-persona-context/${personaId}`);
                 const data = await res.json();
-                display.innerText = data.context;
+                display.value = data.context; // <-- Changed to .value
                 display.scrollTop = 0;
-            } catch (e) { display.innerText = "Error loading context."; }
+            } catch (e) { display.value = "Error loading context."; }
         }
 
         async function fetchModels() {
