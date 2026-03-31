@@ -87,14 +87,15 @@
             </div>
 
             <div class="sidebar-section flex-1 flex flex-col min-h-0 mb-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <i data-lucide="binary" class="w-3.5 h-3.5 text-orange-400"></i>
-                    <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">System Prompt Information</p>
-                </div>
-                <div class="flex-1 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex flex-col">
-                    <div id="persona-context-display" class="p-3 text-[9px] font-mono text-slate-400 overflow-y-auto leading-relaxed break-all whitespace-pre-wrap selection:bg-orange-500/30 h-full">
-                        Loading context data...
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="binary" class="w-3.5 h-3.5 text-orange-400"></i>
+                        <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">System Prompt</p>
                     </div>
+                    <button id="save-persona-btn" class="text-[9px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded hover:bg-orange-500/40 transition font-bold tracking-widest cursor-pointer">SAVE</button>
+                </div>
+                <div class="flex-1 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex flex-col relative">
+                    <textarea id="persona-context-display" class="w-full h-full bg-transparent p-3 text-[10px] font-mono text-slate-400 outline-none resize-none leading-relaxed selection:bg-orange-500/30" spellcheck="false">Loading context data...</textarea>
                 </div>
             </div>
         </div>
