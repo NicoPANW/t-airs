@@ -182,6 +182,24 @@ def chat_aws_bedrock(model_id, system_prompt, user_message):
 
 # --- ROUTES ---
 
+@app.post("/update-persona")
+async def update_persona(
+    persona_id: str = Form(...),
+    new_context: str = Form(...)
+):
+    if persona_id in PERSONAS:
+        # 1. Update the live memory
+        PERSONAS[persona_id] = new_context
+        
+        # 2. Write it permanently to the personas.py file
+        try:
+            with open("personas.py", "w") as f:
+                f.write(f"PERSONAS = {repr(PERSONAS)}\n")
+            return {"status": "success"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    return {"status": "not found"}
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
