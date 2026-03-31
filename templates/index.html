@@ -13,7 +13,7 @@
         #log-panel { transition: all 0.3s ease; }
         #model-select option.local-option { background-color: #1e293b; color: #60a5fa; font-weight: bold; }
         #persona-context-display::-webkit-scrollbar { width: 4px; }
-        #persona-context-display::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        #persona-context-display::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
         .sidebar-section {
             background-color: rgba(30, 41, 59, 0.4);
             border: 1px solid rgba(51, 65, 85, 0.5);
@@ -31,7 +31,7 @@
             <h1 class="text-xl font-black tracking-tighter text-white uppercase italic">T-AIRS</h1>
         </div>
 
-        <div class="flex flex-col gap-8 flex-1 min-h-0">
+        <div class="flex flex-col gap-6 flex-1 min-h-0">
             <div class="sidebar-section">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
@@ -60,30 +60,7 @@
                 <select id="model-select" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
                     <option value="">Discovering models...</option>
                 </select>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="flex items-center gap-2 mb-4">
-                    <i data-lucide="bot" class="w-3.5 h-3.5 text-blue-400"></i>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target Chatbot Type</p>
-                </div>
-                <nav class="space-y-2">
-                    <label class="flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-slate-800 transition has-[:checked]:bg-blue-600 group">
-                        <input type="radio" name="persona" value="banking" class="hidden" checked>
-                        <i data-lucide="landmark" class="w-4 h-4 text-slate-400 group-hover:text-white"></i>
-                        <span class="text-sm font-medium">Banking</span>
-                    </label>
-                    <label class="flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-slate-800 transition has-[:checked]:bg-blue-600 group">
-                        <input type="radio" name="persona" value="travel" class="hidden">
-                        <i data-lucide="plane" class="w-4 h-4 text-slate-400 group-hover:text-white"></i>
-                        <span class="text-sm font-medium">Travel</span>
-                    </label>
-                    <label class="flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-slate-800 transition has-[:checked]:bg-blue-600 group">
-                        <input type="radio" name="persona" value="eshop" class="hidden">
-                        <i data-lucide="shopping-bag" class="w-4 h-4 text-slate-400 group-hover:text-white"></i>
-                        <span class="text-sm font-medium">E-Shop</span>
-                    </label>
-                </nav>
+                <p class="text-[8px] text-blue-400/80 mt-2 font-bold tracking-tight italic">* Blue models are local</p>
             </div>
 
             <div class="sidebar-section flex-1 flex flex-col min-h-0 mb-4">
@@ -94,8 +71,8 @@
                     </div>
                     <button id="save-persona-btn" class="text-[9px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded hover:bg-orange-500/40 transition font-bold tracking-widest cursor-pointer">SAVE</button>
                 </div>
-                <div class="flex-1 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex flex-col relative">
-                    <textarea id="persona-context-display" class="w-full h-full bg-transparent p-3 text-[10px] font-mono text-slate-400 outline-none resize-none leading-relaxed selection:bg-orange-500/30" spellcheck="false">Loading context data...</textarea>
+                <div class="flex-1 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex flex-col relative shadow-inner">
+                    <textarea id="persona-context-display" class="w-full h-full bg-transparent p-3 text-[11px] font-mono text-slate-300 outline-none resize-none leading-relaxed selection:bg-orange-500/30 transition-colors focus:bg-slate-900/50" spellcheck="false" placeholder="Loading context data..."></textarea>
                 </div>
             </div>
         </div>
@@ -103,10 +80,26 @@
 
     <main class="flex-1 flex flex-col bg-white relative">
         <header class="px-8 py-4 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0 z-20 shadow-sm">
-            <div>
-                <h2 id="current-persona-title" class="font-bold text-slate-800 mb-0.5 tracking-tight text-lg">Banking Assistant</h2>
-                <div class="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase" id="engine-tag">-</div>
+            
+            <div class="flex items-center gap-4">
+                <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+                    <label class="flex items-center gap-2 px-4 py-1.5 rounded-lg cursor-pointer hover:text-slate-800 text-slate-500 font-semibold text-sm transition-all has-[:checked]:bg-white has-[:checked]:text-blue-600 has-[:checked]:shadow-sm">
+                        <input type="radio" name="persona" value="banking" class="hidden" checked>
+                        <i data-lucide="landmark" class="w-4 h-4"></i> Banking
+                    </label>
+                    <label class="flex items-center gap-2 px-4 py-1.5 rounded-lg cursor-pointer hover:text-slate-800 text-slate-500 font-semibold text-sm transition-all has-[:checked]:bg-white has-[:checked]:text-blue-600 has-[:checked]:shadow-sm">
+                        <input type="radio" name="persona" value="travel" class="hidden">
+                        <i data-lucide="plane" class="w-4 h-4"></i> Travel
+                    </label>
+                    <label class="flex items-center gap-2 px-4 py-1.5 rounded-lg cursor-pointer hover:text-slate-800 text-slate-500 font-semibold text-sm transition-all has-[:checked]:bg-white has-[:checked]:text-blue-600 has-[:checked]:shadow-sm">
+                        <input type="radio" name="persona" value="eshop" class="hidden">
+                        <i data-lucide="shopping-bag" class="w-4 h-4"></i> E-Shop
+                    </label>
+                </div>
+                
+                <div class="hidden md:flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200" id="engine-tag">-</div>
             </div>
+
             <div class="flex items-center gap-3">
                 <button id="reset-session" class="flex items-center gap-2 px-4 py-2 rounded-full border border-red-200 text-xs font-bold text-red-600 shadow-sm hover:bg-red-50 transition-all">
                     <i data-lucide="refresh-cw" class="w-4 h-4"></i> New Session
@@ -144,21 +137,56 @@
         const chatBox = document.getElementById('chat-box');
         const logContainer = document.getElementById('log-container');
 
+        // Fetch System Prompt into Editable Textarea
         async function updatePersonaDisplay(personaId) {
             const display = document.getElementById('persona-context-display');
             try {
                 const res = await fetch(`/get-persona-context/${personaId}`);
                 const data = await res.json();
-                display.value = data.context; // <-- Changed to .value
+                display.value = data.context;
                 display.scrollTop = 0;
             } catch (e) { display.value = "Error loading context."; }
         }
 
+        // Save System Prompt Logic
+        document.getElementById('save-persona-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('save-persona-btn');
+            const newContext = document.getElementById('persona-context-display').value;
+            const activePersona = document.querySelector('input[name="persona"]:checked').value;
+            
+            btn.innerText = "SAVING...";
+            btn.classList.add("text-white", "bg-orange-500");
+            
+            try {
+                const res = await fetch('/update-persona', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({'persona_id': activePersona, 'new_context': newContext})
+                });
+                if (res.ok) {
+                    btn.innerText = "SAVED ✓";
+                    btn.classList.replace("bg-orange-500", "bg-green-500");
+                }
+            } catch (e) {
+                btn.innerText = "ERROR";
+                btn.classList.replace("bg-orange-500", "bg-red-500");
+            }
+            
+            setTimeout(() => {
+                btn.innerText = "SAVE";
+                btn.className = "text-[9px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded hover:bg-orange-500/40 transition font-bold tracking-widest cursor-pointer";
+            }, 2000);
+        });
+
+        // Fetch AI Models (With robust offline handling)
         async function fetchModels() {
             try {
                 const res = await fetch('/models');
                 const data = await res.json();
                 const select = document.getElementById('model-select');
+                const msgInput = document.getElementById('msg');
+                const submitBtn = chatForm.querySelector('button[type="submit"]');
+
                 if (data.models && data.models.length > 0) {
                     select.innerHTML = data.models.map(m => {
                         const isLocal = m.startsWith('local-');
@@ -166,10 +194,21 @@
                     }).join('');
                     select.value = data.models[0];
                     document.getElementById('engine-tag').innerText = select.value;
+                    
+                    msgInput.disabled = false;
+                    submitBtn.disabled = false;
+                    msgInput.placeholder = "Enter attack vector or prompt...";
+                } else {
+                    select.innerHTML = '<option value="">❌ No Cloud LLMs Detected</option>';
+                    document.getElementById('engine-tag').innerText = "OFFLINE";
+                    msgInput.disabled = true;
+                    submitBtn.disabled = true;
+                    msgInput.placeholder = "Chat disabled: Cloud LLM engine not reachable.";
                 }
             } catch (e) { console.error(e); }
         }
 
+        // Check AIRS Status
         async function checkAirsHealth() {
             try {
                 const res = await fetch('/health-airs');
@@ -191,20 +230,21 @@
             } catch (e) {}
         }
 
+        // Top Header Radio Buttons Change Logic
         document.querySelectorAll('input[name="persona"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 const val = e.target.value;
-                document.getElementById('current-persona-title').innerText = e.target.parentElement.innerText.trim() + " Assistant";
-                updatePersonaDisplay(val);
+                updatePersonaDisplay(val); // Load new context into the giant text box
             });
         });
 
+        // Model Dropdown Change Logic
         document.getElementById('model-select').addEventListener('change', (e) => {
             document.getElementById('engine-tag').innerText = e.target.value;
         });
 
+        // UI Toggles
         document.getElementById('toggle-logs').addEventListener('click', () => document.getElementById('log-panel').classList.toggle('log-hidden'));
-
         document.getElementById('reset-session').addEventListener('click', () => {
             if(confirm("Start a fresh session? This clears chat and generates a new session ID.")) {
                 sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
@@ -228,19 +268,27 @@
             lucide.createIcons();
         }
 
-chatForm.onsubmit = async (e) => {
+        // Chat Submit
+        chatForm.onsubmit = async (e) => {
             e.preventDefault();
+            const modelId = document.getElementById('model-select').value;
+            
+            if (!modelId) {
+                appendMessage('bot', "⚠️ Cannot send message: No AI engine is currently available.");
+                return; 
+            }
+
             const msgInput = document.getElementById('msg');
             const message = msgInput.value;
             const persona = document.querySelector('input[name="persona"]:checked').value;
             const airsEnabled = document.getElementById('airs-toggle').checked;
-            const modelId = document.getElementById('model-select').value;
 
             appendMessage('user', message);
             msgInput.value = '';
 
             const loadId = 'l-' + Date.now();
             chatBox.insertAdjacentHTML('beforeend', `<div id="${loadId}" class="text-[10px] text-slate-400 ml-11 italic flex items-center gap-2"><div class="w-1 h-1 bg-slate-400 rounded-full animate-ping"></div>Processing Request...</div>`);
+            chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
                 const res = await fetch('/chat', {
@@ -257,7 +305,6 @@ chatForm.onsubmit = async (e) => {
                 if (data.bot) {
                     appendMessage('bot', data.bot);
                     
-                    // --- NEW DYNAMIC COLOR LOGIC ---
                     const statusText = data.logs.security_scan || "";
                     let borderColor = "border-l-slate-500";
                     let badgeColor = "bg-slate-900/50 text-slate-400";
@@ -272,7 +319,6 @@ chatForm.onsubmit = async (e) => {
                         borderColor = "border-l-green-500";
                         badgeColor = "bg-green-900/50 text-green-400";
                     }
-                    // -------------------------------
 
                     const logHtml = `
                         <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${borderColor} transition-all hover:bg-slate-800/60">
@@ -302,38 +348,6 @@ chatForm.onsubmit = async (e) => {
             checkAirsHealth();
             const activePersona = document.querySelector('input[name="persona"]:checked').value;
             updatePersonaDisplay(activePersona);
-        });
-
-        // Save Persona Logic
-        document.getElementById('save-persona-btn').addEventListener('click', async () => {
-            const btn = document.getElementById('save-persona-btn');
-            const newContext = document.getElementById('persona-context-display').value;
-            const activePersona = document.querySelector('input[name="persona"]:checked').value;
-            
-            btn.innerText = "SAVING...";
-            btn.classList.add("text-white", "bg-orange-500");
-            
-            try {
-                const res = await fetch('/update-persona', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: new URLSearchParams({'persona_id': activePersona, 'new_context': newContext})
-                });
-                
-                if (res.ok) {
-                    btn.innerText = "SAVED ✓";
-                    btn.classList.replace("bg-orange-500", "bg-green-500");
-                }
-            } catch (e) {
-                btn.innerText = "ERROR";
-                btn.classList.replace("bg-orange-500", "bg-red-500");
-            }
-            
-            // Reset button visually after 2 seconds
-            setTimeout(() => {
-                btn.innerText = "SAVE";
-                btn.className = "text-[9px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded hover:bg-orange-500/40 transition font-bold tracking-widest cursor-pointer";
-            }, 2000);
         });
     </script>
 </body>
