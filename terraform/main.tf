@@ -44,7 +44,7 @@ locals {
   allowed_ingress = concat([local.my_auto_subnet], var.prisma_airs_ips)
 
   # Inject variables into the bootstrap script
-  userdata = templatefile("${path.module}/bootstrap.sh", {
+  userdata = userdata = templatefile("${path.module}/scripts/bootstrap.sh", {
     airs_key     = var.airs_key
     airs_profile = var.airs_profile
     gcp_project  = var.gcp_project_id
