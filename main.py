@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 from google import genai
 from google.genai import types
 
-# Prisma AIRS Imports - CRITICAL FIX: Moved to top level
+# Prisma AIRS Imports
 import aisecurity
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
 from aisecurity.scan.inline.scanner import Scanner
@@ -29,14 +29,16 @@ import personas
 parser = argparse.ArgumentParser(description="T-AIRS Red-Team Lab")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
-parser.add_argument("--gcp-project", help="GCP Project ID for Vertex AI", required=True)
+parser.add_argument("--target-cloud", help="Deploy target: aws or gcp", default="gcp")
+parser.add_argument("--gcp-project", help="GCP Project ID for Vertex AI", default="")
 parser.add_argument("--gcp-region", help="GCP Region for Vertex AI", default="us-central1")
+parser.add_argument("--aws-region", help="AWS Region", default="us-east-1")
+parser.add_argument("--bedrock-model-id", help="Bedrock Model ID", default="meta.llama3-8b-instruct-v1:0")
 args, _ = parser.parse_known_args()
 
 AIRS_KEY = args.airs_key
 AIRS_PROFILE_NAME = args.airs_profile
-PROJECT_ID = args.gcp_project
-REGION = args.gcp_region
+TARGET_CLOUD = args.target_cloud
 
 AIRS_CONFIGURED = False
 airs_error_msg = "Not initialized"
@@ -46,25 +48,36 @@ validated_models = []
 ai_profile_obj = None
 PERSONAS = personas.PERSONAS
 
-# 2. VERTEX AI SETUP
-try:
-    # Swap "us-central1" for the dynamic REGION variable
-    client = genai.Client(vertexai=True, project=PROJECT_ID, location=REGION)
-except Exception as e:
-    print(f"CRITICAL: Failed to initialize Vertex AI in {REGION}. Error: {e}")
-    client = None
+# 2. CLOUD CLIENT SETUP
+vertex_client = None
+bedrock_client = None
+
+if TARGET_CLOUD == "gcp":
+    try:
+        vertex_client = genai.Client(vertexai=True, project=args.gcp_project, location=args.gcp_region)
+        print("✅ GCP Vertex AI Initialized.")
+    except Exception as e:
+        print(f"CRITICAL: Failed to initialize Vertex AI in {args.gcp_region}. Error: {e}")
+elif TARGET_CLOUD == "aws":
+    import boto3
+    try:
+        bedrock_client = boto3.client("bedrock-runtime", region_name=args.aws_region)
+        print(f"✅ AWS Bedrock Initialized in {args.aws_region}.")
+    except Exception as e:
+        print(f"CRITICAL: Failed to initialize AWS Bedrock. Error: {e}")
 
 # --- INITIALIZATION LOGIC ---
 
 def is_gemini_runnable(model_id):
     try:
-        client.models.generate_content(model=model_id, contents="ping", config=types.GenerateContentConfig(max_output_tokens=1))
+        vertex_client.models.generate_content(model=model_id, contents="ping", config=types.GenerateContentConfig(max_output_tokens=1))
         return True
     except:
         return False
 
 def discover_all_models():
     found = []
+    # Local Ollama Discovery
     try:
         resp = requests.get("http://localhost:11434/api/tags", timeout=2)
         if resp.status_code == 200:
@@ -75,22 +88,32 @@ def discover_all_models():
     except:
         print("DEBUG: ⚠️ OLLAMA NOT DETECTED")
 
-    try:
-        all_gemini = client.models.list()
-        excluded = ["image", "audio", "video", "live", "embedding", "tts", "imagen", "search"]
-        for m in all_gemini:
-            model_id = m.name.split('/')[-1]
-            if "gemini" in model_id.lower() and not any(x in model_id.lower() for x in excluded):
-                if is_gemini_runnable(model_id):
-                    print(f"DEBUG: ✅ GEMINI VALID: {model_id}")
-                    found.append(model_id)
-    except:
-        print("DEBUG: ❌ GEMINI DISCOVERY FAILED")
+    # GCP Discovery
+    if TARGET_CLOUD == "gcp" and vertex_client:
+        try:
+            all_gemini = vertex_client.models.list()
+            excluded = ["image", "audio", "video", "live", "embedding", "tts", "imagen", "search"]
+            for m in all_gemini:
+                model_id = m.name.split('/')[-1]
+                if "gemini" in model_id.lower() and not any(x in model_id.lower() for x in excluded):
+                    if is_gemini_runnable(model_id):
+                        print(f"DEBUG: ✅ GEMINI VALID: {model_id}")
+                        found.append(model_id)
+        except:
+            print("DEBUG: ❌ GEMINI DISCOVERY FAILED")
+            
+    # AWS Discovery
+    if TARGET_CLOUD == "aws" and bedrock_client:
+        print(f"DEBUG: ✅ BEDROCK CONFIGURED: {args.bedrock_model_id}")
+        found.append(args.bedrock_model_id)
 
     found.sort()
-    if "gemini-2.5-flash-lite" in found:
+    
+    # Set default order for GCP
+    if TARGET_CLOUD == "gcp" and "gemini-2.5-flash-lite" in found:
         found.remove("gemini-2.5-flash-lite")
         found.insert(0, "gemini-2.5-flash-lite")
+        
     return found
 
 @asynccontextmanager
@@ -104,17 +127,14 @@ async def lifespan(app: FastAPI):
         print(f"Handshaking with Prisma AIRS: {AIRS_PROFILE_NAME}...")
         try:
             aisecurity.init(api_key=AIRS_KEY)
-            # Using the pre-imported AiProfile class
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             
-            # Overwrite defaults on success
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
             print("RESULT: ✅ AIRS ONLINE")
             
         except Exception as e:
-            # Overwrite defaults on failure
             raw_error = str(e)
             match = re.search(r'HTTP response body: (\{.*\})', raw_error)
             airs_error_msg = match.group(1) if match else raw_error
@@ -148,6 +168,18 @@ def chat_local_ollama(model_name, system_prompt, user_message):
     except Exception as e:
         return f"Local LLM Error: {str(e)}"
 
+def chat_aws_bedrock(model_id, system_prompt, user_message):
+    try:
+        response = bedrock_client.converse(
+            modelId=model_id,
+            messages=[{"role": "user", "content": [{"text": user_message}]}],
+            system=[{"text": system_prompt}],
+            inferenceConfig={"temperature": 0.7}
+        )
+        return response['output']['message']['content'][0]['text']
+    except Exception as e:
+        return f"AWS Bedrock Error: {str(e)}"
+
 # --- ROUTES ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -173,15 +205,19 @@ async def get_persona_context(persona_id: str):
 @app.post("/chat")
 async def chat(
     message: str = Form(...),
-    persona: str = Form(...),
-    session_id: str = Form(...),
+    persona: str = Form("banking"),
+    session_id: str = Form("default-session"),
     airs_enabled: bool = Form(False),
-    model_id: str = Form(...)
+    model_id: str = Form("none")
 ):
     selected_prompt = PERSONAS.get(persona, PERSONAS["banking"])
     security_status = "Bypassed"
     raw_sec_log = "{}"
     ingress_data = {}
+    
+    # Safe fallback if UI sends empty string
+    if not model_id or model_id == "none":
+        model_id = validated_models[0] if validated_models else None
 
     try:
         # --- 1. INGRESS SCAN (Check the User's Prompt) ---
@@ -201,15 +237,24 @@ async def chat(
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
         # --- 2. GENERATE LLM RESPONSE (The core AI engine) ---
-        active_model = model_id if model_id in validated_models else (validated_models[0] if validated_models else "gemini-2.5-flash-lite")
-        if active_model.startswith("local-"):
-            bot_response = chat_local_ollama(active_model, selected_prompt, message)
-        else:
-            chat_session = client.models.generate_content(model=active_model, contents=message, config=types.GenerateContentConfig(system_instruction=selected_prompt))
+        if not model_id:
+             bot_response = "Error: No AI engine available. Cloud clients failed to initialize."
+        elif model_id.startswith("local-"):
+            bot_response = chat_local_ollama(model_id, selected_prompt, message)
+        elif TARGET_CLOUD == "aws":
+            bot_response = chat_aws_bedrock(model_id, selected_prompt, message)
+        elif TARGET_CLOUD == "gcp" and vertex_client:
+            chat_session = vertex_client.models.generate_content(
+                model=model_id, 
+                contents=message, 
+                config=types.GenerateContentConfig(system_instruction=selected_prompt)
+            )
             bot_response = chat_session.text
+        else:
+             bot_response = "Error: Invalid cloud target or missing client."
 
         # --- 3. EGRESS SCAN (Check the LLM's Answer) ---
-        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
             out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=bot_response))
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
@@ -221,7 +266,6 @@ async def chat(
                 raw_sec_log = json.dumps(out_data, indent=2)
                 return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "EGRESS BLOCK", "raw_response": raw_sec_log}}
             
-            # If both passed, we bundle the logs together so your dashboard sees both!
             security_status = "Passed Input & Output"
             raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
 
