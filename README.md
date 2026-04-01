@@ -52,17 +52,20 @@ Below shows to define the Prisma AIRS profile and API key.
 **1. Create a security profile**
 <img width="1847" height="840" alt="Screenshot 2026-04-01 at 16 15 41" src="https://github.com/user-attachments/assets/6b1d96a3-74cf-43b7-9cce-783824087118" />
 
-*> Caption: Create a security profile*
-
 **2. Create an App**
 <img width="1848" height="842" alt="Screenshot 2026-04-01 at 16 10 15" src="https://github.com/user-attachments/assets/527f3685-cd93-4353-9a7b-5392a553447c" />
-
-*> Caption: Create an App*
 
 **3. Select your credit profile**
 <img width="1849" height="843" alt="Screenshot 2026-04-01 at 16 10 34" src="https://github.com/user-attachments/assets/b7adc861-9cab-4b59-bce8-9175079cfa05" />
 
-*> Caption: Select your credit profile*
+**4. Fill in information, make sure to reference your security profile created in setp 1**
+<img width="1847" height="840" alt="Screenshot 2026-04-01 at 16 11 13" src="https://github.com/user-attachments/assets/d9199ed2-e4e4-460f-8bed-ac4548d6b77b" />
+
+**5. Review and generate**
+<img width="1848" height="841" alt="Screenshot 2026-04-01 at 16 11 37" src="https://github.com/user-attachments/assets/b6e0ecdf-6294-4a2f-bdb3-273f3d20cbeb" />
+
+**6. Copy and save the API key and API Key Name (aka Profile Name), click done**
+<img width="1849" height="842" alt="Screenshot 2026-04-01 at 16 12 26" src="https://github.com/user-attachments/assets/554479ae-28c0-404d-b1fd-d4f2450d7b18" />
 
 ---
 
