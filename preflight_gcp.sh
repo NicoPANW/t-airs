@@ -56,12 +56,15 @@ if [ -z "$TOKEN" ]; then
     exit 1
 fi
 
-# 1. Baseline Check (Ensures the project can reach the global endpoint at all)
+# 1. Baseline Check (POST to :generateContent)
+# A 400 Bad Request is a SUCCESS here—it means the model caught the empty payload.
 BASELINE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X GET "https://aiplatform.googleapis.com/v1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/gemini-2.5-flash" \
-  -H "Authorization: Bearer $TOKEN")
+  -X POST "https://aiplatform.googleapis.com/v1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/gemini-2.5-flash:generateContent" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}')
 
-if [ "$BASELINE_STATUS" -eq 200 ] || [ "$BASELINE_STATUS" -eq 403 ] || [ "$BASELINE_STATUS" -eq 401 ]; then
+if [ "$BASELINE_STATUS" -eq 400 ] || [ "$BASELINE_STATUS" -eq 200 ] || [ "$BASELINE_STATUS" -eq 403 ]; then
     echo "✅ Global Vertex AI is reachable (Baseline verified)."
 else
     echo "❌ ERROR: Global Vertex AI Endpoint is not responding (Status: $BASELINE_STATUS)."
@@ -69,16 +72,18 @@ else
     exit 1
 fi
 
-# 2. Bleeding-Edge Check (Informative check for Gemini 3)
+# 2. Bleeding-Edge Check for Gemini 3.0
 echo "💎 Checking for Gemini 3.0 capability..."
 G3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X GET "https://aiplatform.googleapis.com/v1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/gemini-3.0-flash" \
-  -H "Authorization: Bearer $TOKEN")
+  -X POST "https://aiplatform.googleapis.com/v1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/gemini-3.0-flash:generateContent" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}')
 
-if [ "$G3_STATUS" -eq 200 ] || [ "$G3_STATUS" -eq 403 ]; then
+if [ "$G3_STATUS" -eq 400 ] || [ "$G3_STATUS" -eq 200 ] || [ "$G3_STATUS" -eq 403 ]; then
     echo "✅ SUCCESS: Gemini 3.0 access confirmed! Your lab will use the latest models."
 else
-    echo "⚠️  NOTE: Gemini 3.0 not detected (Status: $G3_STATUS). The lab will gracefully fall back to Gemini 2.5."
+    echo "⚠️  NOTE: Gemini 3.0 not detected on Global (Status: $G3_STATUS). The lab will gracefully fall back to Gemini 2.5."
 fi
 
 echo "====================================================="
