@@ -54,7 +54,7 @@ bedrock_client = None
 
 if TARGET_CLOUD == "gcp":
     try:
-        vertex_client = genai.Client(vertexai=True, project=args.gcp_project, location=args.gcp_region)
+        vertex_client = genai.Client(vertexai=True, project=args.gcp_project, location="global")
         print("✅ GCP Vertex AI Initialized.")
     except Exception as e:
         print(f"CRITICAL: Failed to initialize Vertex AI in {args.gcp_region}. Error: {e}")
