@@ -71,7 +71,7 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     # Define our array of target models
     MODELS=("llama3" "mistral" "gemma2:9b" "qwen2.5:7b" "deepseek-r1:7b")
 
-    for model in "${MODELS[@]}"; do
+    for model in "$${MODELS[@]}"; do
         # 1. Pull the model if it's missing
         if ! ollama list | grep -q "$model"; then
             echo "⬇️ Pulling $model..."
