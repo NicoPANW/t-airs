@@ -72,18 +72,28 @@ else
     exit 1
 fi
 
-# 2. Bleeding-Edge Check for Gemini 3.0
+# 2. Bleeding-Edge Check for Gemini 3.0 (Using v1beta1 API)
 echo "💎 Checking for Gemini 3.0 capability..."
-G3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X POST "https://aiplatform.googleapis.com/v1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/gemini-3.0-flash:generateContent" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{}')
+G3_FOUND=false
 
-if [ "$G3_STATUS" -eq 400 ] || [ "$G3_STATUS" -eq 200 ] || [ "$G3_STATUS" -eq 403 ]; then
-    echo "✅ SUCCESS: Gemini 3.0 access confirmed! Your lab will use the latest models."
-else
-    echo "⚠️  NOTE: Gemini 3.0 not detected on Global (Status: $G3_STATUS). The lab will gracefully fall back to Gemini 2.5."
+# We loop through the exact same candidates as the Python script
+for model in "gemini-3.0-flash" "gemini-3.0-flash-preview" "gemini-3.0-pro-preview"; do
+    G3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+      -X POST "https://aiplatform.googleapis.com/v1beta1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/$model:generateContent" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{}')
+
+    # 400 Bad Request is success (the model is alive but rejected our empty JSON)
+    if [ "$G3_STATUS" -eq 400 ] || [ "$G3_STATUS" -eq 200 ] || [ "$G3_STATUS" -eq 403 ]; then
+        echo "✅ SUCCESS: $model access confirmed! Your lab will use the latest models."
+        G3_FOUND=true
+        break # Stop checking once we find one that works
+    fi
+done
+
+if [ "$G3_FOUND" = false ]; then
+    echo "⚠️  NOTE: Gemini 3.0 not detected on Global API. The lab will gracefully fall back to Gemini 2.5."
 fi
 
 echo "====================================================="
