@@ -101,3 +101,5 @@ if [ -z "$TF_VAR_prisma_airs_ips" ]; then
 else
     echo "✅ Dynamic AIRS IPs detected: $TF_VAR_prisma_airs_ips"
 fi
+
+echo "✅ GCP Pre-flight passed! Ready to deploy."
