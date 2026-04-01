@@ -18,7 +18,7 @@
 
 * **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
 * **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for red-teaming.
-* **☁️ SAAS models:** GCP deployement come with Gemini (via Vertex AI) and AWS with llama (via Bedrock)
+* **☁️ SAAS models:** GCP deployement comes with Gemini (via Vertex AI) and AWS with llama (via Bedrock)
 * **🏠 Local models:** even though not recommended since far slower than GCP/AWS SAAS models, there is an option to deploy local models
 * **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) API security scanning. In addition, the App can be used to demosntrate AIRS Red-teaming.
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
