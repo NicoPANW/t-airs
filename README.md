@@ -42,11 +42,11 @@ To keep the application clean and scalable, this repository is a "Monorepo" spli
 
 Before you begin, you need a few basic tools installed on your computer:
 
-1. **Terraform:** [Download here](https://developer.hashicorp.com/terraform/downloads)
+1. **Terraform:** Download the engine that builds the cloud infrastructure.
 2. **Prisma AIRS API Key:** You must have a valid Prisma AIRS profile and API key.
 3. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
-   * **For AWS:** Install the [AWS CLI](https://aws.amazon.com/cli/) and run `aws configure`. 
-   * **For GCP:** Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) and run `gcloud auth application-default login`.
+   * **For AWS:** Install the AWS CLI and run `aws configure`. 
+   * **For GCP:** Install the Google Cloud SDK and run `gcloud auth application-default login`.
 
 > [!IMPORTANT]  
 > **AWS Bedrock Users:** AWS does not enable models by default. You must log into the AWS Console, navigate to Amazon Bedrock -> Model Access, and request access to Anthropic, Meta, and Mistral models before deploying.
@@ -61,3 +61,99 @@ Download the code to your local machine and enter the directory.
 ```bash
 git clone [https://github.com/NicoPANW/t-airs.git](https://github.com/NicoPANW/t-airs.git)
 cd t-airs
+```
+
+### Step 2: Export Your Variables
+Terraform needs to know your environment details. Export them as environment variables in your terminal:
+
+```bash
+# Required for both clouds:
+export TF_VAR_airs_key="your_prisma_airs_api_key_here"
+export TF_VAR_airs_profile="Your-Profile-Name"
+export TF_VAR_enable_local_llm="true"
+
+# If deploying to AWS:
+export TF_VAR_target_cloud="aws"
+export TF_VAR_aws_region="us-east-1"
+export TF_VAR_bedrock_model_id="meta.llama3-8b-instruct-v1:0"
+
+# If deploying to GCP:
+export TF_VAR_target_cloud="gcp"
+export TF_VAR_gcp_project_id="your-gcp-project-id"
+export TF_VAR_gcp_region="us-central1"
+```
+
+### Step 3: Run the Preflight Check
+Run our built-in safety script to make sure your terminal is configured correctly.
+
+```bash
+# For AWS
+./preflight_aws.sh
+
+# For GCP
+./preflight_gcp.sh
+```
+
+### Step 4: Deploy with Terraform
+Navigate to the terraform folder, initialize the plugins, and launch the lab!
+
+```bash
+cd terraform
+terraform init
+terraform apply -auto-approve
+```
+
+> [!NOTE]  
+> If you enabled the Local LLM (GPU), the server will take about **15-20 minutes** to boot up, install the NVIDIA drivers, and pull the 24GB of local AI models. Grab a coffee!
+
+### Step 5: Access the Lab
+Once Terraform finishes, it will print out the Public IP address of your new server. Open your web browser and go to:
+
+```bash
+http://<YOUR_SERVER_IP>:8000
+```
+
+---
+
+## 🛑 Teardown (Stop Paying for the Cloud!)
+
+> [!WARNING]  
+> **Do not leave this running!** GPUs cost money by the hour. When you are done testing, destroy the entire lab securely to stop billing.
+
+Destroy the lab with one command:
+
+```bash
+cd terraform
+terraform destroy -auto-approve
+```
+
+---
+
+## 🐛 Troubleshooting & Debugging
+
+If the UI isn't loading, or a model isn't connecting, use this cheat sheet to play detective:
+
+### 1. General App Debugging (AWS & GCP)
+Check your app logs or reset the service:
+
+```bash
+sudo journalctl -u t-airs.service -n 50 -f
+sudo systemctl restart t-airs
+ollama list
+```
+
+### 2. AWS-Specific Debugging
+Connect via SSH (`ssh ubuntu@<YOUR_AWS_PUBLIC_IP>`) and check the cloud-init logs:
+
+```bash
+sudo tail -n 100 /var/log/cloud-init-output.log
+sudo grep -i "Local LLM" /var/log/cloud-init-output.log
+```
+
+### 3. GCP-Specific Debugging
+Connect via SSH (`gcloud compute ssh ubuntu@t-airs-production-node --zone=us-central1-a`) and check the Guest Agent logs:
+
+```bash
+sudo journalctl -u google-startup-scripts.service --no-pager
+curl -H "Metadata-Flavor: Google" [http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script](http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script)
+```
