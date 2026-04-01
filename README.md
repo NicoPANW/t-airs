@@ -39,15 +39,30 @@ To keep the application clean and scalable, this repository is a "Monorepo" spli
 Before you begin, you need a few basic tools installed on your computer:
 
 1. **Terraform:** Download the engine that builds the cloud infrastructure.
-2. **Prisma AIRS API Key:** You must have a valid Prisma AIRS profile and API key.
-3. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
+2. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
    * **For AWS:** Install the AWS CLI and run `aws configure`. 
    * **For GCP:** Install the Google Cloud SDK and run `gcloud auth application-default login`.
-4. **SSH Key (AWS Only):** You must have an Ed25519 SSH key pair generated on your local machine. Terraform will automatically inject this key into the AWS server. If you don't have one, generate it by running:
+3. **SSH Key (AWS Only):** You must have an Ed25519 SSH key pair generated on your local machine. Terraform will automatically inject this key into the AWS server. If you don't have one, generate it by running:
    `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""`
 
-> [!IMPORTANT]  
-> **AWS Bedrock Users:** AWS does not enable models by default. You must log into the AWS Console, navigate to Amazon Bedrock -> Model Access, and request access to Anthropic, Meta, and Mistral models before deploying.
+### 🤖 AI Runtime (API) specific prerequisites
+
+Below shows to define the Prisma AIRS profile and API key.
+
+**1. Create a security profile**
+<img width="1847" height="840" alt="Screenshot 2026-04-01 at 16 15 41" src="https://github.com/user-attachments/assets/6b1d96a3-74cf-43b7-9cce-783824087118" />
+
+*> Caption: Create a security profile*
+
+**2. Create an App**
+<img width="1848" height="842" alt="Screenshot 2026-04-01 at 16 10 15" src="https://github.com/user-attachments/assets/527f3685-cd93-4353-9a7b-5392a553447c" />
+
+*> Caption: Create an App*
+
+**3. Select your credit profile**
+<img width="1849" height="843" alt="Screenshot 2026-04-01 at 16 10 34" src="https://github.com/user-attachments/assets/b7adc861-9cab-4b59-bce8-9175079cfa05" />
+
+*> Caption: Select your credit profile*
 
 ---
 
