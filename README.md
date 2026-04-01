@@ -20,7 +20,7 @@
 * **🛡️ Prisma AIRS Integration:** Deep, native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) security scanning.
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 * **🔎 Visual Metadata Trace:** A built-in inspector panel shows you the exact raw JSON decision logic from Prisma AIRS on every single interaction.
-* **🏎️ Local GPU Arsenal:** even though not recommended since far slower than GCP/AWS SAAS models, there is an option to deploy local models
+* **🏠 Local models:** even though not recommended since far slower than GCP/AWS SAAS models, there is an option to deploy local models
 
 ---
 
