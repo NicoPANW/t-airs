@@ -56,7 +56,7 @@ Before you begin, you need a few basic tools installed on your computer:
 Download the code to your local machine and enter the directory.
 
 ```bash
-git clone [https://github.com/NicoPANW/t-airs.git](https://github.com/NicoPANW/t-airs.git)
+git clone "https://github.com/NicoPANW/t-airs.git"
 cd t-airs
 ```
 
