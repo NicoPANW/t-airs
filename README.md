@@ -47,6 +47,8 @@ Before you begin, you need a few basic tools installed on your computer:
 3. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
    * **For AWS:** Install the AWS CLI and run `aws configure`. 
    * **For GCP:** Install the Google Cloud SDK and run `gcloud auth application-default login`.
+4. **SSH Key (AWS Only):** You must have an Ed25519 SSH key pair generated on your local machine. Terraform will automatically inject this key into the AWS server. If you don't have one, generate it by running:
+   `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""`
 
 > [!IMPORTANT]  
 > **AWS Bedrock Users:** AWS does not enable models by default. You must log into the AWS Console, navigate to Amazon Bedrock -> Model Access, and request access to Anthropic, Meta, and Mistral models before deploying.
