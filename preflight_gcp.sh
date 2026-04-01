@@ -53,4 +53,17 @@ if ! gcloud services list --project="$TF_VAR_gcp_project_id" | grep -q "aiplatfo
     exit 1
 fi
 
+# --- NEW: REGIONAL MODEL AVAILABILITY CHECK ---
+echo "🔍 Checking Model Availability in $TF_VAR_gcp_region..."
+# We check if the region returns at least one model. 
+# Note: We use 'grep -v "Listed 0 items"' because gcloud returns 0 on empty lists.
+MODEL_COUNT=$(gcloud ai models list --region="$TF_VAR_gcp_region" --project="$TF_VAR_gcp_project_id" --limit=1 2>&1)
+
+if [[ "$MODEL_COUNT" == *"Listed 0 items"* ]]; then
+    echo "❌ ERROR: No Foundation Models found in $TF_VAR_gcp_region."
+    echo "   Some regions often lacks Gemini/Vertex model availability."
+    echo "   Please change your region to 'europe-west1' (Belgium) or 'us-central1' (Iowa)."
+    exit 1
+fi
+
 echo "✅ GCP Pre-flight passed! Ready to deploy."
