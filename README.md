@@ -70,7 +70,7 @@ export TF_VAR_aws_region="us-east-1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
 # If AIRS model scaning, add IP listed as per AIRS workflow in the UI
-export TF_VAR_airs_ips='["198.51.100.1/32", "203.0.113.5/32", "202.181.130.201/32"]'
+export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
 
 # If deploying to GCP:
 export TF_VAR_gcp_project_id="your-gcp-project-id"
@@ -78,7 +78,7 @@ export TF_VAR_gcp_region="us-central1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
 # If AIRS model scaning, add IP listed as per AIRS workflow in the UI
-export TF_VAR_airs_ips='["198.51.100.1/32", "203.0.113.5/32", "202.181.130.201/32"]'
+export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
 ```
 
 ### Step 3: Run the Preflight Check
