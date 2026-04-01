@@ -133,8 +133,21 @@ terraform destroy -auto-approve
 
 If the UI isn't loading, or a model isn't connecting, use this cheat sheet to play detective:
 
-### 1. General App Debugging (AWS & GCP)
-Check your app logs or reset the service:
+### Step 1: SSH into the VM
+Before you can run any debug commands, you must log into the server's terminal. 
+
+**For AWS:**
+```bash
+ssh ubuntu@<YOUR_AWS_PUBLIC_IP>
+```
+
+**For GCP:**
+```bash
+gcloud compute ssh ubuntu@t-airs-production-node --zone=us-central1-a
+```
+
+### Step 2: General App Debugging (AWS & GCP)
+Once logged in, you can check your live app logs, reset the service, or check your local models:
 
 ```bash
 sudo journalctl -u t-airs.service -n 50 -f
@@ -142,16 +155,16 @@ sudo systemctl restart t-airs
 ollama list
 ```
 
-### 2. AWS-Specific Debugging
-Connect via SSH (`ssh ubuntu@<YOUR_AWS_PUBLIC_IP>`) and check the cloud-init logs:
+### Step 3: AWS-Specific Debugging
+Check the cloud-init logs to verify if the Terraform startup script and GPU installation succeeded:
 
 ```bash
 sudo tail -n 100 /var/log/cloud-init-output.log
 sudo grep -i "Local LLM" /var/log/cloud-init-output.log
 ```
 
-### 3. GCP-Specific Debugging
-Connect via SSH (`gcloud compute ssh ubuntu@t-airs-production-node --zone=us-central1-a`) and check the Guest Agent logs:
+### Step 4: GCP-Specific Debugging
+Check the Google Guest Agent logs to verify how the startup script executed:
 
 ```bash
 sudo journalctl -u google-startup-scripts.service --no-pager
