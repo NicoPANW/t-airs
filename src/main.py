@@ -91,6 +91,7 @@ def discover_all_models():
     # GCP Discovery
     if TARGET_CLOUD == "gcp" and vertex_client:
         try:
+            # 1. Standard Auto-Discovery (Catches 1.5, 2.0, 2.5)
             all_gemini = vertex_client.models.list()
             excluded = ["image", "audio", "video", "live", "embedding", "tts", "imagen", "search"]
             for m in all_gemini:
@@ -99,8 +100,23 @@ def discover_all_models():
                     if is_gemini_runnable(model_id):
                         print(f"DEBUG: ✅ GEMINI VALID: {model_id}")
                         found.append(model_id)
-        except:
-            print("DEBUG: ❌ GEMINI DISCOVERY FAILED")
+            
+            # 2. Manual Injection for Preview/Global-Only Models (Gemini 3)
+            # Preview models often hide from models.list() to prevent breaking legacy apps.
+            gemini_3_candidates = [
+                "gemini-3-pro-image-preview",
+                "gemini-3-flash-preview",
+                "gemini-3.1-flash-preview",
+                "gemini-3.1-pro-preview"
+            ]
+            for candidate in gemini_3_candidates:
+                if candidate not in found:  # Avoid duplicates if Google updates list()
+                    if is_gemini_runnable(candidate):
+                        print(f"DEBUG: 💎 GEMINI 3 VALID: {candidate}")
+                        found.append(candidate)
+
+        except Exception as e:
+            print(f"DEBUG: ❌ GEMINI DISCOVERY FAILED: {str(e)}")
             
     # AWS Discovery
     if TARGET_CLOUD == "aws" and bedrock_client:
