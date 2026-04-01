@@ -104,8 +104,8 @@ def discover_all_models():
             # 2. Manual Injection for Preview/Global-Only Models (Gemini 3)
             # Preview models often hide from models.list() to prevent breaking legacy apps.
             gemini_3_candidates = [
-                "gemini-3-pro-image-preview",
-                "gemini-3-flash-preview",
+                "gemini-3.0-flash-lite-preview",
+                "gemini-3.1-flash-lite-preview",
                 "gemini-3.1-flash-preview",
                 "gemini-3.1-pro-preview"
             ]
