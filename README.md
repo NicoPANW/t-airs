@@ -16,12 +16,14 @@
 
 ## ✨ Capabilities of the App
 
-* **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS (using Amazon Bedrock) or GCP (using Vertex AI) with a single variable change.
+* **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
 * **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for synchronous model scanning.
+* **☁️ SAAS models:** GCP deployement come with Gemini (via Vertex AI) and AWS with llama (via Bedrock)
+* **🏠 Local models:** even though not recommended since far slower than GCP/AWS SAAS models, there is an option to deploy local models
 * **🛡️ Prisma AIRS Integration:** Deep, native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) security scanning.
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 * **🔎 Visual Metadata Trace:** A built-in inspector panel shows you the exact raw JSON decision logic from Prisma AIRS on every single interaction.
-* **🏠 Local models:** even though not recommended since far slower than GCP/AWS SAAS models, there is an option to deploy local models
+
 
 ---
 
@@ -36,13 +38,14 @@ To keep the application clean and scalable, this repository is a "Monorepo" spli
 
 ## 🛠️ Prerequisites
 
-Before you begin, you need a few basic tools installed on your computer:
+Before you begin, you need meet a few requirements:
 
-1. **Terraform:** Download the engine that builds the cloud infrastructure.
-2. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
+1. **Prisma AIRS tenant:** tenant is deplopyed (via software credits)
+2. **Terraform:** Download the engine that builds the cloud infrastructure.
+3. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
    * **For AWS:** Install the AWS CLI and run `aws configure`. 
    * **For GCP:** Install the Google Cloud SDK and run `gcloud auth application-default login`.
-3. **SSH Key (AWS Only):** You must have an Ed25519 SSH key pair generated on your local machine. Terraform will automatically inject this key into the AWS server. If you don't have one, generate it by running:
+4. **SSH Key (AWS Only):** You must have an Ed25519 SSH key pair generated on your local machine. Terraform will automatically inject this key into the AWS server. If you don't have one, generate it by running:
    `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""`
 
 ### 🤖 AI Runtime (API) specific prerequisites
