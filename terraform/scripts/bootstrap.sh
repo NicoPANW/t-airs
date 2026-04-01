@@ -66,22 +66,31 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     done
 
     # Pull multiple models for diverse Red-Teaming
-    echo "Pre-loading LLM models (this may take 3-5 minutes)..."
+    echo "Pre-loading LLM models (this may take 10-15 minutes)..."
     
-    # Only pull if it's missing
-    if ! ollama list | grep -q "llama3"; then
-        ollama pull llama3
-    fi
+    # Define our array of target models
+    MODELS=("llama3" "mistral" "gemma2:9b" "qwen2.5:7b")
 
-    # CRITICAL: Verify model is indexed in the library
-    echo "Verifying model library readiness..."
-    until ollama list | grep -q "llama3"; do
-        echo "Still indexing models... current status:"
-        ollama list
-        sleep 5
+    for model in "${MODELS[@]}"; do
+        # 1. Pull the model if it's missing
+        if ! ollama list | grep -q "$model"; then
+            echo "⬇️ Pulling $model..."
+            ollama pull "$model"
+        else
+            echo "✅ $model is already downloaded."
+        fi
+
+        # 2. CRITICAL: Verify model is fully indexed and ready
+        echo "Verifying $model readiness..."
+        until ollama list | grep -q "$model"; do
+            echo "Still indexing $model... current status:"
+            ollama list
+            sleep 5
+        done
+        echo "🚀 $model is ready to use."
     done
 
-    echo "✅ Ollama is ready with Llama3."
+    echo "✅ All local GPU models are successfully loaded!"
 else
     echo "ENABLE_LOCAL_LLM is false. Skipping GPU drivers and Ollama setup."
 fi
