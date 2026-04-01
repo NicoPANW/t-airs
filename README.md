@@ -17,15 +17,10 @@
 ## ✨ Capabilities of the App
 
 * **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS (using Amazon Bedrock) or GCP (using Vertex AI) with a single variable change.
-* **🏎️ Local GPU Arsenal:** Automatically provisions NVIDIA T4 GPUs, installs CUDA drivers, and spins up a local Ollama engine loaded with:
-  * `Llama 3 (8B)`
-  * `Mistral (7B)`
-  * `Gemma 2 (9B)`
-  * `Qwen 2.5 (7B)`
-  * `DeepSeek-R1 (7B)`
 * **🛡️ Prisma AIRS Integration:** Deep, native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) security scanning.
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 * **🔎 Visual Metadata Trace:** A built-in inspector panel shows you the exact raw JSON decision logic from Prisma AIRS on every single interaction.
+* **🏎️ Local GPU Arsenal:** even though not recommended since far slower than GCP/AWS SAAS models, there is an option to deploy local models
 
 ---
 
