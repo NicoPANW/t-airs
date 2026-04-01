@@ -186,3 +186,27 @@ Check the Google Guest Agent logs to verify how the startup script executed:
 sudo journalctl -u google-startup-scripts.service --no-pager
 curl -H "Metadata-Flavor: Google" [http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script](http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script)
 ```
+
+---
+
+## Model scaning
+
+**1. Add a new target, write down the IP addresses. If required, update the env vars and rerun terraform**
+<img width="1919" height="1080" alt="Screenshot 2026-04-01 at 15 25 11" src="https://github.com/user-attachments/assets/05d4ec73-e676-4c63-b650-d1e0ecd519ec" />
+
+**2. fill in the curl request (to get the curl, connect to the App via Chrome, enable inspection, and then enter a prompt and copy the curl command**
+<img width="1920" height="1080" alt="Screenshot 2026-04-01 at 15 36 54" src="https://github.com/user-attachments/assets/81e03b3e-e4ae-4f38-aeed-dd93b3d3418a" />
+<img width="1819" height="798" alt="Screenshot 2026-04-01 at 16 49 12" src="https://github.com/user-attachments/assets/0e07a45b-b828-4dce-a6fd-91528fbcdcc2" />
+
+**3. it auto-completes, click next**
+<img width="1918" height="1080" alt="Screenshot 2026-04-01 at 15 37 04" src="https://github.com/user-attachments/assets/98f2db22-6a84-4b9c-b035-b5968a556d30" />
+
+**4. Update with "{INPUT}"**
+<img width="1920" height="1080" alt="Screenshot 2026-04-01 at 15 37 27" src="https://github.com/user-attachments/assets/ef2a0e17-993a-447d-a03e-ad80f8375de8" />
+
+**5. Validate it works, then finish completing. Then you will be able to configure scans (make sure to disable in APP UI Prisma AIRS to remove AIRS protection)"**
+<img width="1920" height="1080" alt="Screenshot 2026-04-01 at 15 37 37" src="https://github.com/user-attachments/assets/0e22269c-0697-4fc9-86d5-c64de483638e" />
+<img width="1920" height="1080" alt="Screenshot 2026-04-01 at 15 37 48" src="https://github.com/user-attachments/assets/5f7b61c0-9a93-48ce-909a-4ede5a8130fb" />
+
+
+
