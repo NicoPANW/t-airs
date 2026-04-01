@@ -72,20 +72,20 @@ else
     exit 1
 fi
 
-# 2. Bleeding-Edge Check for Gemini 3.0 (Using v1beta1 API)
-echo "💎 Checking for Gemini 3.0 capability..."
+# 2. Bleeding-Edge Check for Gemini 3.x Preview (Using v1beta1 API)
+echo "💎 Checking for Gemini 3.x capability..."
 G3_FOUND=false
 
-# We loop through the exact same candidates as the Python script
-for model in "gemini-3.0-flash" "gemini-3.0-flash-preview" "gemini-3.0-pro-preview"; do
+# We loop through the exact preview model IDs currently deployed on the Global endpoint
+for model in "gemini-3.1-pro-preview" "gemini-3.1-flash-preview" "gemini-3.0-flash-lite-preview"; do
     G3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
       -X POST "https://aiplatform.googleapis.com/v1beta1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/$model:generateContent" \
       -H "Authorization: Bearer $TOKEN" \
       -H "Content-Type: application/json" \
       -d '{}')
 
-    # 400 Bad Request is success (the model is alive but rejected our empty JSON)
-    if [ "$G3_STATUS" -eq 400 ] || [ "$G3_STATUS" -eq 200 ] || [ "$G3_STATUS" -eq 403 ]; then
+    # 400 Bad Request is success (the model exists but rejected our empty JSON)
+    if [ "$G3_STATUS" -eq 400 ] || [ "$G3_STATUS" -eq 200 ]; then
         echo "✅ SUCCESS: $model access confirmed! Your lab will use the latest models."
         G3_FOUND=true
         break # Stop checking once we find one that works
@@ -93,8 +93,5 @@ for model in "gemini-3.0-flash" "gemini-3.0-flash-preview" "gemini-3.0-pro-previ
 done
 
 if [ "$G3_FOUND" = false ]; then
-    echo "⚠️  NOTE: Gemini 3.0 not detected on Global API. The lab will gracefully fall back to Gemini 2.5."
+    echo "⚠️  NOTE: Gemini 3.x Preview not detected on Global API. The lab will gracefully fall back to Gemini 2.5."
 fi
-
-echo "====================================================="
-echo "✅ GCP Pre-flight completely passed! Ready to deploy."
