@@ -100,11 +100,11 @@ Navigate to the terraform folder, initialize the plugins, and launch the lab!
 ```bash
 cd terraform
 terraform init
-terraform apply -auto-approve
+terraform apply -var="target_cloud=gcp" -auto-approve
 ```
 
 > [!NOTE]  
-> If you enabled the Local LLM (GPU), the server will take about **15-20 minutes** to boot up, install the NVIDIA drivers, and pull the 24GB of local AI models. Grab a coffee!
+> If you enabled the Local LLM (GPU), terraform apply -var="target_cloud=gcp" -var="enable_local_llm=true" -auto-approve, the server will take about **15-20 minutes** to boot up, install the NVIDIA drivers, and pull the 24GB of local AI models. Grab a coffee!
 
 ### Step 5: Access the Lab
 Once Terraform finishes, it will print out the Public IP address of your new server. Open your web browser and go to:
