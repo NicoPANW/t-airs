@@ -192,7 +192,7 @@ curl -H "Metadata-Flavor: Google" [http://metadata.google.internal/computeMetada
 
 ---
 
-## Model scaning
+## Red teaming
 
 **1. Add a new target, write down the IP addresses. If required, update the env vars and rerun terraform**
 <img width="1919" height="1080" alt="Screenshot 2026-04-01 at 15 25 11" src="https://github.com/user-attachments/assets/05d4ec73-e676-4c63-b650-d1e0ecd519ec" />
