@@ -67,20 +67,16 @@ cd t-airs
 Terraform needs to know your environment details. Export them as environment variables in your terminal:
 
 ```bash
-# Required for both clouds:
+# If deploying to AWS:
+export TF_VAR_aws_region="us-east-1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
-export TF_VAR_enable_local_llm="true"
-
-# If deploying to AWS:
-export TF_VAR_target_cloud="aws"
-export TF_VAR_aws_region="us-east-1"
-export TF_VAR_bedrock_model_id="meta.llama3-8b-instruct-v1:0"
 
 # If deploying to GCP:
-export TF_VAR_target_cloud="gcp"
 export TF_VAR_gcp_project_id="your-gcp-project-id"
 export TF_VAR_gcp_region="us-central1"
+export TF_VAR_airs_key="your_prisma_airs_api_key_here"
+export TF_VAR_airs_profile="Your-Profile-Name"
 ```
 
 ### Step 3: Run the Preflight Check
