@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🛫 Starting Pre-Flight Checks for GCP..."
+echo "🛫 Starting Pre-Flight Checks for GCP (Global Mode)..."
 
 # --- 1. GLOBAL CHECKS ---
 if ! command -v terraform &> /dev/null; then
@@ -10,21 +10,17 @@ fi
 
 if [ -z "$TF_VAR_airs_key" ]; then
     echo "❌ ERROR: TF_VAR_airs_key is not set."
-    echo "   Run: export TF_VAR_airs_key='your_prisma_key_here'"
     exit 1
 fi
 
 if [ -z "$TF_VAR_airs_profile" ]; then
     echo "❌ ERROR: TF_VAR_airs_profile is not set."
-    echo "   Run: export TF_VAR_airs_profile='strict_red_team_profile'"
     exit 1
 fi
 
-# --- 2. GCP CHECKS ---
+# --- 2. GCP ENV CHECKS ---
 if [ -z "$TF_VAR_gcp_project_id" ] || [ -z "$TF_VAR_gcp_region" ]; then
-    echo "❌ ERROR: Missing GCP environment variables."
-    echo "   Run: export TF_VAR_gcp_project_id='sase-product-discovery-project'"
-    echo "   Run: export TF_VAR_gcp_region='us-central1'"
+    echo "❌ ERROR: Missing GCP environment variables (Project ID or Region)."
     exit 1
 fi
 
@@ -34,35 +30,37 @@ if ! command -v gcloud &> /dev/null; then
 fi
 
 echo "🔍 Checking GCP Authentication..."
-if ! gcloud auth print-access-token &> /dev/null; then
+TOKEN=$(gcloud auth print-access-token 2>/dev/null)
+if [ -z "$TOKEN" ]; then
     echo "❌ ERROR: Not logged into GCP. Run: gcloud auth application-default login"
     exit 1
 fi
 
-echo "🔍 Checking GCP Compute API..."
-if ! gcloud services list --project="$TF_VAR_gcp_project_id" | grep -q "compute.googleapis.com"; then
-    echo "❌ ERROR: Compute Engine API is not enabled."
-    echo "   Run: gcloud services enable compute.googleapis.com --project=$TF_VAR_gcp_project_id"
-    exit 1
-fi
+echo "🔍 Checking Required APIs..."
+ENABLED_SERVICES=$(gcloud services list --project="$TF_VAR_gcp_project_id" --format="value(config.name)")
 
-echo "🔍 Checking GCP Vertex AI API..."
-if ! gcloud services list --project="$TF_VAR_gcp_project_id" | grep -q "aiplatform.googleapis.com"; then
-    echo "❌ ERROR: Vertex AI API is not enabled."
-    echo "   Run: gcloud services enable aiplatform.googleapis.com --project=$TF_VAR_gcp_project_id"
-    exit 1
-fi
+for api in "compute.googleapis.com" "aiplatform.googleapis.com"; do
+    if [[ ! "$ENABLED_SERVICES" =~ "$api" ]]; then
+        echo "❌ ERROR: $api is not enabled."
+        echo "   Run: gcloud services enable $api --project=$TF_VAR_gcp_project_id"
+        exit 1
+    fi
+done
 
-# --- NEW: REGIONAL MODEL AVAILABILITY CHECK ---
-echo "🔍 Checking Model Availability in $TF_VAR_gcp_region..."
-# We check if the region returns at least one model. 
-# Note: We use 'grep -v "Listed 0 items"' because gcloud returns 0 on empty lists.
-MODEL_COUNT=$(gcloud ai models list --region="$TF_VAR_gcp_region" --project="$TF_VAR_gcp_project_id" --limit=1 2>&1)
+# --- 3. GLOBAL VERTEX AI CONNECTIVITY CHECK ---
+echo "📡 Verifying Global Vertex AI Connectivity..."
 
-if [[ "$MODEL_COUNT" == *"Listed 0 items"* ]]; then
-    echo "❌ ERROR: No Foundation Models found in $TF_VAR_gcp_region."
-    echo "   Some regions often lacks Gemini/Vertex model availability."
-    echo "   Please change your region to 'europe-west1' (Belgium) or 'us-central1' (Iowa)."
+# We "ping" the global Gemini 1.5 Flash endpoint. 
+# A 200 means success. A 403/401 means the endpoint exists but we need full credentials (still a pass).
+# A 404 means the Global endpoint is unreachable.
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X GET "https://aiplatform.googleapis.com/v1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/gemini-1.5-flash" \
+  -H "Authorization: Bearer $TOKEN")
+
+if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 403 ] || [ "$HTTP_STATUS" -eq 401 ]; then
+    echo "✅ Global Vertex AI is reachable."
+else
+    echo "❌ ERROR: Global Vertex AI Endpoint is not responding (Status: $HTTP_STATUS)."
     exit 1
 fi
 
