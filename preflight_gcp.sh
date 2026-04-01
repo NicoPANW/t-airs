@@ -97,7 +97,7 @@ if [ "$G3_FOUND" = false ]; then
 fi
 
 if [ -z "$TF_VAR_prisma_airs_ips" ]; then
-    echo "⚠️  NOTE: TF_VAR_airs_ips is not set. Terraform will use the default AIRS IPs."
+    echo "⚠️  NOTE: TF_VAR_airs_ips is not set. Terraform will use the default AIRS IPs for model scaning inbound connection."
 else
     echo "✅ Dynamic AIRS IPs detected: $TF_VAR_prisma_airs_ips"
 fi
