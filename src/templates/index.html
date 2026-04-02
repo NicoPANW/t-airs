@@ -194,7 +194,7 @@
             }, 2000);
         });
 
-        // Fetch AI Models
+        // Fetch AI Models and populate the dropdown
         async function fetchModels() {
             try {
                 const res = await fetch('/models');
@@ -204,25 +204,34 @@
                 const submitBtn = chatForm.querySelector('button[type="submit"]');
 
                 if (data.models && data.models.length > 0) {
-                    const displayModels = data.models.filter(m => m !== 'auto-router');
-                    select.innerHTML = data.models.map(m => {
+                    // 🌟 THE FIX: Filter out 'auto-router' so it only exists as a toggle
+                    const cleanModels = data.models.filter(m => m !== 'auto-router');
+
+                    select.innerHTML = cleanModels.map(m => {
                         const isLocal = m.startsWith('local-');
                         return `<option value="${m}" class="${isLocal ? 'local-option' : ''}">${isLocal ? '🏠 ' + m + ' (Local)' : '☁️ ' + m}</option>`;
                     }).join('');
-                    select.value = data.models[0];
-                    document.getElementById('engine-tag').innerText = select.value;
                     
-                    msgInput.disabled = false;
-                    submitBtn.disabled = false;
-                    msgInput.placeholder = "Enter attack vector or prompt...";
+                    // Set default selection to the first available real model
+                    if (cleanModels.length > 0) {
+                        select.value = cleanModels[0];
+                        // Update the engine tag if the auto-toggle is currently OFF
+                        if (!document.getElementById('auto-route-toggle').checked) {
+                            document.getElementById('engine-tag').innerText = select.value;
+                        }
+                        msgInput.disabled = false;
+                        submitBtn.disabled = false;
+                        msgInput.placeholder = "Enter attack vector or prompt...";
+                    }
                 } else {
                     select.innerHTML = '<option value="">❌ No Cloud LLMs Detected</option>';
                     document.getElementById('engine-tag').innerText = "OFFLINE";
                     msgInput.disabled = true;
                     submitBtn.disabled = true;
-                    msgInput.placeholder = "Chat disabled: Cloud LLM engine not reachable.";
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error("Failed to fetch models:", e); 
+            }
         }
 
         // Check AIRS Status
