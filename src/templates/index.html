@@ -319,6 +319,9 @@
                 return; 
             }
 
+            const historyToggle = document.getElementById('history-toggle');
+            const historyEnabled = historyToggle ? historyToggle.checked : true;
+
             const msgInput = document.getElementById('msg');
             const message = msgInput.value;
             const persona = document.querySelector('input[name="persona"]:checked').value;
