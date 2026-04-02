@@ -30,7 +30,7 @@ resource "google_compute_instance" "t_airs_node" {
   zone         = "${var.gcp_region}-a"
 
   # DYNAMIC FLAVOR: N1 for GPU, E2 for CPU-only
-  machine_type = var.enable_local_llm ? "n1-standard-4" : "e2-highcpu-2"
+  machine_type = var.enable_local_llm ? "n1-standard-4" : "e2-standard-2"
 
   # DYNAMIC GPU: Only attach the T4 if enable_local_llm is true
   dynamic "guest_accelerator" {
