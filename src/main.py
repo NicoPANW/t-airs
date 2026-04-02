@@ -49,6 +49,10 @@ validated_models = []
 ai_profile_obj = None
 PERSONAS = personas.PERSONAS
 
+# Key: session_id, Value: List of message objects
+SESSION_HISTORY = {}
+MAX_HISTORY = 10
+
 # --- CLIENT INITIALIZATION ---
 # Point the standard OpenAI client at our local LiteLLM Gateway
 llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
@@ -228,7 +232,8 @@ async def chat(
     persona: str = Form("banking"),
     session_id: str = Form("default-session"),
     airs_enabled: bool = Form(False),
-    model_id: str = Form("none")
+    model_id: str = Form("none"),
+    history_enabled: bool = Form(True)
 ):
     selected_prompt = PERSONAS.get(persona, PERSONAS["banking"])
     security_status = "Bypassed"
@@ -260,16 +265,27 @@ async def chat(
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
         # --- 2. RAG CONTEXT RETRIEVAL ---
-        # 🌟 NEW: Unpack the tuple and pass the persona to route to the correct DB!
         rag_context, raw_rag_docs = retrieve_rag_context(message, persona)
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
-        
         system_instruction = f"{selected_prompt}\n{rag_context}"
 
-        # --- 3. AI GATEWAY & MCP TOOL CALLING LOOP ---
-        messages = [{"role": "system", "content": system_instruction}, {"role": "user", "content": message}]
+        # --- 3. SESSION HISTORY & MESSAGE BUILDING ---
+        # 🌟 NEW: Check if history is enabled to build the conversation chain
+        if history_enabled:
+            if session_id not in SESSION_HISTORY:
+                SESSION_HISTORY[session_id] = []
+            
+            # Record user input in history
+            SESSION_HISTORY[session_id].append({"role": "user", "content": message})
+            current_context = SESSION_HISTORY[session_id]
+        else:
+            # Stateless mode: just current prompt
+            current_context = [{"role": "user", "content": message}]
 
-        # Call the AI Gateway
+        # Final payload: System Prompt + History (or single message)
+        messages = [{"role": "system", "content": system_instruction}] + current_context
+
+        # --- 4. AI GATEWAY & MCP TOOL CALLING LOOP ---
         response = await llm_client.chat.completions.create(
             model=model_id,
             messages=messages,
@@ -277,22 +293,15 @@ async def chat(
             temperature=0.7
         )
         
-        # --- START REPLACEMENT BLOCK ---
-        # 🌟 NEW: Reach into the hidden 'model' field provided by LiteLLM
-        # If it's a routed call, LiteLLM stores the ACTUAL worker model here
+        # Extract true model from Gateway
         actual_model = getattr(response, "model", model_id)
-        
-        # Sometimes the Gateway returns the alias at the top level, 
-        # so we check the choice-level metadata if it exists.
         if actual_model == "auto-router":
-            # Fallback to a string so the UI doesn't say 'auto-router ➔ auto-router'
             actual_model = "gemini-2.5-flash-lite" 
 
         if model_id == "auto-router":
             architecture_trace["ai_gateway"]["routed_to"] = f"auto-router ➔ {actual_model}"
         else:
             architecture_trace["ai_gateway"]["routed_to"] = actual_model
-        # --- END REPLACEMENT BLOCK ---
         
         response_msg = response.choices[0].message
 
@@ -308,7 +317,6 @@ async def chat(
                 
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": db_output})
                 
-                # 🌟 NEW: Record exactly what the AI did in the database for the UI
                 architecture_trace["mcp_execution"].append({
                     "tool": tool_name,
                     "arguments": tool_args,
@@ -324,7 +332,7 @@ async def chat(
         else:
             bot_response = response_msg.content
 
-        # --- 4. EGRESS SCAN ---
+        # --- 5. EGRESS SCAN ---
         if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
             out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=bot_response))
             out_res_data = out_scan_response.to_dict()
@@ -332,12 +340,20 @@ async def chat(
             
             if str(out_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ Prisma AIRS Blocked Output: The LLM generated a {out_data.get('category', 'Policy')} violation."
+                # 💡 Return without saving the response to history if it was blocked
                 return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "EGRESS BLOCK", "raw_response": json.dumps(out_data, indent=2), "trace": architecture_trace}}
             
             security_status = "Passed Input & Output"
             raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
 
-        # 🌟 NEW: Return the new trace data in the logs object!
+        # --- 6. PERSIST HISTORY ---
+        # 🌟 NEW: If not blocked, save assistant's reply to history
+        if history_enabled:
+            SESSION_HISTORY[session_id].append({"role": "assistant", "content": bot_response})
+            # Keep history under control
+            if len(SESSION_HISTORY[session_id]) > 10:
+                SESSION_HISTORY[session_id] = SESSION_HISTORY[session_id][-10:]
+
         return {"bot": bot_response, "output": bot_response, "logs": {"security_scan": security_status, "raw_response": raw_sec_log, "trace": architecture_trace}}
 
     except Exception as e:
