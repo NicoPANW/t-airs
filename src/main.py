@@ -341,8 +341,17 @@ async def chat(
             
             if str(out_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ Prisma AIRS Blocked Output: The LLM generated a {out_data.get('category', 'Policy')} violation."
-                # 💡 Return without saving the response to history if it was blocked
-                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "EGRESS BLOCK", "raw_response": json.dumps(out_data, indent=2), "trace": architecture_trace}}
+                
+                return {
+                    "bot": block_txt, 
+                    "output": block_txt, 
+                    "logs": {
+                        "security_scan": "EGRESS BLOCK", 
+                        "raw_response": json.dumps(out_data, indent=2), 
+                        "trace": architecture_trace,
+                        "intercepted_text": bot_response  # <--- Added this line
+                    }
+                }
             
             security_status = "Passed Input & Output"
             raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
