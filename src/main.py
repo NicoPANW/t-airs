@@ -21,6 +21,7 @@ from mcp.client.stdio import stdio_client
 # 🌟 3. RAG Imports (For Unstructured Data)
 import chromadb
 from sentence_transformers import SentenceTransformer
+from rag_data import RAG_KNOWLEDGE_BASE
 
 # Prisma AIRS Imports
 import aisecurity
