@@ -342,34 +342,33 @@
                     let traceHtml = "";
                     if (data.logs.trace) {
                         
-                        // 1. AI Gateway Trace
-                        if (data.logs.trace.ai_gateway && data.logs.trace.ai_gateway.routed_to) {
-                            traceHtml += `
-                                <div class="mt-2 border-t border-slate-700/50 pt-2">
-                                    <div class="text-[9px] text-blue-400 font-bold mb-1 uppercase tracking-tighter italic">🚦 AI Gateway Routing:</div>
-                                    <div class="bg-black/60 p-2 rounded text-[9px] text-blue-300 border border-slate-800">Routed payload to: <b>${data.logs.trace.ai_gateway.routed_to}</b></div>
-                                </div>`;
-                        }
-
-                        // 2. RAG Pipeline Trace
+                        // 1. RAG Pipeline Trace (Happens first to build the prompt)
                         if (data.logs.trace.rag_pipeline && data.logs.trace.rag_pipeline.chunks_injected && data.logs.trace.rag_pipeline.chunks_injected.length > 0) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
-                                    <div class="text-[9px] text-purple-400 font-bold mb-1 uppercase tracking-tighter italic">📚 RAG Pipeline Context Injected:</div>
+                                    <div class="text-[9px] text-purple-400 font-bold mb-1 uppercase tracking-tighter italic">📚 1. RAG Pipeline (Context Retrieved):</div>
                                     <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-purple-300 border border-slate-800 leading-tight">${JSON.stringify(data.logs.trace.rag_pipeline.chunks_injected, null, 2)}</pre>
                                 </div>`;
                         }
 
-                        // 3. MCP Tool Execution Trace
+                        // 2. AI Gateway Trace (Routes the augmented prompt)
+                        if (data.logs.trace.ai_gateway && data.logs.trace.ai_gateway.routed_to) {
+                            traceHtml += `
+                                <div class="mt-2 border-t border-slate-700/50 pt-2">
+                                    <div class="text-[9px] text-blue-400 font-bold mb-1 uppercase tracking-tighter italic">🚦 2. AI Gateway (Model Routed):</div>
+                                    <div class="bg-black/60 p-2 rounded text-[9px] text-blue-300 border border-slate-800">Routed payload to: <b>${data.logs.trace.ai_gateway.routed_to}</b></div>
+                                </div>`;
+                        }
+
+                        // 3. MCP Tool Execution Trace (LLM queries the DB)
                         if (data.logs.trace.mcp_execution && data.logs.trace.mcp_execution.length > 0) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
-                                    <div class="text-[9px] text-teal-400 font-bold mb-1 uppercase tracking-tighter italic">🔌 MCP Database Execution:</div>
+                                    <div class="text-[9px] text-teal-400 font-bold mb-1 uppercase tracking-tighter italic">🔌 3. MCP Execution (Tool Called):</div>
                                     <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-teal-300 border border-slate-800 leading-tight">${JSON.stringify(data.logs.trace.mcp_execution, null, 2)}</pre>
                                 </div>`;
                         }
                     }
-
                     // --- ASSEMBLE FULL LOG PANEL ---
                     const logHtml = `
                         <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${borderColor} transition-all hover:bg-slate-800/60">
@@ -377,16 +376,18 @@
                                 <span>SESSION: ${sessionId.toUpperCase()}</span>
                                 <span>${new Date().toLocaleTimeString()}</span>
                             </div>
-                            <div class="mb-3">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}">
-                                    Prisma AIRS status: ${statusText}
-                                </span>
-                            </div>
                             
                             ${traceHtml}
 
                             <div class="mt-2 border-t border-slate-700/50 pt-2">
-                                <div class="text-[9px] text-green-400 font-bold mb-1 uppercase tracking-tighter italic">🛡️ Prisma AIRS Raw Validation:</div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-[9px] font-bold uppercase tracking-tighter italic ${statusText.includes('BLOCK') ? 'text-red-400' : 'text-green-400'}">
+                                        🛡️ 4. Prisma AIRS Security Scan
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[9px] font-bold ${badgeColor} shadow-sm">
+                                        ${statusText}
+                                    </span>
+                                </div>
                                 <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${data.logs.raw_response}</pre>
                             </div>
                         </div>`;
