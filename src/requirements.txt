@@ -9,3 +9,4 @@ litellm[proxy]
 mcp
 chromadb
 sentence-transformers
+mcp-server-sqlite
