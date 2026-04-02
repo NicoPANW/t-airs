@@ -52,7 +52,7 @@ Before you begin, you need meet a few requirements:
 
 Below shows to define the Prisma AIRS profile and API key.
 
-**1. Create a security profile**
+**1. Create a security profile (this name will be required foar passing as env parameter)**
 <img width="1847" height="840" alt="Screenshot 2026-04-01 at 16 15 41" src="https://github.com/user-attachments/assets/6b1d96a3-74cf-43b7-9cce-783824087118" />
 
 **2. Create an App**
