@@ -269,12 +269,20 @@ async def chat(
         # --- 3. AI GATEWAY & MCP TOOL CALLING LOOP ---
         messages = [{"role": "system", "content": system_instruction}, {"role": "user", "content": message}]
 
+        # Call the AI Gateway
         response = await llm_client.chat.completions.create(
             model=model_id,
             messages=messages,
             tools=openai_tools if openai_tools else None,
             temperature=0.7
         )
+        
+        # 🌟 NEW: Extract the exact model chosen by the Gateway's routing engine
+        actual_model = response.model
+        if model_id == "auto-router":
+            architecture_trace["ai_gateway"]["routed_to"] = f"auto-router ➔ {actual_model}"
+        else:
+            architecture_trace["ai_gateway"]["routed_to"] = actual_model
         
         response_msg = response.choices[0].message
 
