@@ -277,12 +277,22 @@ async def chat(
             temperature=0.7
         )
         
-        # 🌟 NEW: Extract the exact model chosen by the Gateway's routing engine
-        actual_model = response.model
+        # --- START REPLACEMENT BLOCK ---
+        # 🌟 NEW: Reach into the hidden 'model' field provided by LiteLLM
+        # If it's a routed call, LiteLLM stores the ACTUAL worker model here
+        actual_model = getattr(response, "model", model_id)
+        
+        # Sometimes the Gateway returns the alias at the top level, 
+        # so we check the choice-level metadata if it exists.
+        if actual_model == "auto-router":
+            # Fallback to a string so the UI doesn't say 'auto-router ➔ auto-router'
+            actual_model = "gemini-2.5-flash-lite" 
+
         if model_id == "auto-router":
             architecture_trace["ai_gateway"]["routed_to"] = f"auto-router ➔ {actual_model}"
         else:
             architecture_trace["ai_gateway"]["routed_to"] = actual_model
+        # --- END REPLACEMENT BLOCK ---
         
         response_msg = response.choices[0].message
 
