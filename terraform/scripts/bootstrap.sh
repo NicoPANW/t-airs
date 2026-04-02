@@ -68,7 +68,7 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     # Pull multiple models for diverse Red-Teaming
     echo "Pre-loading LLM models (this may take 10-15 minutes)..."
     
-    # Define our array of target models
+    # Define our array of target models (using $$ to escape Terraform interpolation)
     MODELS=("llama3" "mistral" "gemma2:9b" "qwen2.5:7b" "deepseek-r1:7b")
 
     for model in "$${MODELS[@]}"; do
@@ -97,7 +97,7 @@ fi
 # ==========================================
 
 
-# --- 3. Deploy Application Code ---
+# --- 3. Deploy Application Code & AI Gateway ---
 mkdir -p /opt/t-airs
 git clone https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
@@ -106,34 +106,83 @@ cd /opt/t-airs
 python3 -m venv venv
 source venv/bin/activate
 pip3 install -r /opt/t-airs/src/requirements.txt
+# Install the AI Gateway!
+pip3 install 'litellm[proxy]' openai
 
-# --- 4. Create Systemd Service for Auto-Start ---
-# Conditionally set the service dependencies
-if [ "${enable_local_llm}" == "true" ]; then
-    SYSTEMD_AFTER="network.target ollama.service"
-else
-    SYSTEMD_AFTER="network.target"
+# --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
+echo "Building LiteLLM routing configuration..."
+cat <<EOF > /opt/t-airs/src/litellm_config.yaml
+model_list:
+EOF
+
+# Inject GCP Models if deploying to Google
+if [ "${target_cloud}" == "gcp" ]; then
+cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+  - model_name: gemini-3.1-pro-preview
+    litellm_params:
+      model: vertex_ai/gemini-3.1-pro-preview
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: vertex_ai/gemini-2.5-flash
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+EOF
+# Inject AWS Models if deploying to Amazon
+elif [ "${target_cloud}" == "aws" ]; then
+cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+  - model_name: ${bedrock_model_id}
+    litellm_params:
+      model: bedrock/${bedrock_model_id}
+      aws_region_name: "${aws_region}"
+EOF
 fi
 
-# 1. Write the top half of the systemd file
-cat <<EOF > /etc/systemd/system/t-airs.service
+# Inject Local Models if GPU is enabled
+if [ "${enable_local_llm}" == "true" ]; then
+cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+  - model_name: local-llama3
+    litellm_params:
+      model: ollama/llama3
+      api_base: "http://localhost:11434"
+  - model_name: local-mistral
+    litellm_params:
+      model: ollama/mistral
+      api_base: "http://localhost:11434"
+  - model_name: local-gemma2:9b
+    litellm_params:
+      model: ollama/gemma2:9b
+      api_base: "http://localhost:11434"
+  - model_name: local-qwen2.5:7b
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: "http://localhost:11434"
+  - model_name: local-deepseek-r1:7b
+    litellm_params:
+      model: ollama/deepseek-r1:7b
+      api_base: "http://localhost:11434"
+EOF
+fi
+
+# Close out the YAML
+cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+litellm_settings:
+  drop_params: true
+EOF
+
+
+# --- 4. Create Systemd Services ---
+
+# A. Create the AI Gateway Service
+cat <<EOF > /etc/systemd/system/litellm.service
 [Unit]
-Description=T-AIRS Red-Team Lab Engine
-After=$SYSTEMD_AFTER
+Description=LiteLLM AI Gateway
+After=network.target
 
 [Service]
 WorkingDirectory=/opt/t-airs/src
-EOF
-
-# 2. Safely append the exact ExecStart line using Terraform variables natively
-if [ "${target_cloud}" == "aws" ]; then
-    echo "ExecStart=/opt/t-airs/venv/bin/python3 main.py --target-cloud aws --aws-region ${aws_region} --bedrock-model-id ${bedrock_model_id} --airs-key ${airs_key} --airs-profile ${airs_profile} --local-llm ${enable_local_llm}" >> /etc/systemd/system/t-airs.service
-else
-    echo "ExecStart=/opt/t-airs/venv/bin/python3 main.py --target-cloud gcp --gcp-project ${gcp_project} --gcp-region ${gcp_region} --airs-key ${airs_key} --airs-profile ${airs_profile} --local-llm ${enable_local_llm}" >> /etc/systemd/system/t-airs.service
-fi
-
-# 3. Write the bottom half of the file
-cat <<EOF >> /etc/systemd/system/t-airs.service
+ExecStart=/opt/t-airs/venv/bin/litellm --config litellm_config.yaml --port 4000
 Restart=always
 User=root
 
@@ -141,6 +190,33 @@ User=root
 WantedBy=multi-user.target
 EOF
 
+# B. Create the T-AIRS App Service
+# We conditionally add ollama.service dependency if local LLMs are enabled
+if [ "${enable_local_llm}" == "true" ]; then
+    TAIRS_AFTER="network.target litellm.service ollama.service"
+else
+    TAIRS_AFTER="network.target litellm.service"
+fi
+
+cat <<EOF > /etc/systemd/system/t-airs.service
+[Unit]
+Description=T-AIRS Red-Team Lab Engine
+After=$TAIRS_AFTER
+
+[Service]
+WorkingDirectory=/opt/t-airs/src
+# The Python app is now entirely cloud-agnostic, passing only the Prisma keys and Gateway URL
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://localhost:4000
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# --- 5. Start Services ---
 systemctl daemon-reload
+systemctl enable litellm
+systemctl start litellm
 systemctl enable t-airs
 systemctl start t-airs
