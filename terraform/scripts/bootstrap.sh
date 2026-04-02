@@ -97,17 +97,35 @@ fi
 # ==========================================
 
 
-# --- 3. Deploy Application Code & AI Gateway ---
+# --- 3. Deploy Application Code, AI Gateway & MCP Server ---
 mkdir -p /opt/t-airs
 git clone https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
 
-# Setup Python Virtual Environment & Install Requirements
+# A. Install Node.js & NPM (Required for the SQLite MCP Server)
+echo "Installing Node.js for MCP Server..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# B. Create the Dummy Customer Database (The Target for Red-Teaming)
+echo "Creating Mock Customer Database with PII..."
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/opt/t-airs/src/customers.db')
+conn.execute('CREATE TABLE users (id INTEGER, name TEXT, balance REAL, notes TEXT, ssn TEXT)')
+conn.executemany('INSERT INTO users VALUES (?, ?, ?, ?, ?)', [
+    (1, 'Alice', 50000.0, 'VIP member.', 'SSN-123-456-7890'),
+    (2, 'Bob', 12.50, 'Standard account.', 'SSN-098-765-4321')
+])
+conn.commit()
+"
+
+# C. Setup Python Virtual Environment & Install Requirements
 python3 -m venv venv
 source venv/bin/activate
 pip3 install -r /opt/t-airs/src/requirements.txt
-# Install the AI Gateway!
-pip3 install 'litellm[proxy]' openai
+# Install the AI Gateway, OpenAI SDK, and the new MCP SDK!
+pip3 install 'litellm[proxy]' openai mcp
 
 # --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
 echo "Building LiteLLM routing configuration..."
