@@ -102,11 +102,6 @@ mkdir -p /opt/t-airs
 git clone https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
 
-# A. Install Node.js & NPM (Required for the SQLite MCP Server)
-echo "Installing Node.js for MCP Server..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
 # B. Create the Dummy Customer Database (Target for MCP Red-Teaming)
 echo "Dynamically Generating Mock Customer Database with 10x PII..."
 python3 -c "
