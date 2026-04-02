@@ -195,6 +195,7 @@ EOF
 # Inject GCP Models if deploying to Google
 if [ "${target_cloud}" == "gcp" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+  # --- EXPLICIT MODELS (For the manual UI dropdown) ---
   - model_name: gemini-3.1-pro-preview
     litellm_params:
       model: vertex_ai/gemini-3.1-pro-preview
@@ -221,6 +222,38 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       vertex_project: "${gcp_project}"
       vertex_location: "global"
   - model_name: gemini-2.5-flash-lite
+    litellm_params:
+      model: vertex_ai/gemini-2.5-flash-lite
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+
+  # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
+  - model_name: auto-router
+    litellm_params:
+      model: vertex_ai/gemini-3.1-pro-preview
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: auto-router
+    litellm_params:
+      model: vertex_ai/gemini-3.1-flash-preview
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: auto-router
+    litellm_params:
+      model: vertex_ai/gemini-3.1-flash-lite-preview
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: auto-router
+    litellm_params:
+      model: vertex_ai/gemini-2.5-pro
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: auto-router
+    litellm_params:
+      model: vertex_ai/gemini-2.5-flash
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: auto-router
     litellm_params:
       model: vertex_ai/gemini-2.5-flash-lite
       vertex_project: "${gcp_project}"
