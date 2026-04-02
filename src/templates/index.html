@@ -397,6 +397,27 @@
             }
         };
 
+        // Auto-Router Toggle Logic
+        const autoToggle = document.getElementById('auto-route-toggle');
+        const manualContainer = document.getElementById('manual-model-container');
+        const autoContainer = document.getElementById('auto-model-container');
+        const engineTag = document.getElementById('engine-tag');
+
+        autoToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                // Turn Auto ON
+                manualContainer.classList.add('hidden');
+                autoContainer.classList.remove('hidden');
+                engineTag.innerHTML = '<i data-lucide="zap" class="w-3 h-3 text-blue-500"></i> AUTO-ROUTING';
+            } else {
+                // Turn Auto OFF
+                manualContainer.classList.remove('hidden');
+                autoContainer.classList.add('hidden');
+                engineTag.innerText = document.getElementById('model-select').value;
+            }
+            lucide.createIcons();
+        });
+
         window.addEventListener('DOMContentLoaded', () => {
             fetchModels();
             checkAirsHealth();
