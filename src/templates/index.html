@@ -287,7 +287,8 @@
         // Chat Submit
         chatForm.onsubmit = async (e) => {
             e.preventDefault();
-            const modelId = document.getElementById('model-select').value;
+            const isAuto = document.getElementById('auto-route-toggle').checked;
+            const modelId = isAuto ? "auto-router" : document.getElementById('model-select').value;
             
             if (!modelId) {
                 appendMessage('bot', "⚠️ Cannot send message: No AI engine is currently available.");
