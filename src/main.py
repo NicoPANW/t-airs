@@ -262,8 +262,6 @@ async def chat(
         
         # We instruct the AI to actively use its MCP tools and RAG data
         system_instruction = f"{selected_prompt}\n{rag_context}"
-{rag_context}
-You also have access to a SQL database via your tools. Always query the database to find facts instead of guessing."""
 
         # =================================================================
         # STAGE 3: AI GATEWAY & MCP TOOL CALLING LOOP
