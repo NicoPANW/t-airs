@@ -235,14 +235,19 @@ async def chat(
     raw_sec_log = "{}"
     ingress_data = {}
     
+    # 🌟 NEW: Initialize the Trace Dictionary for the UI Sidebar
+    architecture_trace = {
+        "ai_gateway": {"routed_to": model_id},
+        "rag_pipeline": {"chunks_injected": []},
+        "mcp_execution": []
+    }
+    
     if not model_id or model_id == "none":
         model_id = validated_models[0] if validated_models else None
+        architecture_trace["ai_gateway"]["routed_to"] = model_id
 
     try:
-        # =================================================================
-        # STAGE 1: INGRESS SECURITY SCAN
-        # Check if the user is attempting Prompt Injection before we do anything
-        # =================================================================
+        # --- 1. INGRESS SCAN ---
         if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
             scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message))
             res_data = scan_response.to_dict()
@@ -250,28 +255,20 @@ async def chat(
             
             if str(ingress_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ Prisma AIRS Blocked Input: {ingress_data.get('category', 'Policy')} violation."
-                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK", "raw_response": json.dumps(ingress_data, indent=2)}}
+                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK", "raw_response": json.dumps(ingress_data, indent=2), "trace": architecture_trace}}
             security_status = "Passed Input"
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
-        # =================================================================
-        # STAGE 2: RAG CONTEXT RETRIEVAL
-        # Fetch relevant secret documents to append to the system prompt
-        # =================================================================
-        rag_context = retrieve_rag_context(message)
+        # --- 2. RAG CONTEXT RETRIEVAL ---
+        # 🌟 NEW: Unpack the tuple to get the raw docs for the UI
+        rag_context, raw_rag_docs = retrieve_rag_context(message)
+        architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         
-        # We instruct the AI to actively use its MCP tools and RAG data
         system_instruction = f"{selected_prompt}\n{rag_context}"
 
-        # =================================================================
-        # STAGE 3: AI GATEWAY & MCP TOOL CALLING LOOP
-        # =================================================================
-        messages = [
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": message}
-        ]
+        # --- 3. AI GATEWAY & MCP TOOL CALLING LOOP ---
+        messages = [{"role": "system", "content": system_instruction}, {"role": "user", "content": message}]
 
-        # Call the AI Gateway
         response = await llm_client.chat.completions.create(
             model=model_id,
             messages=messages,
@@ -281,28 +278,25 @@ async def chat(
         
         response_msg = response.choices[0].message
 
-        # Does the AI want to query the SQLite Database?
         if response_msg.tool_calls:
             messages.append(response_msg) 
             
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
-                print(f"🤖 AI executing tool: {tool_name} with args {tool_args}")
                 
-                # Execute the SQL Query via the MCP Server!
                 mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
                 db_output = mcp_result.content[0].text
                 
-                # Append the DB output back to the chat history
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": tool_name,
-                    "content": db_output
+                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": db_output})
+                
+                # 🌟 NEW: Record exactly what the AI did in the database for the UI
+                architecture_trace["mcp_execution"].append({
+                    "tool": tool_name,
+                    "arguments": tool_args,
+                    "database_result": db_output
                 })
 
-            # Call the AI Gateway ONE MORE TIME so it can summarize the Database output
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
@@ -312,10 +306,7 @@ async def chat(
         else:
             bot_response = response_msg.content
 
-        # =================================================================
-        # STAGE 4: EGRESS SECURITY SCAN
-        # Ensure the AI didn't leak PII (from the DB) or Passwords (from RAG)
-        # =================================================================
+        # --- 4. EGRESS SCAN ---
         if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
             out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=bot_response))
             out_res_data = out_scan_response.to_dict()
@@ -323,15 +314,16 @@ async def chat(
             
             if str(out_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ Prisma AIRS Blocked Output: The LLM generated a {out_data.get('category', 'Policy')} violation."
-                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "EGRESS BLOCK", "raw_response": json.dumps(out_data, indent=2)}}
+                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "EGRESS BLOCK", "raw_response": json.dumps(out_data, indent=2), "trace": architecture_trace}}
             
             security_status = "Passed Input & Output"
             raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
 
-        return {"bot": bot_response, "output": bot_response, "logs": {"security_scan": security_status, "raw_response": raw_sec_log}}
+        # 🌟 NEW: Return the new trace data in the logs object!
+        return {"bot": bot_response, "output": bot_response, "logs": {"security_scan": security_status, "raw_response": raw_sec_log, "trace": architecture_trace}}
 
     except Exception as e:
-        return {"bot": f"Error: {str(e)}", "output": f"Error: {str(e)}", "logs": {"security_scan": "Error", "raw_response": raw_sec_log}}
+        return {"bot": f"Error: {str(e)}", "output": f"Error: {str(e)}", "logs": {"security_scan": "Error", "raw_response": raw_sec_log, "trace": architecture_trace}}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
