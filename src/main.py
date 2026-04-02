@@ -328,9 +328,10 @@ async def chat(
                 messages=messages,
                 temperature=0.7
             )
-            bot_response = final_response.choices[0].message.content
+            bot_response = final_response.choices[0].message.content or ""
         else:
-            bot_response = response_msg.content
+            bot_response = response_msg.content or ""
+
 
         # --- 5. EGRESS SCAN ---
         if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
