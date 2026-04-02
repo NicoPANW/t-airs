@@ -79,6 +79,20 @@
                 </div>
             </div>
 
+            <div class="sidebar-section">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="history" class="w-3.5 h-3.5 text-blue-400"></i>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Session History</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer" title="Keep conversation context">
+                        <input type="checkbox" id="history-toggle" class="sr-only peer" checked>
+                        <div class="w-8 h-4 bg-slate-700 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4 shadow-sm"></div>
+                    </label>
+                </div>
+                <p class="text-[9px] text-slate-500 mt-2 italic leading-tight">When enabled, the AI remembers previous messages in this session.</p>
+            </div>
+
             <div class="sidebar-section flex-1 flex flex-col min-h-0 mb-4">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
@@ -323,7 +337,7 @@
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: new URLSearchParams({
                         'message': message, 'persona': persona, 'session_id': sessionId,
-                        'airs_enabled': airsEnabled, 'model_id': modelId
+                        'airs_enabled': airsEnabled, 'model_id': modelId, 'history_enabled': historyEnabled
                     })
                 });
                 const data = await res.json();
