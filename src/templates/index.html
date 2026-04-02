@@ -123,8 +123,8 @@
 
     <aside id="log-panel" class="w-[500px] bg-slate-900 flex flex-col border-l border-slate-800 log-hidden shadow-2xl">
         <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest italic">Prisma AIRS Metadata Trace</h3>
-            <button onclick="document.getElementById('log-container').innerHTML=''" class="text-[10px] text-slate-500 hover:text-white uppercase font-bold">Clear</button>
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest italic">Architecture Observability Trace</h3>
+            <button onclick="document.getElementById('log-container').innerHTML=''" class="text-[10px] text-slate-500 hover:text-white uppercase font-bold transition">Clear</button>
         </div>
         <div id="log-container" class="flex-1 overflow-y-auto p-4 font-mono text-[10px] space-y-4"></div>
     </aside>
@@ -177,7 +177,7 @@
             }, 2000);
         });
 
-        // Fetch AI Models (With robust offline handling)
+        // Fetch AI Models
         async function fetchModels() {
             try {
                 const res = await fetch('/models');
@@ -233,7 +233,7 @@
         document.querySelectorAll('input[name="persona"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 const val = e.target.value;
-                updatePersonaDisplay(val); // Load new context into the giant text box
+                updatePersonaDisplay(val);
             });
         });
 
@@ -319,10 +319,43 @@
                         badgeColor = "bg-green-900/50 text-green-400";
                     }
 
+                    // --- NEW OBSERVABILITY TRACE BUILDER ---
+                    let traceHtml = "";
+                    if (data.logs.trace) {
+                        
+                        // 1. AI Gateway Trace
+                        if (data.logs.trace.ai_gateway && data.logs.trace.ai_gateway.routed_to) {
+                            traceHtml += `
+                                <div class="mt-2 border-t border-slate-700/50 pt-2">
+                                    <div class="text-[9px] text-blue-400 font-bold mb-1 uppercase tracking-tighter italic">🚦 AI Gateway Routing:</div>
+                                    <div class="bg-black/60 p-2 rounded text-[9px] text-blue-300 border border-slate-800">Routed payload to: <b>${data.logs.trace.ai_gateway.routed_to}</b></div>
+                                </div>`;
+                        }
+
+                        // 2. RAG Pipeline Trace
+                        if (data.logs.trace.rag_pipeline && data.logs.trace.rag_pipeline.chunks_injected && data.logs.trace.rag_pipeline.chunks_injected.length > 0) {
+                            traceHtml += `
+                                <div class="mt-2 border-t border-slate-700/50 pt-2">
+                                    <div class="text-[9px] text-purple-400 font-bold mb-1 uppercase tracking-tighter italic">📚 RAG Pipeline Context Injected:</div>
+                                    <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-purple-300 border border-slate-800 leading-tight">${JSON.stringify(data.logs.trace.rag_pipeline.chunks_injected, null, 2)}</pre>
+                                </div>`;
+                        }
+
+                        // 3. MCP Tool Execution Trace
+                        if (data.logs.trace.mcp_execution && data.logs.trace.mcp_execution.length > 0) {
+                            traceHtml += `
+                                <div class="mt-2 border-t border-slate-700/50 pt-2">
+                                    <div class="text-[9px] text-teal-400 font-bold mb-1 uppercase tracking-tighter italic">🔌 MCP Database Execution:</div>
+                                    <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-teal-300 border border-slate-800 leading-tight">${JSON.stringify(data.logs.trace.mcp_execution, null, 2)}</pre>
+                                </div>`;
+                        }
+                    }
+
+                    // --- ASSEMBLE FULL LOG PANEL ---
                     const logHtml = `
                         <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${borderColor} transition-all hover:bg-slate-800/60">
                             <div class="flex justify-between text-[9px] text-blue-400 mb-2 border-b border-slate-700/50 pb-1 font-bold">
-                                <span>MODEL: ${modelId.toUpperCase()}</span>
+                                <span>SESSION: ${sessionId.toUpperCase()}</span>
                                 <span>${new Date().toLocaleTimeString()}</span>
                             </div>
                             <div class="mb-3">
@@ -330,8 +363,13 @@
                                     Prisma AIRS status: ${statusText}
                                 </span>
                             </div>
-                            <div class="text-[9px] text-green-400 font-bold mb-1 uppercase tracking-tighter italic">Prisma AIRS Raw Trace:</div>
-                            <pre class="bg-black/60 p-3 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${data.logs.raw_response}</pre>
+                            
+                            ${traceHtml}
+
+                            <div class="mt-2 border-t border-slate-700/50 pt-2">
+                                <div class="text-[9px] text-green-400 font-bold mb-1 uppercase tracking-tighter italic">🛡️ Prisma AIRS Raw Validation:</div>
+                                <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${data.logs.raw_response}</pre>
+                            </div>
                         </div>`;
                     
                     logContainer.insertAdjacentHTML('afterbegin', logHtml);
