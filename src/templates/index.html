@@ -440,6 +440,15 @@
                                         ${statusText}
                                     </span>
                                 </div>
+                                
+                                ${data.logs.intercepted_text ? `
+                                <div class="mb-2">
+                                    <div class="text-[8px] text-red-400 uppercase font-bold mb-1 flex items-center gap-1">
+                                        <i data-lucide="shield-alert" class="w-2.5 h-2.5"></i> Intercepted Payload:
+                                    </div>
+                                    <div class="bg-red-950/40 p-2 rounded text-[9px] text-red-200 border border-red-900/50 max-h-32 overflow-y-auto whitespace-pre-wrap">${data.logs.intercepted_text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                                </div>` : ""}
+
                                 <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${data.logs.raw_response}</pre>
                             </div>
                         </div>`;
