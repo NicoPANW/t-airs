@@ -204,6 +204,7 @@
                 const submitBtn = chatForm.querySelector('button[type="submit"]');
 
                 if (data.models && data.models.length > 0) {
+                    const displayModels = data.models.filter(m => m !== 'auto-router');
                     select.innerHTML = data.models.map(m => {
                         const isLocal = m.startsWith('local-');
                         return `<option value="${m}" class="${isLocal ? 'local-option' : ''}">${isLocal ? '🏠 ' + m + ' (Local)' : '☁️ ' + m}</option>`;
