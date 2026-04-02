@@ -351,12 +351,38 @@
                     let traceHtml = "";
                     if (data.logs.trace) {
                         
-                        // 1. RAG Pipeline Trace (Happens first to build the prompt)
-                        if (data.logs.trace.rag_pipeline && data.logs.trace.rag_pipeline.chunks_injected && data.logs.trace.rag_pipeline.chunks_injected.length > 0) {
+                        // 1. RAG Pipeline Status Flag
+                        if (data.logs.trace.rag_pipeline) {
+                            const chunks = data.logs.trace.rag_pipeline.chunks_injected || [];
+                            const hasContext = chunks.length > 0;
+                            
+                            // Calculate total characters to show "weight" of the data
+                            const totalChars = chunks.join("").length;
+
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
-                                    <div class="text-[9px] text-purple-400 font-bold mb-1 uppercase tracking-tighter italic">📚 1. RAG Pipeline (Context Retrieved):</div>
-                                    <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-purple-300 border border-slate-800 leading-tight">${JSON.stringify(data.logs.trace.rag_pipeline.chunks_injected, null, 2)}</pre>
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-[9px] text-purple-400 font-bold uppercase tracking-tighter italic">
+                                            📚 1. RAG Grounding Status:
+                                        </div>
+                                        <span class="px-1.5 py-0.5 rounded text-[8px] font-bold ${hasContext ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-slate-700 text-slate-500'}">
+                                            ${hasContext ? '✅ CONTEXT INJECTED' : '⚪ NO DATA FOUND'}
+                                        </span>
+                                    </div>
+                                    ${hasContext ? `
+                                        <div class="mt-1 flex gap-2">
+                                            <div class="text-[8px] text-slate-500 uppercase font-mono">Size: ${totalChars} chars</div>
+                                            <div class="text-[8px] text-slate-500 uppercase font-mono">Chunks: ${chunks.length}</div>
+                                        </div>
+                                        <details class="mt-1 group">
+                                            <summary class="text-[8px] text-slate-600 hover:text-purple-400 cursor-pointer list-none flex items-center gap-1">
+                                                <i data-lucide="eye" class="w-2 h-2"></i> Peek at injected data...
+                                            </summary>
+                                            <pre class="mt-1 bg-black/40 p-2 rounded text-[8px] text-purple-300/70 border border-slate-800 italic truncate max-h-16 overflow-hidden">
+                                                ${chunks[0]}...
+                                            </pre>
+                                        </details>
+                                    ` : ''}
                                 </div>`;
                         }
 
