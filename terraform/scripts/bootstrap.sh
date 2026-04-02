@@ -134,8 +134,6 @@ EOF
 python3 -m venv venv
 source venv/bin/activate
 pip3 install -r /opt/t-airs/src/requirements.txt
-# Install the AI Gateway, MCP SDK, and RAG Vector DB dependencies!
-pip3 install 'litellm[proxy]' openai mcp chromadb sentence-transformers
 
 # --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
 echo "Building LiteLLM routing configuration..."
