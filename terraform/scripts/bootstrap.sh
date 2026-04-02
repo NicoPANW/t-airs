@@ -266,6 +266,9 @@ fi
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 litellm_settings:
   drop_params: true
+
+router_settings:
+  routing_strategy: cost-based-routing
 EOF
 
 
