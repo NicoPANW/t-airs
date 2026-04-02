@@ -67,7 +67,7 @@ Below shows to define the Prisma AIRS profile and API key.
 **5. Review and generate**
 <img width="1848" height="841" alt="Screenshot 2026-04-01 at 16 11 37" src="https://github.com/user-attachments/assets/b6e0ecdf-6294-4a2f-bdb3-273f3d20cbeb" />
 
-**6. Copy and save the API key and API Key Name (aka Profile Name), click done**
+**6. Copy and save the API key, click done**
 <img width="1849" height="842" alt="Screenshot 2026-04-01 at 16 12 26" src="https://github.com/user-attachments/assets/554479ae-28c0-404d-b1fd-d4f2450d7b18" />
 
 ---
