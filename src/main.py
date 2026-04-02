@@ -63,7 +63,7 @@ server_params = StdioServerParameters(
 
 # RAG State
 chroma_client = None
-rag_collection = None
+rag_collections = {}
 embedder = None
 
 # --- CORE LOGIC HELPERS ---
@@ -83,41 +83,40 @@ def discover_gateway_models():
 
 def init_rag_pipeline():
     """Initializes the Vector DB and loads the mock confidential company policy."""
-    global chroma_client, rag_collection, embedder
-    print("📚 Initializing RAG Pipeline...")
+    global chroma_client, rag_collections, embedder
+    print("📚 Initializing Multi-Persona RAG Pipeline...")
     try:
         chroma_client = chromadb.Client()
-        rag_collection = chroma_client.create_collection(name="internal_knowledge")
         embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-        # Load the mock document created by our bootstrap script
-        if os.path.exists("company_policy.txt"):
-            with open("company_policy.txt", "r") as f:
-                text = f.read()
+        # Loop through the dictionary imported from rag_data.py
+        for persona_name, content in RAG_KNOWLEDGE_BASE.items():
+            col = chroma_client.create_collection(name=f"rag_{persona_name}")
             
             # Simple chunking by newline for this lab
-            chunks = [c for c in text.split('\n') if c.strip()]
-            embeddings = embedder.encode(chunks).tolist()
+            chunks = [c for c in content.split('\n') if len(c.strip()) > 10]
+            if chunks:
+                embeddings = embedder.encode(chunks).tolist()
+                col.add(
+                    embeddings=embeddings,
+                    documents=chunks,
+                    ids=[f"{persona_name}_chunk_{i}" for i in range(len(chunks))]
+                )
+            rag_collections[persona_name] = col
             
-            rag_collection.add(
-                embeddings=embeddings,
-                documents=chunks,
-                ids=[f"doc_{i}" for i in range(len(chunks))]
-            )
-            print(f"✅ RAG Ready: Loaded {len(chunks)} confidential chunks into Vector DB.")
-        else:
-            print("⚠️ RAG Warning: company_policy.txt not found. RAG will be empty.")
+        print("✅ RAG Ready: Loaded multiple personas into Vector DB.")
     except Exception as e:
         print(f"❌ RAG Initialization Failed: {e}")
 
-def retrieve_rag_context(user_prompt: str, top_k: int = 2):
+def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
     """Converts user prompt to vector, searches DB, and returns matching context AND raw docs."""
-    if not rag_collection:
+    target_collection = rag_collections.get(persona)
+    if not target_collection:
         return "", [] # Return empty string and empty list
     
     try:
         query_emb = embedder.encode([user_prompt]).tolist()
-        results = rag_collection.query(query_embeddings=query_emb, n_results=top_k)
+        results = target_collection.query(query_embeddings=query_emb, n_results=top_k)
         docs = results.get("documents", [[]])[0]
         
         if docs:
@@ -261,8 +260,8 @@ async def chat(
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
         # --- 2. RAG CONTEXT RETRIEVAL ---
-        # 🌟 NEW: Unpack the tuple to get the raw docs for the UI
-        rag_context, raw_rag_docs = retrieve_rag_context(message)
+        # 🌟 NEW: Unpack the tuple and pass the persona to route to the correct DB!
+        rag_context, raw_rag_docs = retrieve_rag_context(message, persona)
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         
         system_instruction = f"{selected_prompt}\n{rag_context}"
