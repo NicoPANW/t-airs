@@ -1,8 +1,11 @@
 fastapi
 uvicorn
 requests
-google-genai
 jinja2
 python-multipart
 pan-aisecurity
-boto3
+openai
+litellm[proxy]
+mcp
+chromadb
+sentence-transformers
