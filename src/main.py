@@ -56,8 +56,8 @@ llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-
 mcp_session = None
 openai_tools = []
 server_params = StdioServerParameters(
-    command="npx",
-    args=["-y", "@modelcontextprotocol/server-sqlite", "customers.db"]
+    command="/opt/t-airs/venv/bin/mcp-server-sqlite",
+    args=["--db-path", "/opt/t-airs/src/customers.db"]
 )
 
 # RAG State
