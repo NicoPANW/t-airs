@@ -5,7 +5,7 @@ jinja2
 python-multipart
 pan-aisecurity
 openai
-litellm[proxy]
+litellm[proxy,google]
 mcp
 chromadb
 sentence-transformers
