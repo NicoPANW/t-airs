@@ -109,10 +109,10 @@ def init_rag_pipeline():
     except Exception as e:
         print(f"❌ RAG Initialization Failed: {e}")
 
-def retrieve_rag_context(user_prompt: str, top_k: int = 2) -> str:
-    """Converts user prompt to vector, searches DB, and returns matching context."""
+def retrieve_rag_context(user_prompt: str, top_k: int = 2):
+    """Converts user prompt to vector, searches DB, and returns matching context AND raw docs."""
     if not rag_collection:
-        return ""
+        return "", [] # Return empty string and empty list
     
     try:
         query_emb = embedder.encode([user_prompt]).tolist()
@@ -120,12 +120,12 @@ def retrieve_rag_context(user_prompt: str, top_k: int = 2) -> str:
         docs = results.get("documents", [[]])[0]
         
         if docs:
-            # Format the retrieved text so the LLM knows it is secure internal context
-            return "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(docs)
+            formatted_text = "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(docs)
+            return formatted_text, docs # Return both!
     except Exception as e:
         print(f"RAG Retrieval Error: {e}")
     
-    return ""
+    return "", []
 
 
 @asynccontextmanager
