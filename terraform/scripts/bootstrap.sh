@@ -73,7 +73,8 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
 
     echo "Pre-loading LLM models..."
     # Terraform uses ${} for variables, so we use $${} to tell Terraform "this is a literal bash variable"
-    MODELS=("llama3.2:3b" "ministral-3:3b" "qwen2.5:1.5b" "deepseek-r1:1.5b")
+    #MODELS=("llama3.2:3b" "ministral-3:3b" "qwen2.5:1.5b" "deepseek-r1:1.5b")
+    MODELS="llama3.2:3b ministral-3:3b qwen2.5:1.5b deepseek-r1:1.5b"
 
     for model in "$${MODELS[@]}"; do
         if ! ollama list | grep -q "$model"; then
