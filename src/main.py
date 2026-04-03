@@ -30,6 +30,7 @@ from aisecurity.scan.inline.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
 import personas
+from custom_tools import PERSONA_TOOLS
 
 # --- CAPTURE CLI ARGUMENTS ---
 parser = argparse.ArgumentParser(description="T-AIRS Red-Team Lab")
