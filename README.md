@@ -16,21 +16,19 @@
 
 ## ✨ Capabilities of the App
 
-* **🤖 Agentic AI Framework:** Implements a full Reasoning-Observation-Action loop. The AI isn't just a chatbot; it is an autonomous agent capable of using tools to achieve complex objectives.
+* **🤖 Agentic AI Framework:** Implements a full Reasoning-Observation-Action loop. The AI isn't just a chatbot; it is an autonomous agent capable of using tools to achieve objectives. Custom-coded actions for Wire Transfers, Flight Upgrades, and Store Refunds that perform real, permanent modifications to the backend database, providing a high-stakes environment for red-teaming.
 
 * **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) API security scanning. In addition, the App can be used to demonstrate AIRS Red-teaming.
 
-* **🌐 Universal AI Gateway:** Powered by a local LiteLLM Gateway, providing a unified OpenAI-compatible API for all models. This abstraction layer enables seamless switching between SaaS providers (Vertex AI, Bedrock) and local GPU models without changing a single line of backend code.
+* **🌐 AI Gateway:** Powered by a local LiteLLM Gateway, providing a unified OpenAI-compatible API for all models.
 
 * **🔌 MCP Database Integration:** Native support for the Model Context Protocol. The AI interacts directly with a live SQLite database, generating and executing its own SQL queries to retrieve or modify records in real-time.
 
 * **📚 Integrated RAG Pipeline:** Built-in ChromaDB Vector Database for Retrieval-Augmented Generation. Private, unstructured data (like internal company policies) is semantically searched and injected into the AI's context window.
 
-* **🛠️ State-Changing Tools:** Custom-coded actions for Wire Transfers, Flight Upgrades, and Store Refunds that perform real, permanent modifications to the backend database, providing a high-stakes environment for red-teaming.
+* **☁️ SAAS models (recommended):** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
 
-* **☁️ SAAS models:** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
-
-* **🏠 Local models:** Even though not recommended since they are slower than SAAS models, there is an option to deploy local models on Tesla T4 GPUs. Note the very first prompt is slow as it loads the model into VRAM.
+* **🏠 Local models (not recommended):** Even though not recommended since they are slower than SAAS models, there is an option to deploy local models on Tesla T4 GPUs. Note the very first prompt is slow as it loads the model into VRAM.
 
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 
@@ -45,9 +43,16 @@
 
 ## 🏗️ How it is Designed
 
-To keep the application clean and scalable, this repository is a "Monorepo" split into two distinct layers:
+To keep the application clean and scalable, this repository is a "Monorepo" split into four distinct layers:
 
-1. **The Application Layer (`/src`):** Contains the custom Python FastAPI backend and the sleek web UI. It acts as the "brain," routing messages between the user, the cloud AI models, the local Ollama engine, and the Prisma AIRS security scanner.
+1. **The Intelligent Agent & Gateway Layer (`/src`):**  (/src): This is the "Core Engine" of the lab. It combines a FastAPI backend with a LiteLLM Gateway to create a unified, cloud-agnostic API.
+
+   Reasoning-Action Loop: Instead of simple chat, the system manages a full agentic loop, allowing the AI to autonomously decide its next move.
+
+   Data & Memory (RAG/MCP): The agent is equipped with "Long-term Memory" via a ChromaDB Vector Database and "Live Facts" via a Model Context Protocol (MCP) connection to a local SQLite database.
+
+   State-Changing Tools: The AI has the agency to execute real-world operations like Wire Transfers and Refunds, providing high-value targets for red-teaming and security policy testing.
+
 2. **The Infrastructure Layer (`/terraform`):** Contains the Terraform blueprints. It dynamically builds a dedicated Virtual Private Cloud (VPC), configures strict firewall rules, and launches a Virtual Machine injected with a `bootstrap.sh` script to install the application and AI models automatically.
 
 ---
