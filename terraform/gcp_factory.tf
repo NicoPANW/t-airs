@@ -49,7 +49,7 @@ resource "google_compute_instance" "t_airs_node" {
   boot_disk {
     initialize_params { 
       image = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
-      size  = var.enable_local_llm ? 40 : 20 
+      size  = var.enable_local_llm ? 50 : 20 
     }
   }
 
