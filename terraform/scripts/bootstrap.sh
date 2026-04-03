@@ -27,24 +27,20 @@ systemctl restart unattended-upgrades
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     echo "Local LLM requested. Configuring GPU and Ollama..."
 
-    # --- 1. DRIVER INSTALLATION ---
-    echo "Checking for NVIDIA Drivers..."
-    if ! command -v nvidia-smi &> /dev/null; then
-        echo "Installing NVIDIA Drivers..."
-        until apt-get update && apt-get install -y ubuntu-drivers-common; do sleep 5; done
+    
+    echo "Installing NVIDIA Drivers..."
+    until apt-get update && apt-get install -y ubuntu-drivers-common; do sleep 5; done
         
         # Install the drivers
-        sudo ubuntu-drivers autoinstall
+    sudo ubuntu-drivers autoinstall
         
         # Dynamically load the NVIDIA kernel modules WITHOUT rebooting
-        echo "Loading NVIDIA kernel modules..."
-        sudo modprobe nvidia
-        sudo modprobe nvidia_uvm
+    echo "Loading NVIDIA kernel modules..."
+    sudo modprobe nvidia
+    sudo modprobe nvidia_uvm
         
-        echo "✅ Drivers installed and activated."
-    else
-        echo "✅ NVIDIA drivers already present."
-    fi
+    cho "✅ Drivers installed and activated."
+
 
     # --- 2. Setup Ollama (Smart Install) ---
     export HOME=/root
