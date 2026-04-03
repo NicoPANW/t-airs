@@ -20,11 +20,7 @@
 
 * **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) API security scanning. In addition, the App can be used to demonstrate AIRS Red-teaming.
 
-* **🌐 AI Gateway:** Powered by a local LiteLLM Gateway, providing a unified OpenAI-compatible API for all models.
-
-* **🔌 MCP Database Integration:** Native support for the Model Context Protocol. The AI interacts directly with a live SQLite database, generating and executing its own SQL queries to retrieve or modify records in real-time.
-
-* **📚 Integrated RAG Pipeline:** Built-in ChromaDB Vector Database for Retrieval-Augmented Generation. Private, unstructured data (like internal company policies) is semantically searched and injected into the AI's context window.
+* **🌐 Modern design:** Powered by a local LiteLLM Gateway, AI interacts directly with a live SQLite database via MCP, vector Database for Retrieval-Augmented Generation for private, unstructured data (like internal company policies) is semantically searched and injected into the AI's context window.
 
 * **☁️ SAAS models (recommended):** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
 
