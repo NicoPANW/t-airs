@@ -284,6 +284,9 @@ async def chat(
     security_status = "Bypassed"
     raw_sec_log = "{}"
     ingress_data = {}
+    print(f"\n{'='*40}")
+    print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona}")
+    print(f"💬 PROMPT: {message}")
     
     # Initialize the Trace Dictionary for the UI Observability Sidebar
     architecture_trace = {
@@ -340,6 +343,7 @@ async def chat(
 
         # --- 4. AI GATEWAY INFERENCE & TOOL CALLING ---
         # Send payload to LiteLLM for processing
+        print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
         response = await llm_client.chat.completions.create(
             model=model_id,
             messages=messages,
@@ -363,6 +367,8 @@ async def chat(
         if response_msg.tool_calls:
             # Echo the AI's tool request into the message chain so it has context
             messages.append(response_msg) 
+            print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
+            print(f"📦 ARGUMENTS: {tool_args}")
             
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
@@ -483,6 +489,8 @@ async def chat(
                 SESSION_HISTORY[session_id] = SESSION_HISTORY[session_id][-10:]
 
         # Return standard successful response
+        print(f"🏁 REQUEST COMPLETE | Security Status: {security_status}")
+        print(f"{'='*40}\n")
         return {"bot": bot_response, "output": bot_response, "logs": {"security_scan": security_status, "raw_response": raw_sec_log, "trace": architecture_trace}}
 
     # Catch-all for API timeouts, local LLM JSON hallucinations, and broken SQL queries
