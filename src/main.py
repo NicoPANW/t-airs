@@ -4,6 +4,7 @@ import uvicorn
 import json
 import re
 import requests
+import torch
 from contextlib import asynccontextmanager, AsyncExitStack
 
 # FastAPI Imports
@@ -73,6 +74,18 @@ embedder = None
 
 # --- CORE LOGIC HELPERS ---
 
+def check_gpu_status():
+    """Interrogates the system for an NVIDIA GPU and its VRAM."""
+    try:
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            vram_gb = round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 1)
+            return f"✅ GPU ONLINE: {gpu_name} ({vram_gb} GB VRAM Ready)"
+        else:
+            return "⚠️ NO GPU DETECTED: Running on CPU (Local models will be severely degraded)"
+    except Exception as e:
+        return f"⚠️ GPU CHECK FAILED: {str(e)}"
+
 def discover_gateway_models():
     """Queries the local AI Gateway for all active routing models."""
     found = []
@@ -139,6 +152,9 @@ async def lifespan(app: FastAPI):
     print("\n" + "="*50)
     print("🚀 T-AIRS STARTUP (GATEWAY + MCP + RAG MODE)")
     print("="*50)
+    print("Checking Hardware Acceleration...")
+    print(f"RESULT: {check_gpu_status()}")
+    print("-" * 50)
     
     # 1. Prisma AIRS Handshake
     if AIRS_KEY and AIRS_PROFILE_NAME:
