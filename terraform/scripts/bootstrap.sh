@@ -52,7 +52,6 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
             fi
         fi
     fi
-fi
 
     # 5. Setup Ollama
     export HOME=/root
