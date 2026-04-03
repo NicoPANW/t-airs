@@ -26,7 +26,7 @@ systemctl restart unattended-upgrades
 # ==========================================
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     
-    # 🌟 NEW: Check if drivers are already working. If so, skip the whole block!
+    # 🌟 Check if drivers are already working. If so, skip the whole block!
     if lsmod | grep -q nvidia; then
         echo "✅ NVIDIA drivers are already loaded and active. Skipping installation."
     else
@@ -53,58 +53,30 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
         fi
     fi
 
-    # 5. Setup Ollama
-    export HOME=/root
-    if ! command -v ollama &> /dev/null; then
-        curl -fsSL https://ollama.com/install.sh | sh
-        systemctl enable --now ollama
-    fi
-
-    # 6. Pull Models (Using Terraform-Safe String Syntax)
-    echo "Waiting for Ollama..."
-    until curl -s http://localhost:11434/api/tags > /dev/null; do sleep 2; done
-
-    MODELS=("llama3.2:3b" "ministral-3:3b" "qwen2.5:1.5b" "deepseek-r1:1.5b")
-    
-    for model in $MODELS_TO_PULL; do
-        echo "⬇️ Processing $model..."
-        ollama pull "$model"
-        until ollama list | grep -q "$model"; do sleep 5; done
-    done
-    echo "✅ Local GPU models loaded!"
-
-else
-    echo "ENABLE_LOCAL_LLM is false. Skipping GPU/Ollama setup."
-fi
-
-# ==========================================
-    # --- 2. Setup Ollama (Smart Install) ---
+    # --- 5. Setup Ollama ---
     export HOME=/root
     if ! command -v ollama &> /dev/null; then
         echo "Ollama not found. Installing..."
         curl -fsSL https://ollama.com/install.sh | sh
-        systemctl enable ollama
+        systemctl enable --now ollama
     else
-        echo "✅ Ollama is already installed. Skipping download."
+        echo "✅ Ollama is already installed."
+        systemctl start ollama
     fi
-
-    # Ensure service is started regardless
-    systemctl start ollama
 
     # Wait dynamically for the Ollama API to wake up
     echo "Waiting for Ollama engine to initialize..."
-    until curl -s http://localhost:11434/api/tags > /dev/null; do
+    until curl -s http://localhost:11434/api/tags > /dev/null; do 
         sleep 2
     done
 
-    # Pull multiple models for diverse Red-Teaming
+    # --- 6. Pull Models (Using Terraform-Safe String Syntax) ---
     echo "Pre-loading LLM models (this may take 10-15 minutes)..."
     
-    # Define our array of target models (using $$ to escape Terraform interpolation)
-    MODELS=("llama3.2:3b" "ministral-3:3b" "qwen2.5:1.5b" "deepseek-r1:1.5b")
-
-    for model in "$${MODELS[@]}"; do
-        # 1. Pull the model if it's missing
+    # 🌟 FIXED: Space-separated string avoids the ${} parsing errors in Terraform
+    MODELS_TO_PULL="llama3.2:3b ministral-3:3b qwen2.5:1.5b deepseek-r1:1.5b"
+    
+    for model in $MODELS_TO_PULL; do
         if ! ollama list | grep -q "$model"; then
             echo "⬇️ Pulling $model..."
             ollama pull "$model"
@@ -112,19 +84,18 @@ fi
             echo "✅ $model is already downloaded."
         fi
 
-        # 2. CRITICAL: Verify model is fully indexed and ready
         echo "Verifying $model readiness..."
-        until ollama list | grep -q "$model"; do
-            echo "Still indexing $model... current status:"
-            ollama list
+        until ollama list | grep -q "$model"; do 
             sleep 5
         done
         echo "🚀 $model is ready to use."
     done
 
     echo "✅ All local GPU models are successfully loaded!"
+
 else
-    echo "ENABLE_LOCAL_LLM is false. Skipping GPU drivers and Ollama setup."
+    # This correctly closes the main ENABLE_LOCAL_LLM check
+    echo "ENABLE_LOCAL_LLM is false. Skipping GPU/Ollama setup."
 fi
 # ==========================================
 
