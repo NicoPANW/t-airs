@@ -22,75 +22,75 @@
 graph TD
     %% Zones Definition %%
     subgraph Frontend ["RED-TEAM CONTROL PANEL (index.html)"]
-        AttackerInput[Attacker Input / Prompt]:::attacker
-        UISettings[Lab Toggles:<br/>- Persona<br/>- AIRS Shield<br/>- Model Route<br/>- Session History]:::config
-        InspectorLogs[Inspector Sidebar:<br/>- RAG Status<br/>- Gateway Route<br/>- MCP Traces<br/>- Block Logs<br/>- INTERCEPTED TEXT]:::logs
+        AttackerInput["Attacker Input / Prompt"]:::attacker
+        UISettings["Lab Toggles:<br/>- Persona<br/>- AIRS Shield<br/>- Model Route<br/>- Session History"]:::config
+        InspectorLogs["Inspector Sidebar:<br/>- RAG Status<br/>- Gateway Route<br/>- MCP Traces<br/>- Block Logs<br/>- INTERCEPTED TEXT"]:::logs
     end
 
     subgraph Backend ["FASTAPI BACKEND ENGINE (main.py)"]
-        router[Router: /chat]:::core
-        HistoryStore{SESS_HISTORY<br/>Buffer}:::memory
+        router["Router: /chat"]:::core
+        HistoryStore{"SESS_HISTORY<br/>Buffer"}:::memory
     end
 
     subgraph SecurityZone ["SECURITY LAYER"]
-        AIRSSDK(Prisma AIRS SDK):::airs
-        AIRSServer[Prisma Cloud AIRS Service]:::airsserver
+        AIRSSDK("Prisma AIRS SDK"):::airs
+        AIRSServer["Prisma Cloud AIRS Service"]:::airsserver
     end
 
     subgraph KnowledgeZone ["KNOWLEDGE BASES & TOOLS"]
-        SystemPrompts[Personas<br/>(System Prompts)]:::prompts
-        VectorDB[(ChromaDB<br/>RAG Context)]:::rag
-        SQLiteDB[(SQLite DB<br/>via MCP Tools)]:::mcp
+        SystemPrompts["Personas<br/>(System Prompts)"]:::prompts
+        VectorDB[("ChromaDB<br/>RAG Context")]:::rag
+        SQLiteDB[("SQLite DB<br/>via MCP Tools")]:::mcp
     end
 
     subgraph LLMZone ["AI GATEWAY & WORKER MODELS"]
-        LiteLLM[LiteLLM Gateway<br/>Cost Router]:::gateway
-        GeminiFlash[Gemini 2.5<br/>Flash Worker]:::model
-        GeminiFlashLite[Gemini 2.5<br/>Flash-Lite Worker]:::model
+        LiteLLM["LiteLLM Gateway<br/>Cost Router"]:::gateway
+        GeminiFlash["Gemini 2.5<br/>Flash Worker"]:::model
+        GeminiFlashLite["Gemini 2.5<br/>Flash-Lite Worker"]:::model
     end
 
     %% Flow Connections %%
     AttackerInput --> router
-    UISettings -. Pass State .-> router
+    UISettings -. "Pass State" .-> router
 
     %% INGRESS SCAN %%
-    router ==>>|1. INGRESS SCAN<br/>Prompt| AIRSSDK
-    AIRSSDK -->>|Validate| AIRSServer
-    AIRSServer ==>>|Block / Pass| AIRSSDK
-    AIRSSDK ==>>|Scan Result| router
+    router ==>>|"1. INGRESS SCAN<br/>Prompt"| AIRSSDK
+    AIRSSDK -->>|"Validate"| AIRSServer
+    AIRSServer ==>>|"Block / Pass"| AIRSSDK
+    AIRSSDK ==>>|"Scan Result"| router
     
     %% If Blocked %%
-    AIRSSDK -. If Blocked .-> AttackerInput
-    AIRSSDK -. Log Block .-> InspectorLogs
+    AIRSSDK -. "If Blocked" .-> AttackerInput
+    AIRSSDK -. "Log Block" .-> InspectorLogs
 
     %% IF PASSED: Augmentation %%
-    router -->|2. Get Persona| SystemPrompts
-    router -->|3. Embed & Query| VectorDB
-    router -->|4. Check Toggle| HistoryStore
-    router -->|5. Build STATEFUL Payload| LiteLLM
+    router -->|"2. Get Persona"| SystemPrompts
+    router -->|"3. Embed & Query"| VectorDB
+    router -->|"4. Check Toggle"| HistoryStore
+    router -->|"5. Build STATEFUL Payload"| LiteLLM
 
     %% LLM Processing %%
     LiteLLM --> GeminiFlash
     LiteLLM --> GeminiFlashLite
     
-    GeminiFlash -->|Optional<br/>Tool Call| SQLiteDB
+    GeminiFlash -->|"Optional<br/>Tool Call"| SQLiteDB
     SQLiteDB --> GeminiFlash
 
-    GeminiFlash -->|6. Raw Answer| LiteLLM
-    LiteLLM -->|7. Return Response| router
+    GeminiFlash -->|"6. Raw Answer"| LiteLLM
+    LiteLLM -->|"7. Return Response"| router
 
     %% EGRESS SCAN %%
-    router ==>>|8. EGRESS SCAN<br/>Bot Answer| AIRSSDK
-    AIRSSDK -->>|Validate| AIRSServer
-    AIRSServer ==>>|Block / Pass| AIRSSDK
-    AIRSSDK ==>>|Final Result| router
+    router ==>>|"8. EGRESS SCAN<br/>Bot Answer"| AIRSSDK
+    AIRSSDK -->>|"Validate"| AIRSServer
+    AIRSServer ==>>|"Block / Pass"| AIRSSDK
+    AIRSSDK ==>>|"Final Result"| router
 
     %% Final Return Loop %%
-    router -->|If Pass: Update Memory| HistoryStore
-    router -->|Return Answer| AttackerInput
+    router -->|"If Pass: Update Memory"| HistoryStore
+    router -->|"Return Answer"| AttackerInput
     
     %% Logging Loop %%
-    router -->|Return Full Trace<br/>incl. Intercepted Text| InspectorLogs
+    router -->|"Return Full Trace<br/>incl. Intercepted Text"| InspectorLogs
 
     %% Styling %%
     classDef attacker fill:#ef4444,stroke:#ef4444,color:white,stroke-width:2px;
@@ -108,7 +108,7 @@ graph TD
 
     linkStyle default stroke:#64748b,stroke-width:1px;
     linkStyle 10,11,12,13,22,23,24,25 stroke:#22c55e,stroke-width:2px,stroke-dasharray: none; %% AIRS Path %%
-    linkStyle 19,2
+    linkStyle 19,20,21 stroke:#2563eb,stroke-width:1.5px; %% LLM Path %%
 
 * **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
 * **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for red-teaming.
