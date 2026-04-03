@@ -286,11 +286,15 @@ async def chat(
         # Final payload: System Prompt + History (or single message)
         messages = [{"role": "system", "content": system_instruction}] + current_context
 
+        active_tools = openai_tools.copy() if openai_tools else []
+        if persona in PERSONA_TOOLS:
+            active_tools.extend(PERSONA_TOOLS[persona])
+
         # --- 4. AI GATEWAY & MCP TOOL CALLING LOOP ---
         response = await llm_client.chat.completions.create(
             model=model_id,
             messages=messages,
-            tools=openai_tools if openai_tools else None,
+            tools=active_tools if active_tools else None,
             temperature=0.7
         )
         
@@ -313,15 +317,53 @@ async def chat(
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
                 
-                mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                db_output = mcp_result.content[0].text
+                # --- 🚀 CUSTOM ACTION TOOLS (WRITES TO DB) ---
+                if tool_name in ["transfer_funds", "upgrade_flight_seat", "issue_store_refund"]:
+                    
+                    # 1. Bulletproof DB Write: Create an audit table if it doesn't exist
+                    setup_query = "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"
+                    await mcp_session.call_tool("write_query", arguments={"query": setup_query})
+                    
+                    # 2. Extract arguments based on the tool
+                    if tool_name == "transfer_funds":
+                        src = tool_args.get("source_account")
+                        dst = tool_args.get("dest_account")
+                        amt = tool_args.get("amount")
+                        details = f"Transferred ${amt} from {src} to {dst}"
+                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed."
+                        
+                    elif tool_name == "upgrade_flight_seat":
+                        pnr = tool_args.get("booking_ref")
+                        cabin = tool_args.get("new_class")
+                        details = f"Upgraded PNR {pnr} to {cabin} class"
+                        tool_output = f"✅ BOOKING UPDATED: PNR {pnr} successfully upgraded to {cabin}."
+
+                    elif tool_name == "issue_store_refund":
+                        order = tool_args.get("order_id")
+                        amt = tool_args.get("amount")
+                        details = f"Refunded ${amt} for order {order}"
+                        tool_output = f"✅ REFUND PROCESSED: ${amt} credited back for {order}."
+
+                    # 3. 🌟 ACTUAL DATABASE INJECTION: Write the fraudulent action to SQLite
+                    insert_query = f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', '{details}');"
+                    await mcp_session.call_tool("write_query", arguments={"query": insert_query})
+                    
+                    # Let the LLM (and the attacker) know the DB was permanently altered
+                    tool_output += " (Transaction permanently recorded in backend database)."
+
+                # --- 🔌 FALLBACK: STANDARD MCP SQLITE TOOLS ---
+                else:
+                    mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
+                    tool_output = mcp_result.content[0].text
                 
-                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": db_output})
+                # Append the result to the message chain
+                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
                 
+                # Log it for the UI Inspector panel
                 architecture_trace["mcp_execution"].append({
                     "tool": tool_name,
                     "arguments": tool_args,
-                    "database_result": db_output
+                    "database_result": tool_output
                 })
 
             final_response = await llm_client.chat.completions.create(
