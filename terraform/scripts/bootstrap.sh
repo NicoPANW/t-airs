@@ -254,25 +254,21 @@ fi
 # Inject Local Models if GPU is enabled
 if [ "${enable_local_llm}" == "true" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
-  - model_name: local-llama3
+  - model_name: local-llama3.2:3b
     litellm_params:
-      model: ollama/llama3
+      model: ollama/llama3.2:3b
       api_base: "http://localhost:11434"
-  - model_name: local-mistral
+  - model_name: local-ministral:3b
     litellm_params:
-      model: ollama/mistral
+      model: ollama/ministral-3:3b
       api_base: "http://localhost:11434"
-  - model_name: local-gemma2:9b
+  - model_name: local-qwen2.5:1.5b
     litellm_params:
-      model: ollama/gemma2:9b
+      model: ollama/qwen2.5:1.5b
       api_base: "http://localhost:11434"
-  - model_name: local-qwen2.5:7b
+  - model_name: local-deepseek-r1:1.5b
     litellm_params:
-      model: ollama/qwen2.5:7b
-      api_base: "http://localhost:11434"
-  - model_name: local-deepseek-r1:7b
-    litellm_params:
-      model: ollama/deepseek-r1:7b
+      model: ollama/deepseek-r1:1.5b
       api_base: "http://localhost:11434"
 EOF
 fi
