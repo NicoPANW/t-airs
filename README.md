@@ -43,15 +43,15 @@
 
 ## 🏗️ How it is Designed
 
-To keep the application clean and scalable, this repository is a "Monorepo" split into four distinct layers:
+To keep the application clean and scalable, this repository is a "Monorepo" split into two distinct layers:
 
 1. **The Intelligent Agent & Gateway Layer (`/src`):**  (/src): This is the "Core Engine" of the lab. It combines a FastAPI backend with a LiteLLM Gateway to create a unified, cloud-agnostic API.
 
-   Reasoning-Action Loop: Instead of simple chat, the system manages a full agentic loop, allowing the AI to autonomously decide its next move.
+         Reasoning-Action Loop: Instead of simple chat, the system manages a full agentic loop, allowing the AI to autonomously decide its next move.
 
-   Data & Memory (RAG/MCP): The agent is equipped with "Long-term Memory" via a ChromaDB Vector Database and "Live Facts" via a Model Context Protocol (MCP) connection to a local SQLite database.
+         Data & Memory (RAG/MCP): The agent is equipped with "Long-term Memory" via a ChromaDB Vector Database and "Live Facts" via a Model Context Protocol (MCP) connection to a local SQLite database.
 
-   State-Changing Tools: The AI has the agency to execute real-world operations like Wire Transfers and Refunds, providing high-value targets for red-teaming and security policy testing.
+         State-Changing Tools: The AI has the agency to execute real-world operations like Wire Transfers and Refunds, providing high-value targets for red-teaming and security policy testing.
 
 2. **The Infrastructure Layer (`/terraform`):** Contains the Terraform blueprints. It dynamically builds a dedicated Virtual Private Cloud (VPC), configures strict firewall rules, and launches a Virtual Machine injected with a `bootstrap.sh` script to install the application and AI models automatically.
 
