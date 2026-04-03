@@ -345,20 +345,42 @@ async def chat(
                         src = tool_args.get("source_account")
                         dst = tool_args.get("dest_account")
                         amt = tool_args.get("amount")
+                        
+                        # --- 🌟 REAL MONEY TRANSFER LOGIC ---
+                        # Deduct from the sender's balance in the 'users' table
+                        deduct_query = f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": deduct_query})
+                        
+                        # Add to the receiver's balance
+                        add_query = f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": add_query})
+
                         details = f"Transferred ${amt} from {src} to {dst}"
-                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed."
+                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed and settled in the users table."
                         
                     elif tool_name == "upgrade_flight_seat":
                         pnr = tool_args.get("booking_ref")
                         cabin = tool_args.get("new_class")
+                        
+                        # --- 🌟 REAL FLIGHT UPGRADE LOGIC ---
+                        # Overwrite the seat assignment with the new premium cabin class
+                        upgrade_query = f"UPDATE passenger_manifest SET seat = '{cabin} Class' WHERE pnr = '{pnr}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": upgrade_query})
+
                         details = f"Upgraded PNR {pnr} to {cabin} class"
-                        tool_output = f"✅ BOOKING UPDATED: PNR {pnr} successfully upgraded to {cabin}."
+                        tool_output = f"✅ BOOKING UPDATED: PNR {pnr} successfully upgraded to {cabin} in the passenger_manifest."
 
                     elif tool_name == "issue_store_refund":
                         order = tool_args.get("order_id")
                         amt = tool_args.get("amount")
+                        
+                        # --- 🌟 REAL E-SHOP REFUND LOGIC ---
+                        # Deduct the refunded amount directly from the order's total price
+                        refund_query = f"UPDATE pending_orders SET price = price - {amt} WHERE ord_id = {order};"
+                        await mcp_session.call_tool("write_query", arguments={"query": refund_query})
+
                         details = f"Refunded ${amt} for order {order}"
-                        tool_output = f"✅ REFUND PROCESSED: ${amt} credited back for {order}."
+                        tool_output = f"✅ REFUND PROCESSED: ${amt} credited back and deducted from pending_orders for {order}."
 
                     # 3. 🌟 ACTUAL DATABASE INJECTION: Write the fraudulent action to SQLite
                     insert_query = f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', '{details}');"
