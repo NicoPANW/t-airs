@@ -192,6 +192,7 @@ sudo journalctl -u t-airs.service -n 50 -f
 sudo systemctl restart t-airs
 ollama list
 nvidia-smi #if local-llm, checking Nvidi T4 is ready
+sudo journalctl -u litellm.service -n 50 --no-pager
 ```
 
 ### Step 3: AWS-Specific Debugging
