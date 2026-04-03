@@ -70,10 +70,24 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
         sleep 2
     done
 
+    # --- 5.5 Configure Ollama for Multi-Model Preloading ---
+    echo "Configuring Ollama to hold multiple models in VRAM..."
+    mkdir -p /etc/systemd/system/ollama.service.d
+    cat <<EOF > /etc/systemd/system/ollama.service.d/override.conf
+[Service]
+# Allow up to 3 models to be loaded into VRAM at the same time
+Environment="OLLAMA_MAX_MODELS=3"
+# Allow multiple requests to be processed concurrently
+Environment="OLLAMA_NUM_PARALLEL=3"
+EOF
+    systemctl daemon-reload
+    systemctl restart ollama
+    sleep 3 # Give it a second to wake back up
+
     # --- 6. Pull Models (Using Terraform-Safe String Syntax) ---
     echo "Pre-loading LLM models (this may take 10-15 minutes)..."
     
-    MODELS_TO_PULL="llama3.2:3b ministral-3:3b qwen2.5:1.5b deepseek-r1:1.5b"
+    MODELS_TO_PULL="llama3.2:3b ministral-3:3b qwen2.5:1.5b"
     
     for model in $MODELS_TO_PULL; do
         if ! ollama list | grep -q "$model"; then
