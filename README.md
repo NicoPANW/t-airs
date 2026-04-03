@@ -16,12 +16,9 @@
 
 ## ✨ Capabilities of the App
 
-
-* **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
-
-* **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for red-teaming.
-
 * **🤖 Agentic AI Framework:** Implements a full Reasoning-Observation-Action loop. The AI isn't just a chatbot; it is an autonomous agent capable of using tools to achieve complex objectives.
+
+* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) API security scanning. In addition, the App can be used to demonstrate AIRS Red-teaming.
 
 * **🔌 MCP Database Integration:** Native support for the Model Context Protocol. The AI interacts directly with a live SQLite database, generating and executing its own SQL queries to retrieve or modify records in real-time.
 
@@ -33,11 +30,13 @@
 
 * **🏠 Local models:** Even though not recommended since they are slower than SAAS models, there is an option to deploy local models on Tesla T4 GPUs. Note the very first prompt is slow as it loads the model into VRAM.
 
-* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) API security scanning. In addition, the App can be used to demonstrate AIRS Red-teaming.
-
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 
 * **🔎 Visual Metadata Trace:** A built-in inspector panel shows you the exact raw JSON decision logic from both the AI Gateway and Prisma AIRS on every single interaction.
+
+* **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
+
+* **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for red-teaming.
 
 
 ---
