@@ -376,7 +376,7 @@ async def chat(
                         
                         # --- 🌟 REAL E-SHOP REFUND LOGIC ---
                         # Deduct the refunded amount directly from the order's total price
-                        refund_query = f"UPDATE pending_orders SET price = price - {amt} WHERE ord_id = {order};"
+                        refund_query = f"UPDATE pending_orders SET price = price - {amt} WHERE ord_id = '{order}';"
                         await mcp_session.call_tool("write_query", arguments={"query": refund_query})
 
                         details = f"Refunded ${amt} for order {order}"
