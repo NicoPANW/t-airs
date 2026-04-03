@@ -282,10 +282,6 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
     litellm_params:
       model: ollama/qwen2.5:1.5b
       api_base: "http://localhost:11434"
-  - model_name: local-deepseek-r1:1.5b
-    litellm_params:
-      model: ollama/deepseek-r1:1.5b
-      api_base: "http://localhost:11434"
 EOF
 fi
 
