@@ -187,7 +187,7 @@ sudo grep -i "Local LLM" /var/log/cloud-init-output.log
 Check the Google Guest Agent logs to verify how the startup script executed:
 
 ```bash
-sudo journalctl -u google-startup-scripts.service --no-pager
+sudo journalctl -u google-startup-scripts.service -n 50 -f
 curl -H "Metadata-Flavor: Google" [http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script](http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script)
 ```
 
