@@ -191,6 +191,7 @@ Once logged in, you can check your live app logs, reset the service, or check yo
 sudo journalctl -u t-airs.service -n 50 -f
 sudo systemctl restart t-airs
 ollama list
+nvidia-smi #if local-llm, checking Nvidi T4 is ready
 ```
 
 ### Step 3: AWS-Specific Debugging
