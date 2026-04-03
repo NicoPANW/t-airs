@@ -36,7 +36,7 @@ from custom_tools import PERSONA_TOOLS
 
 # --- CAPTURE CLI ARGUMENTS ---
 # Allows dynamic configuration of the lab via startup script or terminal
-parser = argparse.ArgumentParser(description="T-AIRS Red-Team Lab")
+parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
@@ -367,13 +367,14 @@ async def chat(
         if response_msg.tool_calls:
             # Echo the AI's tool request into the message chain so it has context
             messages.append(response_msg) 
-            print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
-            print(f"📦 ARGUMENTS: {tool_args}")
+
             
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
                 # This json.loads will fail safely into the main Try/Except if local SLMs hallucinate syntax
                 tool_args = json.loads(tool_call.function.arguments)
+                print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
+                print(f"📦 ARGUMENTS: {tool_args}")
                 
                 # --- 🚀 CUSTOM ACTION TOOLS (WRITES TO DB) ---
                 if tool_name in ["transfer_funds", "upgrade_flight_seat", "issue_store_refund"]:
