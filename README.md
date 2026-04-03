@@ -16,7 +16,7 @@
 
 ## ✨ Capabilities of the App
 
-[```mermaid
+```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#0f172a', 'edgeLabelBackground':'#1e293b', 'tertiaryColor': '#1e293b', 'lineColor': '#60a5fa', 'fontSize': '11px', 'fontFamily': 'inter, sans-serif' }}}%%
 
 graph TD
@@ -54,10 +54,10 @@ graph TD
     UISettings -. "Pass State" .-> router
 
     %% INGRESS SCAN %%
-    router ==>>|"1. INGRESS SCAN<br/>Prompt"| AIRSSDK
-    AIRSSDK -->>|"Validate"| AIRSServer
-    AIRSServer ==>>|"Block / Pass"| AIRSSDK
-    AIRSSDK ==>>|"Scan Result"| router
+    router ==>|"1. INGRESS SCAN Prompt"| AIRSSDK
+    AIRSSDK -->|"Validate"| AIRSServer
+    AIRSServer ==>|"Block / Pass"| AIRSSDK
+    AIRSSDK ==>|"Scan Result"| router
     
     %% If Blocked %%
     AIRSSDK -. "If Blocked" .-> AttackerInput
@@ -73,24 +73,24 @@ graph TD
     LiteLLM --> GeminiFlash
     LiteLLM --> GeminiFlashLite
     
-    GeminiFlash -->|"Optional<br/>Tool Call"| SQLiteDB
+    GeminiFlash -->|"Optional Tool Call"| SQLiteDB
     SQLiteDB --> GeminiFlash
 
     GeminiFlash -->|"6. Raw Answer"| LiteLLM
     LiteLLM -->|"7. Return Response"| router
 
     %% EGRESS SCAN %%
-    router ==>>|"8. EGRESS SCAN<br/>Bot Answer"| AIRSSDK
-    AIRSSDK -->>|"Validate"| AIRSServer
-    AIRSServer ==>>|"Block / Pass"| AIRSSDK
-    AIRSSDK ==>>|"Final Result"| router
+    router ==>|"8. EGRESS SCAN Bot Answer"| AIRSSDK
+    AIRSSDK -->|"Validate"| AIRSServer
+    AIRSServer ==>|"Block / Pass"| AIRSSDK
+    AIRSSDK ==>|"Final Result"| router
 
     %% Final Return Loop %%
     router -->|"If Pass: Update Memory"| HistoryStore
     router -->|"Return Answer"| AttackerInput
     
     %% Logging Loop %%
-    router -->|"Return Full Trace<br/>incl. Intercepted Text"| InspectorLogs
+    router -->|"Return Full Trace"| InspectorLogs
 
     %% Styling %%
     classDef attacker fill:#ef4444,stroke:#ef4444,color:white,stroke-width:2px;
@@ -107,8 +107,6 @@ graph TD
     classDef logs fill:#0f172a,stroke:#475569,color:#cbd5e1;
 
     linkStyle default stroke:#64748b,stroke-width:1px;
-    linkStyle 10,11,12,13,22,23,24,25 stroke:#22c55e,stroke-width:2px,stroke-dasharray: none; %% AIRS Path %%
-    linkStyle 19,20,21 stroke:#2563eb,stroke-width:1.5px; %% LLM Path %%](http://34.9.150.140:8000)
 
 * **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
 * **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for red-teaming.
