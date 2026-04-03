@@ -39,7 +39,11 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     sudo modprobe nvidia
     sudo modprobe nvidia_uvm
         
-    cho "✅ Drivers installed and activated."
+    if lsmod | grep -q nvidia; then
+            echo "✅ Drivers installed and kernel modules activated."
+        else
+            echo "⚠️ WARNING: modprobe failed. If GCP Secure Boot is ON, a reboot is required."
+        fi
 
 
     # --- 2. Setup Ollama (Smart Install) ---
