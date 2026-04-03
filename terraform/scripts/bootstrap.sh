@@ -27,7 +27,7 @@ systemctl restart unattended-upgrades
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     echo "Local LLM requested. Configuring GPU and Ollama..."
 
-    # 1. Install Build Dependencies & Headers
+    # 1. Install Build Dependencies & Headers (Crucial for GCP)
     echo "Installing build-essential and kernel headers..."
     until apt-get update; do sleep 5; done
     apt-get install -y linux-headers-$(uname -r) build-essential ubuntu-drivers-common
@@ -45,53 +45,64 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     if lsmod | grep -q nvidia; then
         echo "✅ Drivers installed and kernel modules activated."
     else
+        # Check if we are running on Google Cloud
         if [ -f /sys/class/dmi/id/product_name ] && grep -q "Google" /sys/class/dmi/id/product_name; then
-            echo "🚨 GCP DETECTED: Triggering reboot in 5 seconds..."
+            echo "🚨 GCP DETECTED: Kernel modules failed to load (likely Secure Boot)."
+            echo "🔄 Triggering mandatory reboot in 5 seconds to finalize NVIDIA installation..."
             sleep 5
             sudo reboot
         else
-            echo "⚠️ WARNING: modprobe failed, but not on GCP."
+            echo "⚠️ WARNING: modprobe failed, but not on GCP. Manual intervention may be required."
         fi
     fi
+fi
 
-    # --- 5. Setup Ollama (Inside the ENABLE_LOCAL_LLM block) ---
+    # --- 2. Setup Ollama (Smart Install) ---
     export HOME=/root
     if ! command -v ollama &> /dev/null; then
         echo "Ollama not found. Installing..."
         curl -fsSL https://ollama.com/install.sh | sh
         systemctl enable ollama
     else
-        echo "✅ Ollama is already installed."
+        echo "✅ Ollama is already installed. Skipping download."
     fi
 
+    # Ensure service is started regardless
     systemctl start ollama
 
-    echo "Waiting for Ollama engine..."
+    # Wait dynamically for the Ollama API to wake up
+    echo "Waiting for Ollama engine to initialize..."
     until curl -s http://localhost:11434/api/tags > /dev/null; do
         sleep 2
     done
 
-    echo "Pre-loading LLM models..."
-    # Terraform uses ${} for variables, so we use $${} to tell Terraform "this is a literal bash variable"
-    #MODELS=("llama3.2:3b" "ministral-3:3b" "qwen2.5:1.5b" "deepseek-r1:1.5b")
-    MODELS="llama3.2:3b ministral-3:3b qwen2.5:1.5b deepseek-r1:1.5b"
+    # Pull multiple models for diverse Red-Teaming
+    echo "Pre-loading LLM models (this may take 10-15 minutes)..."
+    
+    # Define our array of target models (using $$ to escape Terraform interpolation)
+    MODELS=("llama3.2:3b" "ministral-3:3b" "qwen2.5:1.5b" "deepseek-r1:1.5b")
 
     for model in "$${MODELS[@]}"; do
+        # 1. Pull the model if it's missing
         if ! ollama list | grep -q "$model"; then
             echo "⬇️ Pulling $model..."
             ollama pull "$model"
+        else
+            echo "✅ $model is already downloaded."
         fi
-        
+
+        # 2. CRITICAL: Verify model is fully indexed and ready
         echo "Verifying $model readiness..."
         until ollama list | grep -q "$model"; do
+            echo "Still indexing $model... current status:"
+            ollama list
             sleep 5
         done
-        echo "🚀 $model is ready."
+        echo "🚀 $model is ready to use."
     done
 
     echo "✅ All local GPU models are successfully loaded!"
 else
-    # This is the correct 'else' for the ENABLE_LOCAL_LLM if-statement
     echo "ENABLE_LOCAL_LLM is false. Skipping GPU drivers and Ollama setup."
 fi
 
