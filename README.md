@@ -1,4 +1,4 @@
-<h1 align="center">🛡️ T-AIRS: AI chatbot app being deployed on GCP or AWS and used to test Prisma AIRS features</h1>
+<h1 align="center">🛡️ T-AIRS: AI chatbot/agent app being deployed on GCP or AWS and used to test Prisma AIRS features</h1>
 
 <p align="center">
   <i>A fully automated, Infrastructure-as-Code (IaC) sandbox for testing Prisma AIRS features</i>
