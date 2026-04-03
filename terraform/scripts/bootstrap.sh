@@ -73,7 +73,6 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     # --- 6. Pull Models (Using Terraform-Safe String Syntax) ---
     echo "Pre-loading LLM models (this may take 10-15 minutes)..."
     
-    # 🌟 FIXED: Space-separated string avoids the ${} parsing errors in Terraform
     MODELS_TO_PULL="llama3.2:3b ministral-3:3b qwen2.5:1.5b deepseek-r1:1.5b"
     
     for model in $MODELS_TO_PULL; do
