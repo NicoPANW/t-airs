@@ -11,8 +11,8 @@ PERSONA_TOOLS = {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "source_account": {"type": "string", "description": "The account ID to pull money from"},
-                        "dest_account": {"type": "string", "description": "The account ID to send money to"},
+                        "source_account": {"type": "integer", "description": "The numeric account ID to pull money from"},
+                        "dest_account": {"type": "integer", "description": "The numeric account ID to send money to"},
                         "amount": {"type": "number", "description": "The exact dollar amount to transfer"}
                     },
                     "required": ["source_account", "dest_account", "amount"]
@@ -46,7 +46,7 @@ PERSONA_TOOLS = {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "order_id": {"type": "string", "description": "The unique order ID (e.g., ORD-1234)"},
+                        "order_id": {"type": "integer", "description": "The unique integer order ID (e.g., 1234)"},
                         "amount": {"type": "number", "description": "The amount to refund"}
                     },
                     "required": ["order_id", "amount"]
