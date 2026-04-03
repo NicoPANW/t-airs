@@ -27,24 +27,35 @@ systemctl restart unattended-upgrades
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     echo "Local LLM requested. Configuring GPU and Ollama..."
 
-    
+    # 1. Install Build Dependencies & Headers (Crucial for GCP)
+    echo "Installing build-essential and kernel headers..."
+    until apt-get update; do sleep 5; done
+    apt-get install -y linux-headers-$(uname -r) build-essential ubuntu-drivers-common
+
+    # 2. Driver Installation
     echo "Installing NVIDIA Drivers..."
-    until apt-get update && apt-get install -y ubuntu-drivers-common; do sleep 5; done
-        
-        # Install the drivers
     sudo ubuntu-drivers autoinstall
         
-        # Dynamically load the NVIDIA kernel modules WITHOUT rebooting
-    echo "Loading NVIDIA kernel modules..."
+    # 3. Attempt Dynamic Load
+    echo "Attempting to load NVIDIA kernel modules..."
     sudo modprobe nvidia
     sudo modprobe nvidia_uvm
         
+    # 4. GCP-Specific Reboot Logic
     if lsmod | grep -q nvidia; then
-            echo "✅ Drivers installed and kernel modules activated."
+        echo "✅ Drivers installed and kernel modules activated."
+    else
+        # Check if we are running on Google Cloud
+        if [ -f /sys/class/dmi/id/product_name ] && grep -q "Google" /sys/class/dmi/id/product_name; then
+            echo "🚨 GCP DETECTED: Kernel modules failed to load (likely Secure Boot)."
+            echo "🔄 Triggering mandatory reboot in 5 seconds to finalize NVIDIA installation..."
+            sleep 5
+            sudo reboot
         else
-            echo "⚠️ WARNING: modprobe failed. If GCP Secure Boot is ON, a reboot is required."
+            echo "⚠️ WARNING: modprobe failed, but not on GCP. Manual intervention may be required."
         fi
-
+    fi
+fi
 
     # --- 2. Setup Ollama (Smart Install) ---
     export HOME=/root
