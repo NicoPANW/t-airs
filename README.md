@@ -41,7 +41,7 @@
 
 To keep the application clean and scalable, this repository is a "Monorepo" split into two distinct layers:
 
-1. **The Intelligent Agent & Gateway Layer (`/src`):**  (/src): This is the "Core Engine" of the lab. It combines a FastAPI backend with a LiteLLM Gateway to create a unified, cloud-agnostic API.
+1. **The Agent & Gateway Layer (`/src`):** This is the "Core Engine" of the lab. It combines a FastAPI backend with a LiteLLM Gateway to create a unified, cloud-agnostic API.
 
    * **Interactive Frontend:**  Provides a real-time interface, featuring live persona switching and a Visual Metadata Trace panel for inspecting Prisma AIRS and Model decision logic.
 
