@@ -26,7 +26,7 @@ resource "google_compute_firewall" "restricted_access" {
 
 resource "google_compute_instance" "t_airs_node" {
   count        = var.target_cloud == "gcp" ? 1 : 0
-  name         = "t-airs-production-node"
+  name         = "t-airs-node"
   zone         = "${var.gcp_region}-a"
 
   # DYNAMIC FLAVOR: N1 for GPU, E2 for CPU-only
