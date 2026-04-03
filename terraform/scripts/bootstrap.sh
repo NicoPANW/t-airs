@@ -69,7 +69,7 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     echo "Pre-loading LLM models (this may take 10-15 minutes)..."
     
     # Define our array of target models (using $$ to escape Terraform interpolation)
-    MODELS=("llama3" "mistral" "gemma2:9b" "qwen2.5:7b" "deepseek-r1:7b")
+    MODELS=("llama3.2:3b" "ministral-3:3b" "qwen2.5:1.5b" "deepseek-r1:1.5b")
 
     for model in "$${MODELS[@]}"; do
         # 1. Pull the model if it's missing
