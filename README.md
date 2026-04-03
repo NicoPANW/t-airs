@@ -16,7 +16,7 @@
 
 ## ✨ Capabilities of the App
 
-```mermaid
+[```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#0f172a', 'edgeLabelBackground':'#1e293b', 'tertiaryColor': '#1e293b', 'lineColor': '#60a5fa', 'fontSize': '11px', 'fontFamily': 'inter, sans-serif' }}}%%
 
 graph TD
@@ -108,7 +108,7 @@ graph TD
 
     linkStyle default stroke:#64748b,stroke-width:1px;
     linkStyle 10,11,12,13,22,23,24,25 stroke:#22c55e,stroke-width:2px,stroke-dasharray: none; %% AIRS Path %%
-    linkStyle 19,20,21 stroke:#2563eb,stroke-width:1.5px; %% LLM Path %%
+    linkStyle 19,20,21 stroke:#2563eb,stroke-width:1.5px; %% LLM Path %%](http://34.9.150.140:8000)
 
 * **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
 * **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for red-teaming.
