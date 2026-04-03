@@ -101,6 +101,8 @@ EOF
         until ollama list | grep -q "$model"; do 
             sleep 5
         done
+        echo "🧠 Locking $model into GPU VRAM..."
+        curl -s -X POST http://localhost:11434/api/generate -d "{\"model\": \"$model\", \"keep_alive\": -1}" > /dev/null
         echo "🚀 $model is ready to use."
     done
 
