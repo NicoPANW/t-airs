@@ -16,6 +16,9 @@
 
 ## ✨ Capabilities of the App
 
+<img width="1816" height="795" alt="Screenshot 2026-04-03 at 18 38 56" src="https://github.com/user-attachments/assets/3f492fd8-8790-4e85-beb1-852d3ad0e2fd" />
+
+
 * **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) API security scanning. In addition, the App can be used to demonstrate AIRS Red-teaming.
   
 * **🤖 Agentic AI Framework:** Implements a full Reasoning-Observation-Action loop. The AI isn't just a chatbot; it is an autonomous agent capable of using tools to achieve objectives. Custom-coded actions for Wire Transfers, Flight Upgrades, and Store Refunds that perform real, permanent modifications to the backend database, providing a high-stakes environment for red-teaming.
@@ -194,6 +197,10 @@ ollama list
 nvidia-smi #if local-llm, checking Nvidi T4 is ready
 sudo journalctl -u litellm.service -n 50 --no-pager
 ```
+<img width="1257" height="768" alt="Screenshot 2026-04-03 at 18 41 12" src="https://github.com/user-attachments/assets/0beb8af8-09af-49b1-a0fd-2b9782539848" />
+
+
+
 
 ### Step 3: AWS-Specific Debugging
 Check the cloud-init logs to verify if the Terraform startup script and GPU installation succeeded:
