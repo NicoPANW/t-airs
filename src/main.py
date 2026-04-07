@@ -353,8 +353,9 @@ async def chat(
         
         # Extract the resolved model name if Auto-Routing was used
         actual_model = getattr(response, "model", model_id)
+        
         if actual_model == "auto-router":
-            actual_model = "gemini-2.5-flash-lite" 
+            actual_model = "Dynamically Routed (Gateway Load Balancer)" 
 
         if model_id == "auto-router":
             architecture_trace["ai_gateway"]["routed_to"] = f"auto-router ➔ {actual_model}"
