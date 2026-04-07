@@ -28,29 +28,10 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     
     # 🌟 Check if drivers are already working. If so, skip the whole block!
     if lsmod | grep -q nvidia; then
-        echo "✅ NVIDIA drivers are already loaded and active. Skipping installation."
+        echo "✅ NVIDIA drivers are already loaded and active."
     else
-        echo "Local LLM requested. Configuring GPU..."
+        echo "Nvidia drivers missing"
 
-        # 1. Install Build Dependencies
-        apt-get install -y linux-headers-$(uname -r) build-essential ubuntu-drivers-common
-
-        # 2. Driver Installation (This is the slow part)
-        echo "Installing NVIDIA Drivers..."
-        sudo ubuntu-drivers autoinstall
-            
-        # 3. Attempt Dynamic Load
-        sudo modprobe nvidia
-        sudo modprobe nvidia_uvm
-            
-        # 4. GCP-Specific Reboot Logic
-        if ! lsmod | grep -q nvidia; then
-            if [ -f /sys/class/dmi/id/product_name ] && grep -q "Google" /sys/class/dmi/id/product_name; then
-                echo "🚨 GCP DETECTED: Kernel modules failed to load. Rebooting to finalize..."
-                sleep 5
-                sudo reboot
-            fi
-        fi
     fi
 
     # --- 5. Setup Ollama ---
