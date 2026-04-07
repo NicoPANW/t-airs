@@ -286,7 +286,7 @@ guardrails:
     litellm_params:
       guardrail: panw_prisma_airs
       mode: "pre_call"
-      default_on: true
+      default_on: false
       api_key: os.environ/AIRS_API_KEY
       profile_name: os.environ/AIRS_PROFILE
 
@@ -294,7 +294,7 @@ guardrails:
     litellm_params:
       guardrail: panw_prisma_airs
       mode: "post_call"
-      default_on: true
+      default_on: false
       api_key: os.environ/AIRS_API_KEY
       profile_name: os.environ/AIRS_PROFILE
 EOF
