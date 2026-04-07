@@ -138,10 +138,18 @@ Run our built-in safety script to make sure your terminal is configured correctl
 ### Step 4: Deploy with Terraform
 Navigate to the terraform folder, initialize the plugins, and launch the lab!
 
+# If deploying to GCP:
 ```bash
 cd terraform
 terraform init
 terraform apply -var="target_cloud=gcp" -auto-approve
+```
+
+# If deploying to AWS:
+```bash
+cd terraform
+terraform init
+terraform apply -var="target_cloud=aws" -auto-approve
 ```
 
 > [!NOTE]  
