@@ -262,7 +262,14 @@ EOF
 # Inject AWS Models if deploying to Amazon
 elif [ "${target_cloud}" == "aws" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+  # --- EXPLICIT MODELS (For the manual UI dropdown) ---
   - model_name: ${bedrock_model_id}
+    litellm_params:
+      model: bedrock/${bedrock_model_id}
+      aws_region_name: "${aws_region}"
+
+  # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
+  - model_name: auto-router
     litellm_params:
       model: bedrock/${bedrock_model_id}
       aws_region_name: "${aws_region}"
