@@ -313,15 +313,11 @@ After=network.target
 WorkingDirectory=/opt/t-airs/src
 EOF
 
-# Inject AIRS into Gateway if toggle is set to 'gateway'
-if [ "$AIRS_MODE" == "gateway" ]; then
+# 🌟 UNCONDITIONAL INJECTION: Gateway must always have keys ready for the Live UI Toggle
 cat <<EOF >> /etc/systemd/system/litellm.service
+Environment="PANW_PRISMA_AIRS_API_KEY=${airs_key}"
 Environment="AIRS_API_KEY=${airs_key}"
 Environment="AIRS_PROFILE=${airs_profile}"
-EOF
-fi
-
-cat <<EOF >> /etc/systemd/system/litellm.service
 ExecStart=/opt/t-airs/venv/bin/litellm --config litellm_config.yaml --port 4000
 Restart=always
 User=root
