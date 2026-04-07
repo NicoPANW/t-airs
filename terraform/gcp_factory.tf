@@ -1,3 +1,23 @@
+# ==========================================
+# GCP IMAGE DATA SOURCES
+# ==========================================
+# 1. Standard Ubuntu 24.04 (For API-only)
+data "google_compute_image" "ubuntu_standard_gcp" {
+  count   = var.target_cloud == "gcp" ? 1 : 0
+  family  = "ubuntu-2404-lts"
+  project = "ubuntu-os-cloud"
+}
+
+# 2. Deep Learning VM (For Local GPU)
+data "google_compute_image" "ubuntu_dlvm_gcp" {
+  count   = var.target_cloud == "gcp" ? 1 : 0
+  family  = "common-cu121-ubuntu-2204" 
+  project = "deeplearning-platform-release"
+}
+
+# ==========================================
+# GCP NETWORK RESOURCES
+# ==========================================
 resource "google_compute_network" "t_airs_vpc" {
   count                   = var.target_cloud == "gcp" ? 1 : 0
   name                    = var.gcp_vpc_name
@@ -24,6 +44,9 @@ resource "google_compute_firewall" "restricted_access" {
   source_ranges = local.allowed_ingress
 }
 
+# ==========================================
+# GCP COMPUTE INSTANCE
+# ==========================================
 resource "google_compute_instance" "t_airs_node" {
   count        = var.target_cloud == "gcp" ? 1 : 0
   name         = "t-airs-node"
@@ -48,7 +71,10 @@ resource "google_compute_instance" "t_airs_node" {
 
   boot_disk {
     initialize_params { 
-      image = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
+      # 🌟 DYNAMIC IMAGE: DLVM if local_llm is true, standard Ubuntu if false
+      image = var.enable_local_llm ? data.google_compute_image.ubuntu_dlvm_gcp[0].self_link : data.google_compute_image.ubuntu_standard_gcp[0].self_link
+      
+      # DYNAMIC SIZE: 50GB for models, 20GB for standard
       size  = var.enable_local_llm ? 50 : 20 
     }
   }
