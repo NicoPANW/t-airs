@@ -232,7 +232,6 @@
                 const submitBtn = chatForm.querySelector('button[type="submit"]');
 
                 if (data.models && data.models.length > 0) {
-                    // THE FIX: Filter out 'auto-router' so it only exists as a toggle
                     const cleanModels = data.models.filter(m => m !== 'auto-router');
 
                     select.innerHTML = cleanModels.map(m => {
@@ -240,10 +239,8 @@
                         return `<option value="${m}" class="${isLocal ? 'local-option' : ''}">${isLocal ? '🏠 ' + m + ' (Local)' : '☁️ ' + m}</option>`;
                     }).join('');
                     
-                    // Set default selection to the first available real model
                     if (cleanModels.length > 0) {
                         select.value = cleanModels[0];
-                        // Update the engine tag if the auto-toggle is currently OFF
                         if (!document.getElementById('auto-route-toggle').checked) {
                             document.getElementById('engine-tag').innerText = select.value;
                         }
@@ -341,7 +338,6 @@
             const persona = document.querySelector('input[name="persona"]:checked').value;
             const airsEnabled = document.getElementById('airs-toggle').checked;
             
-            // 🌟 NEW: Capture the Placement Toggle Value
             const enforcementPlacement = document.querySelector('input[name="enforcement"]:checked').value;
 
             appendMessage('user', message);
@@ -355,7 +351,6 @@
                 const res = await fetch('/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    // 🌟 NEW: Added enforcement_placement to the payload sent to main.py
                     body: new URLSearchParams({
                         'message': message, 'persona': persona, 'session_id': sessionId,
                         'airs_enabled': airsEnabled, 'model_id': modelId, 'history_enabled': historyEnabled,
@@ -383,16 +378,13 @@
                         badgeColor = "bg-green-900/50 text-green-400";
                     }
 
-                    // --- NEW OBSERVABILITY TRACE BUILDER ---
                     let traceHtml = "";
                     if (data.logs.trace) {
                         
-                        // 1. RAG Pipeline Status Flag
+                        // 1. RAG Pipeline
                         if (data.logs.trace.rag_pipeline) {
                             const chunks = data.logs.trace.rag_pipeline.chunks_injected || [];
                             const hasContext = chunks.length > 0;
-                            
-                            // Calculate total characters to show "weight" of the data
                             const totalChars = chunks.join("").length;
 
                             traceHtml += `
@@ -422,7 +414,7 @@
                                 </div>`;
                         }
 
-                        // 2. AI Gateway Trace (Routes the augmented prompt)
+                        // 2. AI Gateway
                         if (data.logs.trace.ai_gateway && data.logs.trace.ai_gateway.routed_to) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
@@ -431,12 +423,21 @@
                                 </div>`;
                         }
 
-                        // 3. MCP Tool Execution Trace (LLM queries the DB)
+                        // 3. MCP
                         if (data.logs.trace.mcp_execution && data.logs.trace.mcp_execution.length > 0) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
                                     <div class="text-[9px] text-teal-400 font-bold mb-1 uppercase tracking-tighter italic">🔌 3. MCP Execution (Tool Called):</div>
                                     <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-teal-300 border border-slate-800 leading-tight">${JSON.stringify(data.logs.trace.mcp_execution, null, 2)}</pre>
+                                </div>`;
+                        }
+                        
+                        // 🌟 4. LLM Raw Text Output
+                        if (data.logs.trace.llm_generation) {
+                            traceHtml += `
+                                <div class="mt-2 border-t border-slate-700/50 pt-2">
+                                    <div class="text-[9px] text-zinc-400 font-bold mb-1 uppercase tracking-tighter italic">💬 4. LLM Raw Generation:</div>
+                                    <div class="bg-black/60 p-2 rounded text-[9px] text-zinc-300 border border-slate-800 max-h-32 overflow-y-auto whitespace-pre-wrap">${data.logs.trace.llm_generation.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
                                 </div>`;
                         }
                     }
@@ -453,7 +454,7 @@
                             <div class="mt-2 border-t border-slate-700/50 pt-2">
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="text-[9px] font-bold uppercase tracking-tighter italic ${statusText.includes('BLOCK') ? 'text-red-400' : 'text-green-400'}">
-                                        🛡️ 4. Prisma AIRS Security Scan
+                                        🛡️ 5. Prisma AIRS Security Scan
                                     </div>
                                     <span class="px-2 py-0.5 rounded text-[9px] font-bold ${badgeColor} shadow-sm">
                                         ${statusText}
@@ -488,12 +489,10 @@
 
         autoToggle.addEventListener('change', (e) => {
             if (e.target.checked) {
-                // Turn Auto ON
                 manualContainer.classList.add('hidden');
                 autoContainer.classList.remove('hidden');
                 engineTag.innerHTML = '<i data-lucide="zap" class="w-3 h-3 text-blue-500"></i> AUTO-ROUTING';
             } else {
-                // Turn Auto OFF
                 manualContainer.classList.remove('hidden');
                 autoContainer.classList.add('hidden');
                 engineTag.innerText = document.getElementById('model-select').value;
