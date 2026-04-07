@@ -350,16 +350,11 @@ WorkingDirectory=/opt/t-airs/src
 ExecStartPre=/bin/bash -c 'until curl -s http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
 EOF
 
-# Inject AIRS into App ONLY if toggle is set to 'app'
-if [ "$AIRS_MODE" == "app" ]; then
+
 cat <<EOF >> /etc/systemd/system/t-airs.service
-ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-mode app --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
 EOF
-else
-cat <<EOF >> /etc/systemd/system/t-airs.service
-ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-mode gateway --gateway-url http://127.0.0.1:4000
-EOF
-fi
+
 
 cat <<EOF >> /etc/systemd/system/t-airs.service
 Restart=always
