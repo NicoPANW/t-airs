@@ -416,7 +416,8 @@ async def chat(
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
-                temperature=0.7
+                temperature=0.7,
+                extra_body=gateway_params
             )
             bot_response = final_response.choices[0].message.content or ""
         else:
@@ -463,7 +464,7 @@ async def chat(
         error_str = str(e)
         
         # 🌟 1. Catch and Beautify LiteLLM Gateway Security Rejections
-        if AIRS_MODE == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
+        if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
             
             # Determine the Scan Type
             scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
