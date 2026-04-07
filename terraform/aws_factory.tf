@@ -110,7 +110,7 @@ resource "aws_instance" "t_airs_node" {
   root_block_device {
     # DYNAMIC DISK: Local LLMs and NVIDIA drivers take massive space. 
     # 50GB for GPU mode, 20GB for CPU-only mode.
-    volume_size           = var.enable_local_llm ? 50 : 20 
+    volume_size           = var.enable_local_llm ? 75 : 20 
     volume_type           = "gp3"
     delete_on_termination = true
   }
