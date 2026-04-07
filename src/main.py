@@ -253,7 +253,8 @@ async def chat(
     session_id: str = Form("default-session"),
     airs_enabled: bool = Form(False),
     model_id: str = Form("none"),
-    history_enabled: bool = Form(True)
+    history_enabled: bool = Form(True),
+    enforcement_placement: str = Form("gateway")
 ):
     selected_prompt = PERSONAS.get(persona, PERSONAS["banking"])
     security_status = "Bypassed"
