@@ -4,14 +4,14 @@
 # 1. Standard Ubuntu 24.04 (For API-only)
 data "google_compute_image" "ubuntu_standard_gcp" {
   count   = var.target_cloud == "gcp" ? 1 : 0
-  family  = "ubuntu-2404-lts"
+  family  = "ubuntu-2404-lts-amd64"    # 🌟 FIXED: Added architecture suffix
   project = "ubuntu-os-cloud"
 }
 
 # 2. Deep Learning VM (For Local GPU)
 data "google_compute_image" "ubuntu_dlvm_gcp" {
   count   = var.target_cloud == "gcp" ? 1 : 0
-  family  = "common-cu121-ubuntu-2204" 
+  family  = "common-cu128-ubuntu-2204-nvidia-570" # 🌟 FIXED: Latest CUDA/Driver stack
   project = "deeplearning-platform-release"
 }
 
