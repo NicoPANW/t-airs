@@ -2,7 +2,6 @@
 
 # Capture the Terraform variables
 ENABLE_LOCAL_LLM="${enable_local_llm}"
-AIRS_MODE="${airs_integration_mode}"
 
 # --- 0. ROBUST UPDATE & INSTALL ---
 echo "Updating system packages..."
