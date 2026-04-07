@@ -274,6 +274,7 @@ async def chat(
         architecture_trace["ai_gateway"]["routed_to"] = model_id
 
     try:
+        execution_phase = "Initial Inference"
         # --- 1. INGRESS SCAN (Only runs locally if AIRS_MODE == "app") ---
         if AIRS_MODE == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
             scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message))
