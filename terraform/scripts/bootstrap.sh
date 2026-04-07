@@ -280,6 +280,23 @@ litellm_settings:
 
 router_settings:
   routing_strategy: cost-based-routing
+
+guardrails:
+  - guardrail_name: "airs-ingress-scan"
+    litellm_params:
+      guardrail: panw_prisma_airs
+      mode: "pre_call"
+      default_on: true
+      api_key: os.environ/AIRS_API_KEY
+      profile_name: os.environ/AIRS_PROFILE
+
+  - guardrail_name: "airs-egress-scan"
+    litellm_params:
+      guardrail: panw_prisma_airs
+      mode: "post_call"
+      default_on: true
+      api_key: os.environ/AIRS_API_KEY
+      profile_name: os.environ/AIRS_PROFILE
 EOF
 
 
