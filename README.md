@@ -27,7 +27,7 @@
 
 * **☁️ SAAS models (recommended):** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
 
-* **🏠 Local models (not recommended):** Even though not recommended since they are slower than SAAS models, there is an option to deploy local models on Tesla T4 GPUs. Note the very first prompt is slow as it loads the model into VRAM.
+* **🏠 Local models (not recommended):** Even though not recommended since they are slower than SAAS models, there is an option to deploy local models on Nvidia T4 GPUs.
 
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 
@@ -145,7 +145,7 @@ terraform apply -var="target_cloud=gcp" -auto-approve
 ```
 
 > [!NOTE]  
-> If you want to use local LLM with GPU, use this command instead `terraform apply -var="target_cloud=gcp" -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, the server will take about **15-20 minutes** to boot up, install the NVIDIA drivers, and pull the 24GB of local AI models. Grab a coffee! Note the very first prompt is realy slow, since it needs to load the model on the GPU.
+> If you want to use local LLM with GPU, use this command instead `terraform apply -var="target_cloud=gcp" -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, the server will take about **15-20 minutes** to boot up, install the NVIDIA drivers, and pull 3 local AI models and load them in GPU. Grab a coffee!
 
 ### Step 5: Access the Lab
 Once Terraform finishes, it will print out the Public IP address of your new server. Open your web browser and go to:
