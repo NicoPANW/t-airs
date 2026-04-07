@@ -355,12 +355,6 @@ async def chat(
         
         # Parse the raw response back into the standard Pydantic object
         response = raw_response.parse()
-
-        # 🚨 DEBUG: DUMP ALL HTTP HEADERS TO THE CONSOLE
-        print("\n=== 🕵️‍♂️ LITELLM RAW HEADERS ===")
-        for key, value in raw_response.headers.items():
-            print(f"{key}: {value}")
-        print("================================\n")
         
         # Extract the default model name from the JSON body
         actual_model = getattr(response, "model", model_id)
