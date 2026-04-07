@@ -19,7 +19,7 @@
 <img width="1816" height="795" alt="Screenshot 2026-04-03 at 18 38 56" src="https://github.com/user-attachments/assets/3f492fd8-8790-4e85-beb1-852d3ad0e2fd" />
 
 
-* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS for synchronous Ingress (User Prompt) and Egress (LLM Response) API security scanning. In addition, the App can be used to demonstrate AIRS Red-teaming.
+* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS API security scanning, the interception can be either at the AI Gateway level (default) or at the App level. In addition, the App can be used to demonstrate AIRS Red-teaming.
   
 * **🤖 Agentic AI Framework:** Implements a full Reasoning-Observation-Action loop. The AI isn't just a chatbot; it is an autonomous agent capable of using tools to achieve objectives. Custom-coded actions for Wire Transfers, Flight Upgrades, and Store Refunds that perform real, permanent modifications to the backend database, providing a high-stakes environment for red-teaming.
 
