@@ -40,14 +40,14 @@ parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
-parser.add_argument("--airs-mode", help="Where to enforce AIRS (app or gateway)", default="gateway", choices=["app", "gateway"])
+parser.add_argument("--airs-mode", help="Legacy Boot Arg", default="gateway", choices=["app", "gateway"])
 args, _ = parser.parse_known_args()
 
 # Global configuration variables
 AIRS_KEY = args.airs_key
 AIRS_PROFILE_NAME = args.airs_profile
 GATEWAY_URL = args.gateway_url
-AIRS_MODE = args.airs_mode
+# (AIRS_MODE is kept here to prevent CLI crashing, but is no longer used for routing logic)
 
 # Security state trackers
 AIRS_CONFIGURED = False
@@ -149,32 +149,29 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
 async def lifespan(app: FastAPI):
     global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools
     print("\n" + "="*50)
-    print("🚀 T-AIRS STARTUP (GATEWAY + MCP + RAG MODE)")
+    print("🚀 T-AIRS STARTUP (DYNAMIC ENFORCEMENT MODE)")
     print("="*50)
     print("Checking Hardware Acceleration...")
     print(f"RESULT: {check_gpu_status()}")
     print("-" * 50)
     
-    # 1. Prisma AIRS Handshake (Dynamic based on mode)
-    if AIRS_MODE == "app":
-        if AIRS_KEY and AIRS_PROFILE_NAME:
-            print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...")
-            try:
-                aisecurity.init(api_key=AIRS_KEY)
-                ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-                Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
-                AIRS_CONFIGURED = True
-                airs_error_msg = "Connected"
-                print("RESULT: ✅ APP-LEVEL AIRS SDK ONLINE")
-            except Exception as e:
-                raw_error = str(e)
-                match = re.search(r'HTTP response body: (\{.*\})', raw_error)
-                airs_error_msg = match.group(1) if match else raw_error
-                print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}")
+    # 1. Prisma AIRS Handshake (ALWAYS initialize so UI toggle can work instantly)
+    if AIRS_KEY and AIRS_PROFILE_NAME:
+        print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...")
+        try:
+            aisecurity.init(api_key=AIRS_KEY)
+            ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
+            Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
+            AIRS_CONFIGURED = True
+            airs_error_msg = "Connected"
+            print("RESULT: ✅ APP-LEVEL AIRS SDK ONLINE")
+        except Exception as e:
+            raw_error = str(e)
+            match = re.search(r'HTTP response body: (\{.*\})', raw_error)
+            airs_error_msg = match.group(1) if match else raw_error
+            print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}")
     else:
-        print("RESULT: 🌍 AIRS running in GATEWAY mode. Local App SDK bypassed.")
-        AIRS_CONFIGURED = False
-        airs_error_msg = "Security Enforced centrally by LiteLLM Gateway"
+        print("RESULT: ⚠️ AIRS Keys missing. App SDK Disabled.")
 
     # 2. AI Gateway Discovery
     print("Performing Deep Model Discovery via AI Gateway...")
@@ -236,8 +233,6 @@ async def list_models():
 
 @app.get("/health-airs")
 async def health_airs():
-    if AIRS_MODE == "gateway":
-        return {"status": "connected", "profile": "Gateway Mode", "reason": airs_error_msg}
     return {"status": "connected" if AIRS_CONFIGURED else "disconnected", "profile": AIRS_PROFILE_NAME, "reason": airs_error_msg}
 
 @app.get("/get-persona-context/{persona_id}")
@@ -261,7 +256,7 @@ async def chat(
     raw_sec_log = "{}"
     ingress_data = {}
     print(f"\n{'='*40}")
-    print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona} | AIRS Mode: {AIRS_MODE}")
+    print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona} | Placement: {enforcement_placement.upper()}")
     print(f"💬 PROMPT: {message}")
     
     architecture_trace = {
@@ -281,15 +276,15 @@ async def chat(
         # 🌟 STATE TRACKER: Initial Inference Phase
         execution_phase = "Initial Inference"
         
-        # --- 1. INGRESS SCAN (Only runs locally if AIRS_MODE == "app") ---
-        if AIRS_MODE == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+        # --- 1. INGRESS SCAN (App-Level) ---
+        if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
             scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message))
             res_data = scan_response.to_dict()
             ingress_data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
             
             if str(ingress_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ App-Level AIRS Blocked Input: {ingress_data.get('category', 'Policy')} violation."
-                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK", "raw_response": json.dumps(ingress_data, indent=2), "trace": architecture_trace}}
+                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK (User ➔ LLM)", "raw_response": json.dumps(ingress_data, indent=2), "trace": architecture_trace}}
             security_status = "Passed App Input"
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
@@ -352,7 +347,6 @@ async def chat(
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
-                print(f"📦 ARGUMENTS: {tool_args}")
                 
                 # --- 🚀 CUSTOM ACTION TOOLS (WRITES TO DB) ---
                 if tool_name in ["transfer_funds", "upgrade_flight_seat", "issue_store_refund"]:
@@ -424,8 +418,8 @@ async def chat(
         else:
             bot_response = response_msg.content or ""
 
-        # --- 5. EGRESS SCAN (Only runs locally if AIRS_MODE == "app") ---
-        if AIRS_MODE == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
+        # --- 5. EGRESS SCAN (App-Level) ---
+        if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
             out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=bot_response))
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
@@ -437,7 +431,7 @@ async def chat(
                     "bot": block_txt, 
                     "output": block_txt, 
                     "logs": {
-                        "security_scan": "EGRESS BLOCK", 
+                        "security_scan": "EGRESS BLOCK (LLM ➔ User)", 
                         "raw_response": json.dumps(out_data, indent=2), 
                         "trace": architecture_trace,
                         "intercepted_text": bot_response
@@ -453,7 +447,7 @@ async def chat(
             if len(SESSION_HISTORY[session_id]) > 10:
                 SESSION_HISTORY[session_id] = SESSION_HISTORY[session_id][-10:]
 
-        if AIRS_MODE == "gateway" and airs_enabled:
+        if enforcement_placement == "gateway" and airs_enabled:
              security_status = "Checked & Passed by Gateway"
 
         print(f"🏁 REQUEST COMPLETE | Security Status: {security_status}")
