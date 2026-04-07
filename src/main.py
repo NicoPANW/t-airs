@@ -344,17 +344,28 @@ async def chat(
         # --- 4. AI GATEWAY INFERENCE & TOOL CALLING ---
         # Send payload to LiteLLM for processing
         print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
-        response = await llm_client.chat.completions.create(
+        
+        # 🌟 NEW: Use .with_raw_response to capture the raw HTTP packet + headers
+        raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
             messages=messages,
             tools=active_tools if active_tools else None,
             temperature=0.7
         )
         
-        # Extract the resolved model name if Auto-Routing was used
+        # Parse the raw response back into the standard Pydantic object
+        response = raw_response.parse()
+        
+        # Extract the default model name from the JSON body
         actual_model = getattr(response, "model", model_id)
         
-        if actual_model == "auto-router":
+        # 🌟 NEW: Intercept LiteLLM's hidden routing headers to unmask the backend
+        hidden_model = raw_response.headers.get("x-litellm-model-name")
+        
+        if hidden_model:
+            # Successfully pierced the Gateway abstraction!
+            actual_model = hidden_model
+        elif actual_model == "auto-router":
             actual_model = "Dynamically Routed (Gateway Load Balancer)" 
 
         if model_id == "auto-router":
