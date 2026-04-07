@@ -311,9 +311,12 @@ async def chat(
         # --- 4. AI GATEWAY INFERENCE & TOOL CALLING ---
         print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
         
-        gateway_params = {}
+        gateway_params_ingress = {}
+        gateway_params_egress = {}
+        
         if enforcement_placement == "gateway" and airs_enabled:
             gateway_params_ingress = {"guardrails": ["airs-ingress-scan"]}
+            gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
         
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
