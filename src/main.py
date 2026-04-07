@@ -420,7 +420,7 @@ async def chat(
         architecture_trace["llm_generation"] = bot_response
         # --- 5. EGRESS SCAN (App-Level) ---
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
-            out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=bot_response))
+            out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(response=bot_response))
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
             
