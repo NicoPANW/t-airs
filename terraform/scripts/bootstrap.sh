@@ -337,7 +337,7 @@ After=$TAIRS_AFTER
 
 [Service]
 WorkingDirectory=/opt/t-airs/src
-ExecStartPre=/bin/bash -c 'until curl -s http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
+ExecStartPre=/bin/bash -c 'until curl -s http://localhost:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
 # The Python app is now entirely cloud-agnostic, passing only the Prisma keys and Gateway URL
 ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://localhost:4000
 Restart=always
