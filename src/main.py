@@ -5,6 +5,7 @@ import json
 import re
 import requests
 import torch
+import ast  # 🌟 NEW: Abstract Syntax Tree for piercing LiteLLM's nested stringified JSON
 from contextlib import asynccontextmanager, AsyncExitStack
 
 # FastAPI Imports for web server and UI rendering
@@ -12,14 +13,14 @@ from fastapi import FastAPI, Request, Form, Response
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-# 🌟 1. The Universal AI Gateway Client (Routes requests to LiteLLM)
+# 1. The Universal AI Gateway Client (Routes requests to LiteLLM)
 from openai import AsyncOpenAI
 
-# 🌟 2. MCP Imports (Model Context Protocol for direct Database Tool Calling)
+# 2. MCP Imports (Model Context Protocol for direct Database Tool Calling)
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-# 🌟 3. RAG Imports (Retrieval-Augmented Generation for Unstructured Data)
+# 3. RAG Imports (Retrieval-Augmented Generation for Unstructured Data)
 import chromadb
 from sentence_transformers import SentenceTransformer
 from rag_data import RAG_KNOWLEDGE_BASE
@@ -39,7 +40,6 @@ parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
-# 🌟 NEW: The Integration Toggle (Defaults to Gateway)
 parser.add_argument("--airs-mode", help="Where to enforce AIRS (app or gateway)", default="gateway", choices=["app", "gateway"])
 args, _ = parser.parse_known_args()
 
@@ -273,8 +273,13 @@ async def chat(
         model_id = validated_models[0] if validated_models else None
         architecture_trace["ai_gateway"]["routed_to"] = model_id
 
+    # Initialize tracker outside try block for safe exception handling
+    execution_phase = "Pre-Inference"
+
     try:
+        # 🌟 STATE TRACKER: Initial Inference Phase
         execution_phase = "Initial Inference"
+        
         # --- 1. INGRESS SCAN (Only runs locally if AIRS_MODE == "app") ---
         if AIRS_MODE == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
             scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message))
@@ -400,6 +405,9 @@ async def chat(
                     "database_result": tool_output
                 })
 
+            # 🌟 STATE TRACKER: Secondary Inference Phase (after tools return)
+            execution_phase = "Tool Summarization Inference"
+            
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
@@ -449,26 +457,45 @@ async def chat(
     except Exception as e:
         error_str = str(e)
         
-        # 🌟 Catch and Beautify LiteLLM Gateway Security Rejections
-        if AIRS_MODE == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower()):
+        # 🌟 1. Catch and Beautify LiteLLM Gateway Security Rejections
+        if AIRS_MODE == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
             
-            # Use Regex to hunt down the specific violation category in the messy string
-            category_match = re.search(r"'category':\s*'([^']+)'", error_str)
-            
-            if category_match:
-                # E.g., turns "malicious" into "Malicious"
-                category = category_match.group(1).capitalize()
-                clean_msg = f"🛡️ Blocked by Prisma AIRS (Gateway): {category} policy violation."
+            # Determine the Scan Type
+            scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
+            log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
+
+            # 🌟 2. Calculate the exact Traffic Direction based on the execution state
+            if execution_phase == "Initial Inference":
+                direction = "User ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ MCP Tool (or User)"
             else:
-                # Fallback if the regex misses
-                clean_msg = "🛡️ Blocked by Prisma AIRS (Gateway): Security policy violation."
+                direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
+
+            # 🌟 3. Extract the category for the Chat UI
+            category_match = re.search(r"'category':\s*'([^']+)'", error_str)
+            category = category_match.group(1).capitalize() if category_match else "Security"
+            
+            if "http_400_error" in error_str or "scan_failed" in error_str:
+                clean_msg = f"🛡️ Gateway Scan Failed [{direction}]: Payload rejected."
+            else:
+                clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
+
+            # 🌟 4. Pierce the nested string to build a clean JSON log for the Sidebar
+            sidebar_log = {"raw_error": error_str} 
+            try:
+                inner_json_match = re.search(r'"(\{.*?\})"', error_str)
+                if inner_json_match:
+                    inner_str = inner_json_match.group(1)
+                    parsed_dict = ast.literal_eval(inner_str)
+                    sidebar_log = {log_key: parsed_dict.get("error", parsed_dict)}
+            except Exception as parse_error:
+                print(f"Debug: Failed to parse inner LiteLLM error: {parse_error}")
 
             return {
                 "bot": clean_msg, 
                 "output": clean_msg, 
                 "logs": {
-                    "security_scan": "GATEWAY BLOCK", 
-                    "raw_response": error_str,  # Keep the raw JSON for the debug UI!
+                    "security_scan": f"{scan_type} ({direction})", 
+                    "raw_response": json.dumps(sidebar_log, indent=2), 
                     "trace": architecture_trace
                 }
             }
