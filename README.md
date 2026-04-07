@@ -165,8 +165,8 @@ Destroy the lab with one command:
 
 ```bash
 cd terraform
-terraform destroy -var="target_cloud=gcp" -auto-approve # GCP
-terraform destroy -var="target_cloud=aws" -auto-approve # AWS
+terraform destroy -var="target_cloud=gcp" -auto-approve # for GCP
+terraform destroy -var="target_cloud=aws" -auto-approve # for AWS
 ```
 
 ---
