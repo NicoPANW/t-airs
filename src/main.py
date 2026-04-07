@@ -40,7 +40,6 @@ parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
-parser.add_argument("--airs-mode", help="Legacy Boot Arg", default="gateway", choices=["app", "gateway"])
 args, _ = parser.parse_known_args()
 
 # Global configuration variables
