@@ -1,11 +1,18 @@
-# Dynamically fetch the latest Ubuntu 24.04 AMI
+# Dynamically fetch the latest Canonical Ubuntu 24.04 AMI
 data "aws_ami" "ubuntu_standard" {
+  count       = var.target_cloud == "aws" ? 1 : 0
   most_recent = true
-  count = var.target_cloud == "aws" ? 1 : 0
-  name  = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
 }
 
+# Dynamically fetch the AWS Deep Learning AMI
 data "aws_ami" "ubuntu_dlami" {
+  count       = var.target_cloud == "aws" ? 1 : 0
   most_recent = true
   owners      = ["amazon"]
 
