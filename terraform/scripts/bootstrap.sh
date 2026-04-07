@@ -34,7 +34,7 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
         echo "⚠️ Nvidia drivers missing (Check your DLAMI/DLVM mapping!)"
     fi
 
-    # --- 5. Setup Ollama ---
+    # ---  Setup Ollama ---
     export HOME=/root
     if ! command -v ollama &> /dev/null; then
         echo "Ollama not found. Installing..."
@@ -51,7 +51,7 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
         sleep 2
     done
 
-    # --- 5.5 Configure Ollama for Multi-Model Preloading ---
+    # ---  Configure Ollama for Multi-Model Preloading ---
     echo "Configuring Ollama to hold multiple models in VRAM..."
     mkdir -p /etc/systemd/system/ollama.service.d
     cat <<EOF > /etc/systemd/system/ollama.service.d/override.conf
