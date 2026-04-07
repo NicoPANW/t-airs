@@ -20,6 +20,12 @@ variable "prisma_airs_ips" {
   ]
 }
 
+variable "airs_integration_mode" {
+  description = "Where to enforce Prisma AIRS security (gateway or app)"
+  type        = string
+  default     = "gateway" 
+}
+
 variable "enable_local_llm" {
   description = "If true, deploys an N1 instance with a T4 GPU and installs Ollama/Llama3."
   type        = bool
