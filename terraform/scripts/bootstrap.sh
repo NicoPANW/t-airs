@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Capture the Terraform variable (will be "true" or "false")
+# Capture the Terraform variables
 ENABLE_LOCAL_LLM="${enable_local_llm}"
+AIRS_MODE="${airs_integration_mode}"
 
 # --- 0. ROBUST UPDATE & INSTALL ---
 echo "Updating system packages..."
@@ -30,8 +31,7 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     if lsmod | grep -q nvidia; then
         echo "✅ NVIDIA drivers are already loaded and active."
     else
-        echo "Nvidia drivers missing"
-
+        echo "⚠️ Nvidia drivers missing (Check your DLAMI/DLVM mapping!)"
     fi
 
     # --- 5. Setup Ollama ---
@@ -47,7 +47,7 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
 
     # Wait dynamically for the Ollama API to wake up
     echo "Waiting for Ollama engine to initialize..."
-    until curl -s http://localhost:11434/api/tags > /dev/null; do 
+    until curl -s http://127.0.0.1:11434/api/tags > /dev/null; do 
         sleep 2
     done
 
@@ -83,7 +83,7 @@ EOF
             sleep 5
         done
         echo "🧠 Locking $model into GPU VRAM..."
-        curl -s -X POST http://localhost:11434/api/generate -d "{\"model\": \"$model\", \"keep_alive\": -1}" > /dev/null
+        curl -s -X POST http://127.0.0.1:11434/api/generate -d "{\"model\": \"$model\", \"keep_alive\": -1}" > /dev/null
         echo "🚀 $model is ready to use."
     done
 
@@ -169,8 +169,6 @@ conn.executemany('INSERT INTO warehouse_access VALUES (?, ?, ?)', wh_data)
 
 conn.commit()
 "
-
-
 
 # D. Setup Python Virtual Environment & Install Requirements
 python3 -m venv venv
@@ -263,15 +261,15 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: local-llama3.2:3b
     litellm_params:
       model: ollama/llama3.2:3b
-      api_base: "http://localhost:11434"
+      api_base: "http://127.0.0.1:11434"
   - model_name: local-ministral:3b
     litellm_params:
       model: ollama/ministral-3:3b
-      api_base: "http://localhost:11434"
+      api_base: "http://127.0.0.1:11434"
   - model_name: local-qwen2.5:1.5b
     litellm_params:
       model: ollama/qwen2.5:1.5b
-      api_base: "http://localhost:11434"
+      api_base: "http://127.0.0.1:11434"
 EOF
 fi
 
@@ -287,7 +285,9 @@ EOF
 
 # --- 4. Create Systemd Services ---
 
-# A. Create the AI Gateway Service
+echo "Configuring Prisma AIRS Integration Mode: $AIRS_MODE"
+
+# A. Create the AI Gateway Service (LiteLLM)
 cat <<EOF > /etc/systemd/system/litellm.service
 [Unit]
 Description=LiteLLM AI Gateway
@@ -295,6 +295,17 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/t-airs/src
+EOF
+
+# Inject AIRS into Gateway if toggle is set to 'gateway'
+if [ "$AIRS_MODE" == "gateway" ]; then
+cat <<EOF >> /etc/systemd/system/litellm.service
+Environment="AIRS_API_KEY=${airs_key}"
+Environment="AIRS_PROFILE=${airs_profile}"
+EOF
+fi
+
+cat <<EOF >> /etc/systemd/system/litellm.service
 ExecStart=/opt/t-airs/venv/bin/litellm --config litellm_config.yaml --port 4000
 Restart=always
 User=root
@@ -302,6 +313,7 @@ User=root
 [Install]
 WantedBy=multi-user.target
 EOF
+
 
 # B. Create the T-AIRS App Service
 # We conditionally add ollama.service dependency if local LLMs are enabled
@@ -318,9 +330,21 @@ After=$TAIRS_AFTER
 
 [Service]
 WorkingDirectory=/opt/t-airs/src
-ExecStartPre=/bin/bash -c 'until curl -s http://localhost:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
-# The Python app is now entirely cloud-agnostic, passing only the Prisma keys and Gateway URL
-ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://localhost:4000
+ExecStartPre=/bin/bash -c 'until curl -s http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
+EOF
+
+# Inject AIRS into App ONLY if toggle is set to 'app'
+if [ "$AIRS_MODE" == "app" ]; then
+cat <<EOF >> /etc/systemd/system/t-airs.service
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-mode app --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
+EOF
+else
+cat <<EOF >> /etc/systemd/system/t-airs.service
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-mode gateway --gateway-url http://127.0.0.1:4000
+EOF
+fi
+
+cat <<EOF >> /etc/systemd/system/t-airs.service
 Restart=always
 User=root
 
