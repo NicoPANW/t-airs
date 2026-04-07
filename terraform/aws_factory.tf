@@ -1,7 +1,18 @@
 # Dynamically fetch the latest Ubuntu 24.04 AMI
-data "aws_ssm_parameter" "ubuntu" {
+data "aws_ami" "ubuntu_standard" {
+  most_recent = true
   count = var.target_cloud == "aws" ? 1 : 0
   name  = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+}
+
+data "aws_ami" "ubuntu_dlami" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"]
+  }
 }
 
 resource "aws_vpc" "t_airs_vpc" {
@@ -81,7 +92,7 @@ ingress {
 
 resource "aws_instance" "t_airs_node" {
   count                  = var.target_cloud == "aws" ? 1 : 0
-  ami                    = data.aws_ssm_parameter.ubuntu[0].value
+  ami                    = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
   
   # DYNAMIC FLAVOR: g4dn.xlarge (1x NVIDIA T4 GPU) if true, t3.medium (CPU) if false
   instance_type          = var.enable_local_llm ? "g4dn.xlarge" : "t3.medium"
