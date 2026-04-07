@@ -27,7 +27,7 @@
 
 * **☁️ SAAS models (recommended):** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
 
-* **🏠 Local models (not recommended):** Even though not recommended since they are slower than SAAS models, there is an option to deploy local models on Nvidia T4 GPUs.
+* **🏠 Local models (not recommended):** Even though not recommended since they are slower than SAAS models and less accurate, there is an option to deploy local models (llama3.2:3b, ministral-3:3b, qwen2.5:1.5b) on Nvidia T4 GPUs.
 
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 
