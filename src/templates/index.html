@@ -50,6 +50,20 @@
                     <span id="airs-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
                     <span id="airs-profile-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter">NO_PROFILE</span>
                 </div>
+
+                <div class="mt-3 flex items-center justify-between bg-slate-800/50 p-2 rounded-lg border border-slate-700">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Placement</span>
+                    <div class="flex gap-1 bg-slate-900 p-1 rounded-md shadow-inner">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="enforcement" value="app" class="peer sr-only">
+                            <div class="px-2 py-1 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm">APP</div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="enforcement" value="gateway" class="peer sr-only" checked>
+                            <div class="px-2 py-1 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm">GATEWAY</div>
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <div class="sidebar-section">
@@ -218,7 +232,7 @@
                 const submitBtn = chatForm.querySelector('button[type="submit"]');
 
                 if (data.models && data.models.length > 0) {
-                    // 🌟 THE FIX: Filter out 'auto-router' so it only exists as a toggle
+                    // THE FIX: Filter out 'auto-router' so it only exists as a toggle
                     const cleanModels = data.models.filter(m => m !== 'auto-router');
 
                     select.innerHTML = cleanModels.map(m => {
@@ -326,6 +340,9 @@
             const message = msgInput.value;
             const persona = document.querySelector('input[name="persona"]:checked').value;
             const airsEnabled = document.getElementById('airs-toggle').checked;
+            
+            // 🌟 NEW: Capture the Placement Toggle Value
+            const enforcementPlacement = document.querySelector('input[name="enforcement"]:checked').value;
 
             appendMessage('user', message);
             msgInput.value = '';
@@ -338,9 +355,11 @@
                 const res = await fetch('/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    // 🌟 NEW: Added enforcement_placement to the payload sent to main.py
                     body: new URLSearchParams({
                         'message': message, 'persona': persona, 'session_id': sessionId,
-                        'airs_enabled': airsEnabled, 'model_id': modelId, 'history_enabled': historyEnabled
+                        'airs_enabled': airsEnabled, 'model_id': modelId, 'history_enabled': historyEnabled,
+                        'enforcement_placement': enforcementPlacement 
                     })
                 });
                 const data = await res.json();
