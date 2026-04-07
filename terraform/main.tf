@@ -52,6 +52,7 @@ locals {
     enable_local_llm = var.enable_local_llm
     target_cloud     = var.target_cloud
     aws_region       = var.aws_region
+    airs_integration_mode = var.airs_integration_mode
     bedrock_model_id = var.bedrock_model_id
   })
 }
