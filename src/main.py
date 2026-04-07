@@ -448,16 +448,36 @@ async def chat(
     except Exception as e:
         error_str = str(e)
         
-        # 🌟 NEW: Catch LiteLLM Gateway Security Rejections
-        if AIRS_MODE == "gateway":
-            if "content policy" in error_str.lower() or "blocked" in error_str.lower() or "violation" in error_str.lower() or "400" in error_str:
-                return {
-                    "bot": f"🛡️ Gateway Blocked Request: {error_str}", 
-                    "output": f"🛡️ Gateway Blocked Request: {error_str}", 
-                    "logs": {"security_scan": "GATEWAY BLOCK", "raw_response": error_str, "trace": architecture_trace}
-                }
+        # 🌟 Catch and Beautify LiteLLM Gateway Security Rejections
+        if AIRS_MODE == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower()):
+            
+            # Use Regex to hunt down the specific violation category in the messy string
+            category_match = re.search(r"'category':\s*'([^']+)'", error_str)
+            
+            if category_match:
+                # E.g., turns "malicious" into "Malicious"
+                category = category_match.group(1).capitalize()
+                clean_msg = f"🛡️ Blocked by Prisma AIRS (Gateway): {category} policy violation."
+            else:
+                # Fallback if the regex misses
+                clean_msg = "🛡️ Blocked by Prisma AIRS (Gateway): Security policy violation."
 
-        return {"bot": f"Error: {error_str}", "output": f"Error: {error_str}", "logs": {"security_scan": "Error", "raw_response": raw_sec_log, "trace": architecture_trace}}
+            return {
+                "bot": clean_msg, 
+                "output": clean_msg, 
+                "logs": {
+                    "security_scan": "GATEWAY BLOCK", 
+                    "raw_response": error_str,  # Keep the raw JSON for the debug UI!
+                    "trace": architecture_trace
+                }
+            }
+
+        # Catch standard non-security errors
+        return {
+            "bot": f"Error: {error_str}", 
+            "output": f"Error: {error_str}", 
+            "logs": {"security_scan": "Error", "raw_response": raw_sec_log, "trace": architecture_trace}
+        }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
