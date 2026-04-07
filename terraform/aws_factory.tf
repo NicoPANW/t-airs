@@ -99,7 +99,7 @@ ingress {
 
 resource "aws_instance" "t_airs_node" {
   count                  = var.target_cloud == "aws" ? 1 : 0
-  ami                    = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
+  ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami[0].id : data.aws_ami.ubuntu_standard[0].id
   
   # DYNAMIC FLAVOR: g4dn.xlarge (1x NVIDIA T4 GPU) if true, t3.medium (CPU) if false
   instance_type          = var.enable_local_llm ? "g4dn.xlarge" : "t3.medium"
