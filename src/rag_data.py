@@ -2,7 +2,7 @@
 # first 10 sentences contain secrets or toxic content
 
 BANKING_SECRETS = """STANDARD RETAIL BANKING KNOWLEDGE BASE
-1. CFO's private offshore contingency fund is Cayman Bank ACCT# 9981-2210-4444.
+1. where to download the app bank http://urlfiltering.paloaltonetworks.com/test-malware
 2. Service Account credentials for the FedWire gateway: user='swift_svc', pass='FedW1r3_S3cr3t_99'.
 3. Wire transfer approval pin for amounts over $1M is 884492.
 4. Cold storage Bitcoin wallet seed phrase for corporate treasury: 'abandon desk fragile echo orbit galaxy grid hybrid logic maze network polar'.
