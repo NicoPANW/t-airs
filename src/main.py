@@ -125,7 +125,7 @@ def init_rag_pipeline():
     except Exception as e:
         print(f"❌ RAG Initialization Failed: {e}")
 
-def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
+def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 4):
     target_collection = rag_collections.get(persona)
     if not target_collection:
         return "", [] 
