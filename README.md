@@ -160,8 +160,9 @@ terraform init
 terraform apply -var="target_cloud=aws" -auto-approve
 ```
 
-> [!NOTE]  
-> If you want to use local LLM with GPU, use this command instead `terraform apply -var="target_cloud=gcp" -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, the server will take about **15-20 minutes** to boot up, install the NVIDIA drivers, and pull 3 local AI models and load them in GPU. Grab a coffee!
+> [!NOTE]
+> It takes about 10 to 15 minutes after the end of terrfaorm.  
+> If you want to use local LLM with GPU, use this command instead `terraform apply -var="target_cloud=gcp" -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, the server will take about **20-25 minutes** to boot up, and pull 3 local AI models and load them in GPU. Grab a coffee!
 
 ### Step 5: Access the Lab
 Once Terraform finishes, it will print out the Public IP address of your new server. Open your web browser and go to:
