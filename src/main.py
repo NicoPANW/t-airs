@@ -508,6 +508,13 @@ async def chat(
     except Exception as e:
         error_str = str(e)
         
+        # 🌟 THE FIX: Rollback the poisoned prompt!
+        # If the Gateway blocked the request, delete the toxic prompt from history 
+        # so the user isn't permanently paralyzed for the rest of the session.
+        if history_enabled and session_id in SESSION_HISTORY:
+            if len(SESSION_HISTORY[session_id]) > 0 and SESSION_HISTORY[session_id][-1]["content"] == message:
+                SESSION_HISTORY[session_id].pop()
+        
         # 🌟 1. Catch and Beautify LiteLLM Gateway Security Rejections
         if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
             
