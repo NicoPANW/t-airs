@@ -16,7 +16,8 @@
 
 ## ✨ Capabilities of the App
 
-<img width="1816" height="795" alt="Screenshot 2026-04-03 at 18 38 56" src="https://github.com/user-attachments/assets/3f492fd8-8790-4e85-beb1-852d3ad0e2fd" />
+<img width="1920" height="958" alt="Screenshot 2026-04-08 at 09 26 32" src="https://github.com/user-attachments/assets/335e78f3-ef40-4587-acf1-1f0fcf747a0b" />
+
 
 
 * **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS API security scanning, the interception can be either at the AI Gateway level (default) or at the App level. In addition, the App can be used to demonstrate AIRS Red-teaming.
