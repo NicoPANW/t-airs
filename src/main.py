@@ -146,6 +146,9 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
     if not target_collection:
         return "", [], [] 
     
+    filtered_docs = []
+    rejected_docs = []
+    
     try:
         query_emb = embedder.encode([user_prompt]).tolist()
         results = target_collection.query(
@@ -156,9 +159,6 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
         
         raw_docs = results.get("documents", [[]])[0]
         distances = results.get("distances", [[]])[0]
-        
-        filtered_docs = []
-        rejected_docs = []
         
         MAX_DISTANCE = 1.3 
         
@@ -177,8 +177,8 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
     except Exception as e:
         print(f"RAG Retrieval Error: {e}")
     
-    # 🌟 Return 3 items even if it fails
-    return "", [], rejected_docs
+    # 🌟 Always return 3 items, even if it completely fails!
+    return "", filtered_docs, rejected_docs
 
 # --- APP LIFESPAN MANAGEMENT ---
 @asynccontextmanager
