@@ -402,14 +402,14 @@
                                             <div class="text-[8px] text-slate-500 uppercase font-mono">Size: ${totalChars} chars</div>
                                             <div class="text-[8px] text-slate-500 uppercase font-mono">Chunks: ${chunks.length}</div>
                                         </div>
-                                        <details class="mt-1 group">
-                                            <summary class="text-[8px] text-slate-600 hover:text-purple-400 cursor-pointer list-none flex items-center gap-1">
-                                                <i data-lucide="eye" class="w-2 h-2"></i> Peek at injected data...
-                                            </summary>
-                                            <pre class="mt-1 bg-black/40 p-2 rounded text-[8px] text-purple-300/70 border border-slate-800 italic whitespace-pre-wrap max-h-40 overflow-y-auto">
+                                        <div class="mt-2">
+                                            <div class="text-[8px] text-slate-500 uppercase font-mono mb-1 flex items-center gap-1">
+                                                <i data-lucide="eye" class="w-2 h-2"></i> Injected Data Payload:
+                                            </div>
+                                            <pre class="bg-black/40 p-2 rounded text-[8px] text-purple-300/70 border border-slate-800 italic whitespace-pre-wrap max-h-40 overflow-y-auto">
                                                 ${chunks.join('\n\n')}
                                             </pre>
-                                        </details>
+                                        </div>
                                     ` : ''}
                                 </div>`;
                         }
