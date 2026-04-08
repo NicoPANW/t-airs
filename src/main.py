@@ -510,7 +510,12 @@ async def chat(
         error_str = str(e)
 
         if "429" in error_str or "rate limit" in error_str.lower() or "too many requests" in error_str.lower():
-            print("🚦 RATE LIMIT HIT: Passing HTTP 429 back to Prisma AIRS scanner to trigger backoff...")
+            # Print the exact upstream error and format it cleanly for the CLI!
+            print(f"🚦 RATE LIMIT HIT: {error_str}")
+            print("⏳ Passing HTTP 429 back to Prisma AIRS scanner to trigger backoff...")
+            print(f"🏁 REQUEST ABORTED | Security Status: Rate Limited")
+            print(f"{'='*40}\n")
+            
             return JSONResponse(
                 status_code=429,
                 content={
