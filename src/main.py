@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 
 # FastAPI Imports for web server and UI rendering
 from fastapi import FastAPI, Request, Form, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 # 1. The Universal AI Gateway Client (Routes requests to LiteLLM)
@@ -508,7 +508,20 @@ async def chat(
     # Catch API timeouts, Gateway blocks, and hallucinations
     except Exception as e:
         error_str = str(e)
-        
+
+        if "429" in error_str or "rate limit" in error_str.lower() or "too many requests" in error_str.lower():
+            print("🚦 RATE LIMIT HIT: Passing HTTP 429 back to Prisma AIRS scanner to trigger backoff...")
+            return JSONResponse(
+                status_code=429,
+                content={
+                  "error": {
+                    "message": "Rate limit reached for model",
+                    "type": "rate_limit_error",
+                    "code": 429
+                  }
+                }
+            )
+            
         # 🌟 THE FIX: Rollback the poisoned prompt!
         # If the Gateway blocked the request, delete the toxic prompt from history 
         # so the user isn't permanently paralyzed for the rest of the session.
