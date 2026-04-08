@@ -109,12 +109,24 @@ def init_rag_pipeline():
     global chroma_client, rag_collections, embedder
     print("📚 Initializing Multi-Persona RAG Pipeline...")
     try:
+        import importlib
+        import rag_data
         importlib.reload(rag_data)
+        
         chroma_client = chromadb.Client()
         embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-        for persona_name, content in RAG_KNOWLEDGE_BASE.items():
-            col = chroma_client.create_collection(name=f"rag_{persona_name}")
+        # 🌟 THE FIX: Added 'rag_data.' prefix here!
+        for persona_name, content in rag_data.RAG_KNOWLEDGE_BASE.items():
+            
+            # 🌟 SAFE CREATION: Get or Create to prevent ChromaDB crashes
+            col = chroma_client.get_or_create_collection(name=f"rag_{persona_name}")
+            
+            # Wipe any ghost data from previous soft-restarts
+            existing_data = col.get()
+            if existing_data and existing_data["ids"]:
+                col.delete(ids=existing_data["ids"])
+
             chunks = [c for c in content.split('\n') if len(c.strip()) > 10]
             if chunks:
                 embeddings = embedder.encode(chunks).tolist()
