@@ -5,7 +5,8 @@ import json
 import re
 import requests
 import torch
-import ast  # 🌟 NEW: Abstract Syntax Tree for piercing LiteLLM's nested stringified JSON
+import asyncio
+import ast
 from contextlib import asynccontextmanager, AsyncExitStack
 
 # FastAPI Imports for web server and UI rendering
@@ -325,7 +326,7 @@ async def chat(
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
         # --- 2. RAG CONTEXT RETRIEVAL ---
-        rag_context, raw_rag_docs, rejected_rag_docs = retrieve_rag_context(message, persona)
+        rag_context, raw_rag_docs, rejected_rag_docs = await asyncio.to_thread(retrieve_rag_context, message, persona)
         
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         architecture_trace["rag_pipeline"]["chunks_rejected"] = rejected_rag_docs
