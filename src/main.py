@@ -23,7 +23,7 @@ from mcp.client.stdio import stdio_client
 # 3. RAG Imports (Retrieval-Augmented Generation for Unstructured Data)
 import chromadb
 from sentence_transformers import SentenceTransformer
-from rag_data import RAG_KNOWLEDGE_BASE
+
 
 # Prisma AIRS Imports (Enterprise LLM Security Scanning)
 import aisecurity
@@ -106,6 +106,9 @@ def init_rag_pipeline():
     global chroma_client, rag_collections, embedder
     print("📚 Initializing Multi-Persona RAG Pipeline...")
     try:
+        import importlib
+        import rag_data
+        importlib.reload(rag_data)
         chroma_client = chromadb.Client()
         embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
