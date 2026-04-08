@@ -59,6 +59,13 @@ To keep the application clean and scalable, this repository is a "Monorepo" spli
 
 ---
 
+## 🏗️ Typical user flow
+
+<img width="913" height="486" alt="Screenshot 2026-04-08 at 13 11 07" src="https://github.com/user-attachments/assets/9e6f1644-9a96-40d3-831f-035b0135f0fa" />
+
+
+---
+
 ## 🛠️ Prerequisites
 
 Before you begin, you need meet a few requirements:
