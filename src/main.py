@@ -144,12 +144,10 @@ def init_rag_pipeline():
 def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
     target_collection = rag_collections.get(persona)
     if not target_collection:
-        return "", [] 
+        return "", [], [] 
     
     try:
         query_emb = embedder.encode([user_prompt]).tolist()
-        
-        # 🌟 NEW: We explicitly ask ChromaDB to return the "distances" metric
         results = target_collection.query(
             query_embeddings=query_emb, 
             n_results=top_k,
@@ -160,27 +158,27 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
         distances = results.get("distances", [[]])[0]
         
         filtered_docs = []
+        rejected_docs = []
         
-        # 🌟 THE THRESHOLD: L2 Distance (Lower means it's a closer match). 
-        # 1.3 is a great strict baseline for all-MiniLM-L6-v2!
         MAX_DISTANCE = 1.3 
         
         for doc, dist in zip(raw_docs, distances):
             if dist <= MAX_DISTANCE:
                 filtered_docs.append(doc)
             else:
-                # Log the rejected chunks to the console so we can see the math!
-                print(f"🛑 RAG Chunk Rejected: Too far from prompt (Distance: {dist:.2f}) | Text: {doc[:30]}...")
+                # 🌟 Save both the text and the math score!
+                rejected_docs.append({"text": doc, "distance": round(dist, 2)})
+                print(f"🛑 RAG Chunk Rejected: Too far from prompt (Distance: {dist:.2f})")
         
         if filtered_docs:
             formatted_text = "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(filtered_docs)
-            return formatted_text, filtered_docs 
+            return formatted_text, filtered_docs, rejected_docs 
             
     except Exception as e:
         print(f"RAG Retrieval Error: {e}")
     
-    # If nothing passed the threshold, return completely empty strings
-    return "", []
+    # 🌟 Return 3 items even if it fails
+    return "", [], rejected_docs
 
 # --- APP LIFESPAN MANAGEMENT ---
 @asynccontextmanager
@@ -299,7 +297,7 @@ async def chat(
     
     architecture_trace = {
         "ai_gateway": {"routed_to": model_id},
-        "rag_pipeline": {"chunks_injected": []},
+        "rag_pipeline": {"chunks_injected": [], "chunks_rejected": []}, 
         "mcp_execution": []
     }
     
@@ -327,10 +325,12 @@ async def chat(
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
         # --- 2. RAG CONTEXT RETRIEVAL ---
-        rag_context, raw_rag_docs = retrieve_rag_context(message, persona)
+        rag_context, raw_rag_docs, rejected_rag_docs = retrieve_rag_context(message, persona)
+        
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
+        architecture_trace["rag_pipeline"]["chunks_rejected"] = rejected_rag_docs
         system_instruction = f"{selected_prompt}\n{rag_context}"
-
+        
         # --- 3. SESSION HISTORY & MESSAGE BUILDING ---
         if history_enabled:
             if session_id not in SESSION_HISTORY:
