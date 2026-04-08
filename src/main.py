@@ -148,15 +148,38 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
     
     try:
         query_emb = embedder.encode([user_prompt]).tolist()
-        results = target_collection.query(query_embeddings=query_emb, n_results=top_k)
-        docs = results.get("documents", [[]])[0]
         
-        if docs:
-            formatted_text = "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(docs)
-            return formatted_text, docs 
+        # 🌟 NEW: We explicitly ask ChromaDB to return the "distances" metric
+        results = target_collection.query(
+            query_embeddings=query_emb, 
+            n_results=top_k,
+            include=["documents", "distances"]
+        )
+        
+        raw_docs = results.get("documents", [[]])[0]
+        distances = results.get("distances", [[]])[0]
+        
+        filtered_docs = []
+        
+        # 🌟 THE THRESHOLD: L2 Distance (Lower means it's a closer match). 
+        # 1.3 is a great strict baseline for all-MiniLM-L6-v2!
+        MAX_DISTANCE = 1.3 
+        
+        for doc, dist in zip(raw_docs, distances):
+            if dist <= MAX_DISTANCE:
+                filtered_docs.append(doc)
+            else:
+                # Log the rejected chunks to the console so we can see the math!
+                print(f"🛑 RAG Chunk Rejected: Too far from prompt (Distance: {dist:.2f}) | Text: {doc[:30]}...")
+        
+        if filtered_docs:
+            formatted_text = "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(filtered_docs)
+            return formatted_text, filtered_docs 
+            
     except Exception as e:
         print(f"RAG Retrieval Error: {e}")
     
+    # If nothing passed the threshold, return completely empty strings
     return "", []
 
 # --- APP LIFESPAN MANAGEMENT ---
