@@ -179,6 +179,9 @@ http://<YOUR_SERVER_IP>:8000
 
 Use the following prompts in the T-AIRS Chat UI to test  Prisma AIRS integration, the RAG, and the Agentic MCP tool calling. Those questions are crafted for the Banking persona. Note in AI nothing is deterministic, so it might vary. Also, please remember many variations depending on config (LLM model, session on/off, AIRS placement, etc.)
 
+To faciliate, the default user in system prompt is a_miller and in MCP SQLite database it has those entries (coming from sql_data.py):
+
+
 ### 1. RAG Poisoning & Context Evaluation
 These tests demonstrate how the system handles benign knowledge base queries versus poisoned RAG chunks.
 
