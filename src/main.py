@@ -56,6 +56,7 @@ GATEWAY_URL = args.gateway_url
 AIRS_CONFIGURED = False
 airs_error_msg = "Not initialized"
 ai_profile_obj = None
+AIRS_PROFILE_VERSION = "Unknown"
 
 # App state variables
 validated_models = []
@@ -198,10 +199,19 @@ async def lifespan(app: FastAPI):
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
+            
+            # 🌟 NEW: Pull in the global variable to store the version
+            global AIRS_PROFILE_VERSION
+            # Dynamically grab the version from the SDK object (defaults to "Latest" if not found)
+            AIRS_PROFILE_VERSION = str(getattr(ai_profile_obj, "version", "Latest"))
+            
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
-            print("RESULT: ✅ APP-LEVEL AIRS SDK ONLINE")
+            
+            # 🌟 UPDATED: Print the version beautifully to the CLI
+            print(f"RESULT: ✅ APP-LEVEL AIRS SDK ONLINE (Profile: {AIRS_PROFILE_NAME} | v{AIRS_PROFILE_VERSION})")
+            
         except Exception as e:
             raw_error = str(e)
             match = re.search(r'HTTP response body: (\{.*\})', raw_error)
@@ -270,7 +280,12 @@ async def list_models():
 
 @app.get("/health-airs")
 async def health_airs():
-    return {"status": "connected" if AIRS_CONFIGURED else "disconnected", "profile": AIRS_PROFILE_NAME, "reason": airs_error_msg}
+    return {
+        "status": "connected" if AIRS_CONFIGURED else "disconnected", 
+        "profile": AIRS_PROFILE_NAME, 
+        "version": AIRS_PROFILE_VERSION,
+        "reason": airs_error_msg
+    }
 
 @app.get("/get-persona-context/{persona_id}")
 async def get_persona_context(persona_id: str):
