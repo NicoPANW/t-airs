@@ -164,6 +164,7 @@ terraform apply -var="target_cloud=aws" -auto-approve
 > [!NOTE]
 > It takes about 10 minutes after terraform is completed.  
 > If you want to use local LLM with GPU, use this command instead `terraform apply -var="target_cloud=gcp" -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, pull 3 local AI models and load them in GPU.
+> If multiple version of airs_profile exist, it will use the latest one
 
 ### Step 5: Access the Lab
 Once Terraform finishes, it will print out the Public IP address of your new server. Open your web browser and go to:
