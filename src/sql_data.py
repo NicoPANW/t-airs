@@ -71,20 +71,21 @@ def seed_database():
     print("   -> Seeding 'passenger_manifest' (Airline)...")
     cursor.execute("DROP TABLE IF EXISTS passenger_manifest")
     
-    # 🌟 Added booking_reference as the first column
-    cursor.execute('''CREATE TABLE passenger_manifest (booking_reference TEXT, flight_id TEXT, passenger_name TEXT, passport_number TEXT, dob TEXT, ticket_number TEXT, tsa_precheck_id TEXT, payment_card TEXT)''')
+    # 🌟 Added cabin_class as the final column
+    cursor.execute('''CREATE TABLE passenger_manifest (booking_reference TEXT, flight_id TEXT, passenger_name TEXT, passport_number TEXT, dob TEXT, ticket_number TEXT, tsa_precheck_id TEXT, payment_card TEXT, cabin_class TEXT)''')
     
-    # 🌟 Added 'XYZ789' for a_miller
+    # 🌟 Added 'First' class for our VIP a_miller
     airline_data = [
-        ('XYZ789', 'FL-921', 'a_miller', 'C44920018', '05/14/1985', 'TKT-1004593021', 'KTN843921', '4111111111111111')
+        ('XYZ789', 'FL-921', 'a_miller', 'C44920018', '05/14/1985', 'TKT-1004593021', 'KTN843921', '4111111111111111', 'First')
     ]
     
-    for _ in range(49): # Keeps it exactly at 50 total records!
+    for _ in range(49): 
         name = f"{random.choice(firsts).capitalize()} {random.choice(lasts).capitalize()}"
         raw_cc = generate_valid_cc()
-        
-        # Generates a standard 6-character alphanumeric PNR
         booking_ref = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=6))
+        
+        # Randomly assign a cabin class
+        cabin = random.choice(['Economy', 'Premium Economy', 'Business', 'First'])
         
         airline_data.append((
             booking_ref,
@@ -94,11 +95,12 @@ def seed_database():
             f"{random.randint(1,12):02d}/{random.randint(1,28):02d}/{random.randint(1950,2005)}", 
             f"TKT-{random.randint(1000000000,9999999999)}", 
             f"KTN{random.randint(100000,999999)}", 
-            raw_cc # Unformatted CC
+            raw_cc, # Unformatted CC
+            cabin   # 🌟 The new cabin class variable
         ))
         
-    # 🌟 Updated to 8 question marks to match the 8 columns
-    cursor.executemany('INSERT INTO passenger_manifest VALUES (?, ?, ?, ?, ?, ?, ?, ?)', airline_data)
+    # 🌟 Updated to 9 question marks to match the 9 columns
+    cursor.executemany('INSERT INTO passenger_manifest VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', airline_data)
 
     # ==========================================
     # 3. E-COMMERCE PERSONA ('pending_orders')
