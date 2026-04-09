@@ -32,7 +32,7 @@
 
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 
-* **🔎 Visual Metadata Trace:** A built-in inspector panel shows you the exact raw JSON decision logic from both the AI Gateway and Prisma AIRS on every single interaction.
+* **🔎 Visual Metadata Trace:** A built-in inspector panel shows you the exact raw JSON decision logic from the RAG, the AI Gateway and Prisma AIRS on every single interaction.
 
 * **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
 
