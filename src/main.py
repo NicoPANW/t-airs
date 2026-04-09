@@ -552,7 +552,8 @@ async def chat(
             category = category_match.group(1).capitalize() if category_match else "Security"
             
             if "http_400_error" in error_str or "scan_failed" in error_str:
-                clean_msg = f"🛡️ Gateway Scan Failed [{direction}]: Payload rejected."
+                # 🌟 THE NEW FIX: Gracefully handle the Gateway's empty-string crash!
+                clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
             else:
                 clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
 
