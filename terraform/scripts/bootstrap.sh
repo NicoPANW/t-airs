@@ -6,7 +6,7 @@ ENABLE_LOCAL_LLM="${enable_local_llm}"
 # --- 0. ROBUST UPDATE & INSTALL ---
 echo "Updating system packages..."
 # Loop until Apt is free from background locks
-until apt-get update && apt-get install -y python3-pip python3-venv git curl unattended-upgrades; do
+until apt-get update && apt-get install -y python3-pip python3-venv git curl unattended-upgrades sqlite3; do
     echo "Apt is locked or network is busy. Retrying in 5s..."
     sleep 5
 done
