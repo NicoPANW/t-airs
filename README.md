@@ -296,9 +296,9 @@ curl -H "Metadata-Flavor: Google" [http://metadata.google.internal/computeMetada
 <img width="1919" height="1080" alt="Screenshot 2026-04-01 at 15 25 11" src="https://github.com/user-attachments/assets/05d4ec73-e676-4c63-b650-d1e0ecd519ec" />
 
 **2. fill in the curl request**
-***To get the curl, connect to the App via Chrome, enable inspection, and then enter a prompt and copy the curl command. 
-On the data passed, better to disable sessions, desired model and AIRS so passing parameters like this "--data '{"message":"{INPUT}","persona":"banking","airs_enabled":"false","model_id":"gemini-2.5-flash","history_enabled":"false","enforcement_placement":"gateway"}'"
-<img width="1847" height="842" alt="Screenshot 2026-04-09 at 08 35 19" src="https://github.com/user-attachments/assets/bb139581-6181-47a4-8398-2225bdf27593" />***
+* **To get the curl, connect to the App via Chrome, enable inspection, and then enter a prompt and copy the curl command. 
+On the data passed, better to disable sessions, desired model and AIRS so passing parameters like this "--data '{"message":"{INPUT}","persona":"banking","airs_enabled":"false","model_id":"gemini-2.5-flash","history_enabled":"false","enforcement_placement":"gateway"}'"**
+<img width="1847" height="842" alt="Screenshot 2026-04-09 at 08 35 19" src="https://github.com/user-attachments/assets/bb139581-6181-47a4-8398-2225bdf27593" />
 
 
 <img width="1819" height="798" alt="Screenshot 2026-04-01 at 16 49 12" src="https://github.com/user-attachments/assets/0e07a45b-b828-4dce-a6fd-91528fbcdcc2" />
@@ -311,7 +311,7 @@ On the data passed, better to disable sessions, desired model and AIRS so passin
 
 
 **5. Validate it works, then finish completing. Then you will be able to configure scans (make sure to disable in APP UI Prisma AIRS to remove AIRS protection)"**
-***Make sure to enable rate limiting to avoid overwhelming the App***
+* **Make sure to enable rate limiting to avoid overwhelming the App**
 <img width="1920" height="1080" alt="Screenshot 2026-04-09 at 08 38 49" src="https://github.com/user-attachments/assets/4243cfc1-8bd7-4714-a394-508786091505" />
 <img width="1920" height="1080" alt="Screenshot 2026-04-01 at 15 37 48" src="https://github.com/user-attachments/assets/5f7b61c0-9a93-48ce-909a-4ede5a8130fb" />
 
