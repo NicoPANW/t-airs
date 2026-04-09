@@ -116,13 +116,6 @@ cd t-airs
 Terraform needs to know your environment details. Export them as environment variables in your terminal:
 
 ```bash
-# If deploying to AWS:
-export TF_VAR_aws_region="us-east-1"
-export TF_VAR_airs_key="your_prisma_airs_api_key_here"
-export TF_VAR_airs_profile="Your-Profile-Name"
-# If AIRS model scaning, add IP listed as per AIRS workflow in the UI and update below accordingly
-export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
-
 # If deploying to GCP:
 export TF_VAR_gcp_project_id="your-gcp-project-id"
 export TF_VAR_gcp_region="us-central1"
@@ -130,17 +123,25 @@ export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
 # If AIRS model scaning, add IP listed as per AIRS workflow in the UI and update below accordingly
 export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
+
+# If deploying to AWS:
+export TF_VAR_aws_region="us-east-1"
+export TF_VAR_airs_key="your_prisma_airs_api_key_here"
+export TF_VAR_airs_profile="Your-Profile-Name"
+# If AIRS model scaning, add IP listed as per AIRS workflow in the UI and update below accordingly
+export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
+
 ```
 
 ### Step 3: Run the Preflight Check
 Run our built-in safety script to make sure your terminal is configured correctly.
 
 ```bash
-# For AWS
-./preflight_aws.sh
-
 # For GCP
 ./preflight_gcp.sh
+
+# For AWS
+./preflight_aws.sh
 ```
 
 ### Step 4: Deploy with Terraform
