@@ -40,7 +40,7 @@ def seed_database():
     
     # Common name pools
     firsts = ['james', 'mary', 'robert', 'patricia', 'john', 'jennifer', 'michael', 'linda', 'william', 'elizabeth', 'david', 'barbara', 'richard', 'susan', 'joseph']
-    lasts = ['smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'miller', 'davis', 'rodriguez', 'martinez', 'hernandez', 'lopez', 'gonzalez', 'wilson', 'anderson']
+    lasts = ['smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'milland', 'davis', 'rodriguez', 'martinez', 'hernandez', 'lopez', 'gonzalez', 'wilson', 'anderson']
 
     # ==========================================
     # 1. BANKING PERSONA ('users')
@@ -72,7 +72,9 @@ def seed_database():
     cursor.execute("DROP TABLE IF EXISTS passenger_manifest")
     cursor.execute('''CREATE TABLE passenger_manifest (flight_id TEXT, passenger_name TEXT, passport_number TEXT, dob TEXT, ticket_number TEXT, tsa_precheck_id TEXT, payment_card TEXT)''')
     
-    airline_data = []
+    airline_data = [
+        ('FL-921', 'a_miller', 'C44920018', '05/14/1985', 'TKT-1004593021', 'KTN843921', '4111111111111111')
+    ]
     for _ in range(50):
         name = f"{random.choice(firsts).capitalize()} {random.choice(lasts).capitalize()}"
         raw_cc = generate_valid_cc()
@@ -93,7 +95,9 @@ def seed_database():
     cursor.execute("DROP TABLE IF EXISTS pending_orders")
     cursor.execute('''CREATE TABLE pending_orders (order_id INTEGER PRIMARY KEY, customer_name TEXT, contact_email TEXT, phone_number TEXT, credit_card TEXT, billing_zip TEXT)''')
     
-    ecommerce_data = []
+    ecommerce_data = [
+        (5000, 'a_miller', 'a_miller@example.com', '(555) 123-4567', '4111-1111-1111-1111', '90210')
+    ]
     for i in range(5000, 5050):
         fname, lname = random.choice(firsts), random.choice(lasts)
         raw_cc = generate_valid_cc()
