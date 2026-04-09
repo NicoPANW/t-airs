@@ -271,7 +271,7 @@
                     bar.className = "w-full h-full bg-green-500 shadow-[0_0_8px_#22c55e]";
                     statusText.innerText = "CONNECTED Prisma AIRS profile";
                     statusText.className = "text-[9px] font-bold text-green-400 uppercase tracking-tight";
-                    document.getElementById('airs-profile-text').innerText = data.profile;
+                    document.getElementById('YOUR_PROFILE_TEXT_ELEMENT_ID').innerText = `${data.profile} (v${data.version})`;
                 } else {
                     bar.className = "w-full h-full bg-red-500 shadow-[0_0_8px_#ef4444]";
                     statusText.innerText = data.reason;
