@@ -391,11 +391,18 @@ async def chat(
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
                 
                 # --- 🚀 CUSTOM ACTION TOOLS (WRITES TO DB) ---
-                if tool_name in ["transfer_funds", "upgrade_flight_seat", "issue_store_refund"]:
+                action_tools = [
+                    "transfer_funds", "freeze_account", "issue_replacement_card",
+                    "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
+                    "issue_store_refund", "apply_admin_discount", "update_billing_zip"
+                ]
+                
+                if tool_name in action_tools:
                     
                     setup_query = "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"
                     await mcp_session.call_tool("write_query", arguments={"query": setup_query})
                     
+                    # === BANKING TOOLS ===
                     if tool_name == "transfer_funds":
                         src = tool_args.get("source_account")
                         dst = tool_args.get("dest_account")
@@ -408,34 +415,97 @@ async def chat(
                         await mcp_session.call_tool("write_query", arguments={"query": add_query})
 
                         details = f"Transferred ${amt} from {src} to {dst}"
-                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed and settled in the users table."
+                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed and settled."
                         
+                    elif tool_name == "freeze_account":
+                        acc = tool_args.get("account_id")
+                        reason = tool_args.get("reason")
+                        
+                        freeze_query = f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": freeze_query})
+                        
+                        details = f"Froze account {acc}. Reason: {reason}"
+                        tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} has been frozen."
+
+                    elif tool_name == "issue_replacement_card":
+                        acc = tool_args.get("account_id")
+                        
+                        card_query = f"UPDATE users SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": card_query})
+                        
+                        details = f"Canceled and replaced card for account {acc}"
+                        tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
+
+                    # === TRAVEL TOOLS ===
                     elif tool_name == "upgrade_flight_seat":
-                        pnr = tool_args.get("booking_ref")
+                        tkt = tool_args.get("ticket_number")
                         cabin = tool_args.get("new_class")
                         
-                        upgrade_query = f"UPDATE passenger_manifest SET seat = '{cabin} Class' WHERE pnr = '{pnr}';"
+                        upgrade_query = f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"
                         await mcp_session.call_tool("write_query", arguments={"query": upgrade_query})
 
-                        details = f"Upgraded PNR {pnr} to {cabin} class"
-                        tool_output = f"✅ BOOKING UPDATED: PNR {pnr} successfully upgraded to {cabin} in the passenger_manifest."
+                        details = f"Upgraded ticket {tkt} to {cabin} class"
+                        tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} successfully upgraded to {cabin}."
 
+                    elif tool_name == "cancel_flight_booking":
+                        tkt = tool_args.get("ticket_number")
+                        refund = tool_args.get("refund_to_card")
+                        
+                        cancel_query = f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": cancel_query})
+
+                        details = f"Canceled ticket {tkt}. Refund to card: {refund}"
+                        tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked."
+
+                    elif tool_name == "update_passport_details":
+                        tkt = tool_args.get("ticket_number")
+                        new_pass = tool_args.get("new_passport_id")
+                        
+                        pass_query = f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": pass_query})
+
+                        details = f"Updated passport to {new_pass} for ticket {tkt}"
+                        tool_output = f"🛂 PASSPORT UPDATED: New document saved to manifest."
+
+                    # === E-SHOP TOOLS ===
                     elif tool_name == "issue_store_refund":
                         order = tool_args.get("order_id")
                         amt = tool_args.get("amount")
                         
-                        refund_query = f"UPDATE pending_orders SET price = price - {amt} WHERE ord_id = '{order}';"
+                        refund_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"
                         await mcp_session.call_tool("write_query", arguments={"query": refund_query})
 
                         details = f"Refunded ${amt} for order {order}"
-                        tool_output = f"✅ REFUND PROCESSED: ${amt} credited back and deducted from pending_orders for {order}."
+                        tool_output = f"✅ REFUND PROCESSED: ${amt} credited back to payment method for order {order}."
+                        
+                    elif tool_name == "apply_admin_discount":
+                        order = tool_args.get("order_id")
+                        disc = tool_args.get("discount_percentage")
+                        
+                        disc_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": disc_query})
 
+                        details = f"Applied {disc}% SYSTEM_ADMIN discount to order {order}"
+                        tool_output = f"💸 DISCOUNT APPLIED: {disc}% off order {order}."
+
+                    elif tool_name == "update_billing_zip":
+                        order = tool_args.get("order_id")
+                        new_zip = tool_args.get("new_zip_code")
+                        
+                        zip_query = f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": zip_query})
+
+                        details = f"Changed billing zip to {new_zip} for order {order}"
+                        tool_output = f"📦 ADDRESS UPDATED: Billing zip changed to {new_zip}."
+
+                    # === GLOBALLY LOG THE ACTION ===
                     insert_query = f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', '{details}');"
                     await mcp_session.call_tool("write_query", arguments={"query": insert_query})
                     
                     tool_output += " (Transaction permanently recorded in backend database)."
 
                 else:
+                    # Normal READ tools fallback
                     mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_result.content[0].text
                 
