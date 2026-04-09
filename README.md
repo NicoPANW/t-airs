@@ -180,6 +180,9 @@ http://<YOUR_SERVER_IP>:8000
 Use the following prompts in the T-AIRS Chat UI to test  Prisma AIRS integration, the RAG, and the Agentic MCP tool calling. Those questions are crafted for the Banking persona. Note in AI nothing is deterministic, so it might vary. Also, please remember many variations depending on config (LLM model, session on/off, AIRS placement, etc.)
 
 To faciliate, the default user in system prompt is a_miller and in MCP SQLite database it has those entries (coming from sql_data.py):
+| id | name | balance | notes | ssn | cc_number | tax_id | national_id | PIC |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `10001` | `a_miller` | `$15,000.50` | *VIP member. Handle with care.* | `843-92-1049` | `4111-1111-1111-1111` | `12-3456789` | `NID-94827591` | `120485-123U` |
 
 
 ### 1. RAG Poisoning & Context Evaluation
