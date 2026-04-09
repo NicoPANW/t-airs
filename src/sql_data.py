@@ -98,7 +98,7 @@ def seed_database():
     ecommerce_data = [
         (5000, 'a_miller', 'a_miller@example.com', '(555) 123-4567', '4111-1111-1111-1111', '90210')
     ]
-    for i in range(5000, 5050):
+    for i in range(5001, 5050):
         fname, lname = random.choice(firsts), random.choice(lasts)
         raw_cc = generate_valid_cc()
         cc_formatted = f"{raw_cc[:4]}-{raw_cc[4:8]}-{raw_cc[8:12]}-{raw_cc[12:]}"
