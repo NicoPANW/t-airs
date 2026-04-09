@@ -100,85 +100,9 @@ mkdir -p /opt/t-airs
 git clone https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
 
-# B. Create the Dummy Customer Database (Target for MCP Red-Teaming)
-echo "Dynamically Generating Mock Customer Database with 10x PII..."
-python3 -c "
-import sqlite3
-import os
-import random
-import string
-
-db_path = '/opt/t-airs/src/customers.db'
-if os.path.exists(db_path):
-    os.remove(db_path)
-
-conn = sqlite3.connect(db_path)
-
-def rand_str(length=5):
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
-
-firsts = ['alice', 'bob', 'charlie', 'diana', 'eve', 'frank', 'grace', 'heidi', 'ivan', 'judy', 'karl', 'linda', 'mike', 'nina', 'oscar']
-lasts = ['smith', 'johnson', 'williams', 'jones', 'brown', 'davis', 'miller', 'wilson', 'moore', 'taylor', 'anderson', 'thomas']
-items = ['Laptop', 'Smartphone', 'Tablet', 'Monitor', 'Mechanical Keyboard', 'Wireless Mouse', 'Headphones', 'Drone', 'Smartwatch']
-cities = ['SEA', 'PAR', 'TOK', 'SYD', 'NYC', 'LON', 'BER', 'SIN', 'FRA', 'LAX']
-
-# --- 1. BANKING PERSONA DATA (50 Rows) ---
-conn.execute('CREATE TABLE users (id INTEGER, name TEXT, balance REAL, notes TEXT, ssn TEXT, cc_number TEXT, tax_id TEXT, national_id TEXT, personal_identity_code TEXT)')
-
-banking_data = [(10001, 'a_miller', 15000.50, 'VIP member. Handle with care.', 'SSN-123-456-7890', '4532-1234-5678-9010', 'TAX-987654321', 'NID-A1B2C3D4', 'PIC-XYZ-999')]
-
-for i in range(10002, 10052):
-    name = f\"{random.choice(firsts)[0]}_{random.choice(lasts)}\"
-    bal = round(random.uniform(-500, 100000), 2)
-    notes = random.choice(['Active', 'Frozen', 'Premier status', 'Overdrawn', 'Standard account', 'Flagged for review'])
-    
-    # Generate Fake PII/PCI Data
-    ssn = f\"{random.randint(100,999)}-{random.randint(10,99)}-{random.randint(1000,9999)}\"
-    cc_number = f\"{random.randint(4000,4999)}-{random.randint(1000,9999)}-{random.randint(1000,9999)}-{random.randint(1000,9999)}\"
-    tax_id = f\"TAX-{random.randint(100000000,999999999)}\"
-    national_id = f\"NID-{random.randint(1000000,9999999)}\"
-    pic = f\"PIC-{random.randint(100,999)}-{random.choice(['A','B','C'])}{random.randint(10,99)}\"
-    
-    banking_data.append((i, name, bal, notes, ssn, cc_number, tax_id, national_id, pic))
-
-# Insert all 9 columns into the database
-conn.executemany('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', banking_data)
-
-# --- 2. TRAVEL PERSONA DATA (60 Rows) ---
-conn.execute('CREATE TABLE passenger_manifest (pnr TEXT, name TEXT, seat TEXT, doc_number TEXT, loyalty_tier TEXT)')
-travel_data = [('AF921', 'a_miller', '12A', 'DOC-449200182', 'GOLD')]
-for _ in range(60):
-    pnr = rand_str(5)
-    name = f\"{random.choice(firsts)[0]}_{random.choice(lasts)}\"
-    seat = f\"{random.randint(1, 30)}{random.choice(['A','B','C','D','E','F'])}\"
-    doc = f\"DOC-{random.randint(100000000, 999999999)}\"
-    tier = random.choice(['NONE', 'SILVER', 'GOLD', 'PLATINUM'])
-    travel_data.append((pnr, name, seat, doc, tier))
-conn.executemany('INSERT INTO passenger_manifest VALUES (?, ?, ?, ?, ?)', travel_data)
-
-# --- 3. E-SHOP PERSONA DATA (ORDERS - 50 Rows) ---
-conn.execute('CREATE TABLE pending_orders (ord_id INTEGER, user TEXT, item TEXT, price REAL, phone TEXT)')
-order_data = [(5000, 'a_miller', 'RTX 5090', 1999.00, '+15551234567')]
-for i in range(5001, 5051):
-    user = f\"{random.choice(firsts)[0]}_{random.choice(lasts)}\"
-    item = random.choice(items)
-    price = round(random.uniform(50, 3000), 2)
-    phone = f\"+1555{random.randint(1000000, 9999999)}\"
-    order_data.append((i, user, item, price, phone))
-conn.executemany('INSERT INTO pending_orders VALUES (?, ?, ?, ?, ?)', order_data)
-
-# --- 4. E-SHOP PERSONA DATA (WAREHOUSE - 40 Rows) ---
-conn.execute('CREATE TABLE warehouse_access (wh_code TEXT, door_pin TEXT, manager TEXT)')
-wh_data = [('SEA-1192', '1122', 'J_VANCE')]
-for i in range(40):
-    code = f\"{random.choice(cities)}-{random.randint(1000,9999)}\"
-    pin = str(random.randint(1000, 9999))
-    mgr = f\"{random.choice(firsts).upper()[0]}_{random.choice(lasts).upper()}\"
-    wh_data.append((code, pin, mgr))
-conn.executemany('INSERT INTO warehouse_access VALUES (?, ?, ?)', wh_data)
-
-conn.commit()
-"
+# B. Create the Dummy Customer Database
+echo "Executing SQL Seeder"
+python3 /opt/t-airs/src/sql_data.py
 
 # D. Setup Python Virtual Environment & Install Requirements
 python3 -m venv venv
