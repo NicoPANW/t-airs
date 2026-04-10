@@ -86,15 +86,15 @@ import subprocess
 
 def check_gpu_status():
     try:
-        # 1. Check physical GPU via nvidia-smi
+        # 1. Check physical GPU via nvidia-smi (Added 5s timeout)
         gpu_info = subprocess.check_output(
             ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            text=True
+            text=True, timeout=5
         ).strip()
         
-        # 2. Check active models via Ollama
+        # 2. Check active models via Ollama (Added 5s timeout)
         try:
-            ollama_ps = subprocess.check_output(["ollama", "ps"], text=True).strip().split('\n')
+            ollama_ps = subprocess.check_output(["ollama", "ps"], text=True, timeout=5).strip().split('\n')
             # Extract just the model names (skipping the header row)
             loaded_models = [line.split()[0] for line in ollama_ps[1:] if line.strip()]
             
@@ -102,6 +102,8 @@ def check_gpu_status():
                 model_str = f"| Models in VRAM: {', '.join(loaded_models)}"
             else:
                 model_str = "| No models currently active in VRAM"
+        except subprocess.TimeoutExpired:
+            model_str = "| Ollama engine is busy/hanging"
         except Exception:
             model_str = "| Ollama engine not responding"
 
@@ -109,6 +111,8 @@ def check_gpu_status():
 
     except FileNotFoundError:
         return "⚠️ NO GPU DETECTED: 'nvidia-smi' not found. Running on CPU."
+    except subprocess.TimeoutExpired:
+        return "⚠️ GPU CHECK FAILED: nvidia-smi timed out."
     except subprocess.CalledProcessError:
         return "⚠️ GPU CHECK FAILED: nvidia-smi execution failed."
     except Exception as e:
