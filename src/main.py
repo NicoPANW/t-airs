@@ -83,16 +83,37 @@ embedder = None
 
 # --- CORE LOGIC HELPERS ---
 
+import subprocess
+
 def check_gpu_status():
     try:
-        if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            vram_gb = round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 1)
-            return f"✅ GPU ONLINE: {gpu_name} ({vram_gb} GB VRAM Ready)"
-        else:
-            return "⚠️ NO GPU DETECTED: Running on CPU (Local models will be severely degraded)"
+        # 1. Check physical GPU via nvidia-smi
+        gpu_info = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+            text=True
+        ).strip()
+        
+        # 2. Check active models via Ollama
+        try:
+            ollama_ps = subprocess.check_output(["ollama", "ps"], text=True).strip().split('\n')
+            # Extract just the model names (skipping the header row)
+            loaded_models = [line.split()[0] for line in ollama_ps[1:] if line.strip()]
+            
+            if loaded_models:
+                model_str = f"| Models in VRAM: {', '.join(loaded_models)}"
+            else:
+                model_str = "| No models currently active in VRAM"
+        except Exception:
+            model_str = "| Ollama engine not responding"
+
+        return f"✅ GPU ONLINE: {gpu_info} {model_str}"
+
+    except FileNotFoundError:
+        return "⚠️ NO GPU DETECTED: 'nvidia-smi' not found. Running on CPU."
+    except subprocess.CalledProcessError:
+        return "⚠️ GPU CHECK FAILED: nvidia-smi execution failed."
     except Exception as e:
-        return f"⚠️ GPU CHECK FAILED: {str(e)}"
+        return f"⚠️ SYSTEM CHECK FAILED: {str(e)}"
 
 def discover_gateway_models():
     found = []
