@@ -201,7 +201,7 @@ async def lifespan(app: FastAPI):
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
-            print("RESULT: ✅ APP-LEVEL AIRS SDK ONLINE")
+            print("RESULT: ✅ AIRS SDK ONLINE")
         except Exception as e:
             raw_error = str(e)
             match = re.search(r'HTTP response body: (\{.*\})', raw_error)
