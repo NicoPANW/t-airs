@@ -108,6 +108,9 @@ python3 /opt/t-airs/src/sql_data.py
 python3 -m venv venv
 source venv/bin/activate
 
+echo "Installing CUDA 12.4 optimized PyTorch wheels..."
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
 pip3 install -r /opt/t-airs/src/requirements.txt
 
 # --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
