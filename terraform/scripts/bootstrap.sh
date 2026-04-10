@@ -288,7 +288,7 @@ After=$TAIRS_AFTER
 
 [Service]
 WorkingDirectory=/opt/t-airs/src
-ExecStartPre=/bin/bash -c 'until curl -s http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done; echo "LiteLLM started!"'
+ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done; echo "LiteLLM started!"'
 EOF
 
 
