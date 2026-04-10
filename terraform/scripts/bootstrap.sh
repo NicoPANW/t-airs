@@ -272,7 +272,7 @@ fi
 
 cat <<EOF > /etc/systemd/system/t-airs.service
 [Unit]
-Description=T-AIRS Red-Team Lab Engine
+Description=T-AIRS
 After=$TAIRS_AFTER
 
 [Service]
