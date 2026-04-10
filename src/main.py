@@ -141,7 +141,9 @@ def init_rag_pipeline():
         chroma_client = chromadb.Client()
         #embedder = SentenceTransformer("all-MiniLM-L6-v2")
         # 🌟 UPGRADED: Using a modern BAAI Retrieval model
+        print("⏳ Downloading BAAI Embedding Model from HuggingFace...", flush=True)
         embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
+        print("✅ BAAI Model successfully loaded into memory!", flush=True)
 
         # 🌟 THE FIX: Added 'rag_data.' prefix here!
         for persona_name, content in rag_data.RAG_KNOWLEDGE_BASE.items():
