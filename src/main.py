@@ -211,12 +211,12 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools
-    print("\n" + "="*50)
-    print("🚀 T-AIRS STARTUP")
-    print("="*50)
-    print("Checking Hardware Acceleration...")
-    print(f"RESULT: {check_gpu_status()}")
-    print("-" * 50)
+    print("\n" + "="*50, flush=True)
+    print("🚀 T-AIRS STARTUP", flush=True)
+    print("="*50, flush=True)
+    print("Checking Hardware Acceleration...", flush=True)
+    print(f"RESULT: {check_gpu_status()}", flush=True)
+    print("-" * 50, flush=True)
     
     # 1. Prisma AIRS Handshake (ALWAYS initialize so UI toggle can work instantly)
     if AIRS_KEY and AIRS_PROFILE_NAME:
