@@ -206,7 +206,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
 async def lifespan(app: FastAPI):
     global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools
     print("\n" + "="*50)
-    print("🚀 T-AIRS STARTUP (DYNAMIC ENFORCEMENT MODE)")
+    print("🚀 T-AIRS STARTUP")
     print("="*50)
     print("Checking Hardware Acceleration...")
     print(f"RESULT: {check_gpu_status()}")
