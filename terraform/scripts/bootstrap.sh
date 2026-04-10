@@ -107,6 +107,8 @@ python3 /opt/t-airs/src/sql_data.py
 # D. Setup Python Virtual Environment & Install Requirements
 python3 -m venv venv
 source venv/bin/activate
+
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 pip3 install -r /opt/t-airs/src/requirements.txt
 
 # --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
