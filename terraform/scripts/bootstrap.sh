@@ -26,6 +26,9 @@ systemctl restart unattended-upgrades
 # ==========================================
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     
+    echo "Installing CUDA 12.4 optimized PyTorch wheels..."
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
     # 🌟 Check if drivers are already working. If so, skip the whole block!
     if lsmod | grep -q nvidia; then
         echo "✅ NVIDIA drivers are already loaded and active."
@@ -107,9 +110,6 @@ python3 /opt/t-airs/src/sql_data.py
 # D. Setup Python Virtual Environment & Install Requirements
 python3 -m venv venv
 source venv/bin/activate
-
-echo "Installing CUDA 12.4 optimized PyTorch wheels..."
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 pip3 install -r /opt/t-airs/src/requirements.txt
 
