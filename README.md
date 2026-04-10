@@ -16,7 +16,8 @@
 
 ## ✨ Capabilities of the App
 
-<img width="1920" height="958" alt="Screenshot 2026-04-08 at 09 26 32" src="https://github.com/user-attachments/assets/335e78f3-ef40-4587-acf1-1f0fcf747a0b" />
+<img width="1920" height="958" alt="Screenshot 2026-04-10 at 11 14 42" src="https://github.com/user-attachments/assets/47d5aa9d-caa6-42ac-b03c-d596c513e0f2" />
+
 
 
 
@@ -283,7 +284,8 @@ sudo systemctl restart t-airs
 ollama list && ollama ps  && nvidia-smi #if local-llm, checking Nvidi T4 is ready
 sudo journalctl -u litellm.service -n 50 --no-pager
 ```
-<img width="1257" height="768" alt="Screenshot 2026-04-03 at 18 41 12" src="https://github.com/user-attachments/assets/0beb8af8-09af-49b1-a0fd-2b9782539848" />
+
+<img width="1314" height="1045" alt="Screenshot 2026-04-10 at 11 14 27" src="https://github.com/user-attachments/assets/d3c7efbc-92c3-4423-a33d-62265f3cde27" />
 
 
 
