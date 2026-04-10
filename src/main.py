@@ -189,7 +189,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
         raw_docs = results.get("documents", [[]])[0]
         distances = results.get("distances", [[]])[0]
         
-        MAX_DISTANCE = 0.75 
+        MAX_DISTANCE = 0.50 
         
         for doc, dist in zip(raw_docs, distances):
             if dist <= MAX_DISTANCE:
