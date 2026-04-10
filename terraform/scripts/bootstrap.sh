@@ -26,8 +26,6 @@ systemctl restart unattended-upgrades
 # ==========================================
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     
-    echo "Installing CUDA 12.4 optimized PyTorch wheels..."
-    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
     # 🌟 Check if drivers are already working. If so, skip the whole block!
     if lsmod | grep -q nvidia; then
@@ -111,6 +109,15 @@ python3 /opt/t-airs/src/sql_data.py
 python3 -m venv venv
 source venv/bin/activate
 
+# 🌟 CONDITIONAL PYTORCH INSTALL
+if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
+    echo "GPU Enabled: Installing massive CUDA 12.4 optimized PyTorch wheels..."
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+else
+    echo "API Only Mode: Skipping CUDA wheels (will use lightweight CPU version for RAG)."
+fi
+
+echo "Installing remaining Python requirements..."
 pip3 install -r /opt/t-airs/src/requirements.txt
 
 # --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
