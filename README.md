@@ -286,7 +286,8 @@ sudo journalctl -u litellm.service -n 50 --no-pager
 sudo /opt/t-airs/venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; print('⏳ Attempting foreground download...'); SentenceTransformer('BAAI/bge-small-en-v1.5'); print('✅ Download complete.')" #it may happen after several deployements huggingface download does not work, so app is stuck. To prove this, you can run this command. A workaround is to use another CSP region, it will come with new IPs and bypass HF rate limiters
 ```
 
-<img width="1314" height="1045" alt="Screenshot 2026-04-10 at 11 14 27" src="https://github.com/user-attachments/assets/d3c7efbc-92c3-4423-a33d-62265f3cde27" />
+<img width="1661" height="1031" alt="Screenshot 2026-04-10 at 16 24 26" src="https://github.com/user-attachments/assets/04a4865c-3b56-4655-bf88-ee34cd7e2dd6" />
+
 
 
 
