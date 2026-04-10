@@ -170,7 +170,7 @@ def init_rag_pipeline():
     except Exception as e:
         print(f"❌ RAG Initialization Failed: {e}")
 
-def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
+def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
     target_collection = rag_collections.get(persona)
     if not target_collection:
         return "", [], [] 
@@ -189,7 +189,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
         raw_docs = results.get("documents", [[]])[0]
         distances = results.get("distances", [[]])[0]
         
-        MAX_DISTANCE = 0.85 
+        MAX_DISTANCE = 0.75 
         
         for doc, dist in zip(raw_docs, distances):
             if dist <= MAX_DISTANCE:
