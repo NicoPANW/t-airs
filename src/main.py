@@ -321,6 +321,9 @@ async def chat(
             
             if str(ingress_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ App-Level AIRS Blocked Input: {ingress_data.get('category', 'Policy')} violation."
+                print(f"🛑 AIRS APP BLOCK: INGRESS | Category: {ingress_data.get('category', 'Policy')}")
+                print(f"🏁 REQUEST ABORTED | Security Status: Blocked by App SDK")
+                print(f"{'='*40}\n")
                 return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK (User ➔ LLM)", "raw_response": json.dumps(ingress_data, indent=2), "trace": architecture_trace}}
             security_status = "Passed App Input"
             raw_sec_log = json.dumps(ingress_data, indent=2)
@@ -547,7 +550,9 @@ async def chat(
             
             if str(out_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ App-Level AIRS Blocked Output: The LLM generated a {out_data.get('category', 'Policy')} violation."
-                
+                print(f"🛑 AIRS APP BLOCK: EGRESS | Category: {out_data.get('category', 'Policy')}")
+                print(f"🏁 REQUEST ABORTED | Security Status: Blocked by App SDK")
+                print(f"{'='*40}\n")
                 return {
                     "bot": block_txt, 
                     "output": block_txt, 
@@ -638,6 +643,9 @@ async def chat(
             except Exception as parse_error:
                 print(f"Debug: Failed to parse inner LiteLLM error: {parse_error}")
 
+            print(f"🛑 AIRS GATEWAY BLOCK: {scan_type} | Direction: {direction} | Category: {category}")
+            print(f"🏁 REQUEST ABORTED | Security Status: Blocked by Gateway")
+            print(f"{'='*40}\n")
             return {
                 "bot": clean_msg, 
                 "output": clean_msg, 
