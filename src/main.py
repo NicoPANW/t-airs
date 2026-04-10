@@ -313,7 +313,7 @@ async def chat(
     raw_sec_log = "{}"
     ingress_data = {}
     print(f"\n{'='*40}")
-    print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona} | Placement: {enforcement_placement.upper()}")
+    print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona} | AIRS placement: {enforcement_placement.upper()}")
     print(f"💬 PROMPT: {message}")
     
     architecture_trace = {
