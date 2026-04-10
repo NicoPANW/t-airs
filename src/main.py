@@ -135,9 +135,9 @@ def init_rag_pipeline():
         importlib.reload(rag_data)
         
         chroma_client = chromadb.Client()
-        embedder = SentenceTransformer("all-MiniLM-L6-v2")
+        #embedder = SentenceTransformer("all-MiniLM-L6-v2")
         # 🌟 UPGRADED: Using a modern BAAI Retrieval model
-        #embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
+        embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
 
         # 🌟 THE FIX: Added 'rag_data.' prefix here!
         for persona_name, content in rag_data.RAG_KNOWLEDGE_BASE.items():
@@ -183,7 +183,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 3):
         raw_docs = results.get("documents", [[]])[0]
         distances = results.get("distances", [[]])[0]
         
-        MAX_DISTANCE = 1.3 
+        MAX_DISTANCE = 0.85 
         
         for doc, dist in zip(raw_docs, distances):
             if dist <= MAX_DISTANCE:
