@@ -132,7 +132,7 @@ def discover_gateway_models():
 
 def init_rag_pipeline():
     global chroma_client, rag_collections, embedder
-    print("📚 Initializing Multi-Persona RAG Pipeline...")
+    print("📚 Initializing Multi-Persona RAG Pipeline...", flush=True)
     try:
         import importlib
         import rag_data
@@ -220,19 +220,19 @@ async def lifespan(app: FastAPI):
     
     # 1. Prisma AIRS Handshake (ALWAYS initialize so UI toggle can work instantly)
     if AIRS_KEY and AIRS_PROFILE_NAME:
-        print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...")
+        print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...", flush=True)
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
-            print("RESULT: ✅ AIRS SDK ONLINE")
+            print("RESULT: ✅ AIRS SDK ONLINE", flush=True)
         except Exception as e:
             raw_error = str(e)
             match = re.search(r'HTTP response body: (\{.*\})', raw_error)
             airs_error_msg = match.group(1) if match else raw_error
-            print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}")
+            print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}", flush=True)
     else:
         print("RESULT: ⚠️ AIRS Keys missing. App SDK Disabled.")
 
