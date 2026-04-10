@@ -280,7 +280,7 @@ Once logged in, you can check your live app logs, reset the service, or check yo
 ```bash
 sudo journalctl -u t-airs.service -n 50 -f
 sudo systemctl restart t-airs
-ollama list
+ollama list && ollama ps
 nvidia-smi #if local-llm, checking Nvidi T4 is ready
 sudo journalctl -u litellm.service -n 50 --no-pager
 ```
