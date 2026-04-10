@@ -4,7 +4,6 @@ import uvicorn
 import json
 import re
 import requests
-import torch
 import asyncio
 import ast
 from contextlib import asynccontextmanager, AsyncExitStack
