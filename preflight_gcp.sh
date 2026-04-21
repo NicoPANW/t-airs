@@ -47,6 +47,30 @@ for api in "compute.googleapis.com" "aiplatform.googleapis.com"; do
     fi
 done
 
+
+# --- 2.5 REGION & ZONE TOPOLOGY CHECK ---
+echo "🔍 Validating Region and Zone Topology..."
+
+# 1. Check if the provided string is a valid Region
+VALID_REGION=$(gcloud compute regions list --filter="name=($TF_VAR_gcp_region)" --format="value(name)" --project="$TF_VAR_gcp_project_id")
+
+if [ -z "$VALID_REGION" ]; then
+    echo "❌ ERROR: '$TF_VAR_gcp_region' is not a valid GCP region."
+    echo "   (Hint: If you typed 'us-central1-a', that is a Zone. Drop the '-a' and just use 'us-central1')."
+    exit 1
+fi
+
+# 2. Check if the -a Zone exists for this Region
+TARGET_ZONE="${TF_VAR_gcp_region}-a"
+VALID_ZONE=$(gcloud compute zones list --filter="name=($TARGET_ZONE)" --format="value(name)" --project="$TF_VAR_gcp_project_id")
+
+if [ -z "$VALID_ZONE" ]; then
+    echo "❌ ERROR: The zone '$TARGET_ZONE' does not exist physically in Google Cloud."
+    exit 1
+fi
+
+echo "✅ Region ($TF_VAR_gcp_region) and Target Zone ($TARGET_ZONE) verified."
+
 # --- 3. GLOBAL VERTEX AI CONNECTIVITY & CAPABILITY CHECK ---
 echo "📡 Verifying Global Vertex AI Connectivity..."
 
