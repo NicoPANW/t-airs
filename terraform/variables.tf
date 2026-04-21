@@ -51,7 +51,7 @@ variable "gcp_project_id" {
 variable "gcp_region" {
   description = "The GCP Region for Vertex AI"
   type        = string
-  default     = "us-central1-a"
+  default     = "us-central1"
 }
 
 variable "gcp_vpc_name" {
