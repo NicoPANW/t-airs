@@ -4,14 +4,24 @@
 # 1. Standard Ubuntu 24.04 (For API-only)
 data "google_compute_image" "ubuntu_standard_gcp" {
   count   = var.target_cloud == "gcp" ? 1 : 0
-  family  = "ubuntu-2404-lts-amd64"    # 🌟 FIXED: Added architecture suffix
+  family  = "ubuntu-2404-lts-amd64"    
   project = "ubuntu-os-cloud"
 }
 
-# 2. Deep Learning VM (For Local GPU)
+# 🌟 2. NEW: Dynamically execute gcloud to find the newest DLVM family
+data "external" "latest_dlvm_family" {
+  count   = var.target_cloud == "gcp" ? 1 : 0
+  program = [
+    "bash", "-e", "-c",
+    "FAMILY=$(gcloud compute images list --project=deeplearning-platform-release --format='value(family)' | grep -i 'ubuntu-2204' | grep 'common-cu' | sort -r | head -n 1) && printf '{\"family\": \"%s\"}' \"$FAMILY\""
+  ]
+}
+
+# 3. Deep Learning VM (For Local GPU)
 data "google_compute_image" "ubuntu_dlvm_gcp" {
   count   = var.target_cloud == "gcp" ? 1 : 0
-  family  = "common-cu129-ubuntu-2204-nvidia-580" # 🌟 FIXED: Latest CUDA/Driver stack
+  # 🌟 NEW: Pull the family name dynamically from the bash script above
+  family  = data.external.latest_dlvm_family[0].result.family
   project = "deeplearning-platform-release"
 }
 
