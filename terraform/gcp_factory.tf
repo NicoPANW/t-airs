@@ -50,7 +50,7 @@ resource "google_compute_firewall" "restricted_access" {
 resource "google_compute_instance" "t_airs_node" {
   count        = var.target_cloud == "gcp" ? 1 : 0
   name         = "t-airs-node"
-  zone         = "${var.gcp_region}"
+  zone         = "${var.gcp_region}-a"
 
   # DYNAMIC FLAVOR: N1 for GPU, E2 for CPU-only
   machine_type = var.enable_local_llm ? "n1-standard-4" : "e2-standard-2"
