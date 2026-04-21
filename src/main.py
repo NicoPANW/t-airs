@@ -663,9 +663,11 @@ async def chat(
             # 🌟 4. Pierce the nested string to build a clean JSON log for the Sidebar
             sidebar_log = {"raw_error": error_str} 
             try:
-                inner_json_match = re.search(r'"(\{.*?\})"', error_str)
-                if inner_json_match:
-                    inner_str = inner_json_match.group(1)
+                # Find where the dictionary actually starts inside the LiteLLM error string
+                start_idx = error_str.find("{")
+                if start_idx != -1:
+                    inner_str = error_str[start_idx:]
+                    # Convert the stringified Python dict (single quotes) into a real dict
                     parsed_dict = ast.literal_eval(inner_str)
                     sidebar_log = {log_key: parsed_dict.get("error", parsed_dict)}
             except Exception as parse_error:
