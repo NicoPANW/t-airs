@@ -11,7 +11,7 @@ data "google_compute_image" "ubuntu_standard_gcp" {
 # 2. Deep Learning VM (For Local GPU)
 data "google_compute_image" "ubuntu_dlvm_gcp" {
   count   = var.target_cloud == "gcp" ? 1 : 0
-  family  = "common-cu121-ubuntu-2204" # 🌟 FIXED: Latest CUDA/Driver stack
+  family  = "common-cu129-ubuntu-2204-nvidia-580" # 🌟 FIXED: Latest CUDA/Driver stack
   project = "deeplearning-platform-release"
 }
 
