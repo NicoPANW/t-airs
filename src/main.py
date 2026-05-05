@@ -314,8 +314,7 @@ async def chat(
     airs_enabled: bool = Form(False),
     model_id: str = Form("none"),
     history_enabled: bool = Form(True),
-    enforcement_placement: str = Form("gateway"),
-    end_user: str = Form("customer1-user1@sase.com")
+    enforcement_placement: str = Form("gateway")
 ):
     selected_prompt = PERSONAS.get(persona, PERSONAS["banking"])
     security_status = "Bypassed"
@@ -344,7 +343,7 @@ async def chat(
         
         # --- 1. INGRESS SCAN (App-Level) ---
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-            scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message, user=end_user))
+            scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message))
             res_data = scan_response.to_dict()
             ingress_data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
             
@@ -395,7 +394,6 @@ async def chat(
             messages=messages,
             tools=active_tools if active_tools else None,
             temperature=0.7,
-            user=end_user,
             extra_body=gateway_params_ingress
         )
         
@@ -561,7 +559,6 @@ async def chat(
                 model=model_id,
                 messages=messages,
                 temperature=0.7,
-                user=end_user,
                 extra_body=gateway_params_egress  # <-- Use the new variable
             )
             bot_response = final_response.choices[0].message.content or ""
@@ -575,7 +572,7 @@ async def chat(
         
         # --- 5. EGRESS SCAN (App-Level) ---
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
-            out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(response=bot_response, user=end_user))
+            out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(response=bot_response))
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
             
