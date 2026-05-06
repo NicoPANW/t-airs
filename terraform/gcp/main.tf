@@ -23,7 +23,7 @@ locals {
   allowed_ingress = concat([local.my_auto_subnet], var.prisma_airs_ips)
 
   # 🌟 FIXED: Path looks up to the root folder. Unused AWS variables are passed as empty strings.
-  userdata = templatefile("${path.module}/../../scripts/bootstrap.sh", {
+  userdata = templatefile("${path.module}/../scripts/bootstrap.sh", {
     airs_key         = var.airs_key
     airs_profile     = var.airs_profile
     gcp_project      = var.gcp_project_id
