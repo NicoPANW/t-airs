@@ -150,21 +150,21 @@ Navigate to the terraform folder, initialize the plugins, and launch the lab!
 
 #### If deploying to GCP:
 ```bash
-cd terraform
+cd terraform/gcp
 terraform init
-terraform apply -var="target_cloud=gcp" -auto-approve
+terraform apply -var="enable_local_llm=false" -auto-approve
 ```
 
 #### If deploying to AWS:
 ```bash
-cd terraform
+cd terraform/aws
 terraform init
-terraform apply -var="target_cloud=aws" -auto-approve
+terraform apply -var="enable_local_llm=false" -auto-approve
 ```
 
 > [!NOTE]
 > It takes about 10 minutes after terraform is completed.  
-> If you want to use local LLM with GPU, use this command instead `terraform apply -var="target_cloud=gcp" -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, pull 3 local AI models and load them in GPU.
+> If you want to use local LLM with GPU, use this command instead `terraform apply -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, pull 3 local AI models and load them in GPU.
 > If multiple version of airs_profile exist, it will use the latest one
 
 ### Step 5: Access the Lab
@@ -247,13 +247,18 @@ This test highlights the difference between linguistic AI firewalls and structur
 
 Destroy the lab with one command:
 
+#### If deploying to GCP:
 ```bash
-cd terraform
-# for GCP
-terraform destroy -var="target_cloud=gcp" -auto-approve
+cd terraform/gcp
+terraform init
+terraform destroy -var="enable_local_llm=false" -auto-approve
+```
 
-# for AWS
-terraform destroy -var="target_cloud=aws" -auto-approve 
+#### If deploying to AWS:
+```bash
+cd terraform/aws
+terraform init
+terraform destroy -var="enable_local_llm=false" -auto-approve
 ```
 
 ---
