@@ -38,9 +38,9 @@ if ! aws sts get-caller-identity &> /dev/null; then
     exit 1
 fi
 
-# 🌟 FIXED: Change directory into the AWS folder and initialize so Terraform can read the variables!
+
 cd terraform/aws || { echo "❌ ERROR: terraform/aws directory not found."; exit 1; }
-terraform init -quiet
+terraform init > /dev/null
 
 # 1. Ask Terraform for the current value
 echo "🔍 Resolving Bedrock Model ID from Terraform..."
