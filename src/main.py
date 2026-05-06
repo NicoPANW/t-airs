@@ -347,7 +347,7 @@ async def chat(
             scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
-                metadata={"app_user": end_user}
+                metadata={"app_user": end_user, "ai_model": model_id}
             )
             res_data = scan_response.to_dict()
             ingress_data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
@@ -582,7 +582,7 @@ async def chat(
             out_scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),
-                metadata={"app_user": end_user}
+                metadata={"app_user": end_user, "ai_model": model_id}
             )
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
