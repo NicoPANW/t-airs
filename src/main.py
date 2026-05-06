@@ -91,13 +91,13 @@ def check_gpu_status():
             ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
             text=True, timeout=5
         ).strip()
-        
+
         # 2. Check active models via Ollama (Added 5s timeout)
         try:
             ollama_ps = subprocess.check_output(["ollama", "ps"], text=True, timeout=5).strip().split('\n')
             # Extract just the model names (skipping the header row)
             loaded_models = [line.split()[0] for line in ollama_ps[1:] if line.strip()]
-            
+
             if loaded_models:
                 model_str = f"| Models in VRAM: {', '.join(loaded_models)}"
             else:
@@ -137,7 +137,7 @@ def init_rag_pipeline():
         import importlib
         import rag_data
         importlib.reload(rag_data)
-        
+
         chroma_client = chromadb.Client()
         #embedder = SentenceTransformer("all-MiniLM-L6-v2")
         # 🌟 UPGRADED: Using a modern BAAI Retrieval model
@@ -147,10 +147,10 @@ def init_rag_pipeline():
 
         # 🌟 THE FIX: Added 'rag_data.' prefix here!
         for persona_name, content in rag_data.RAG_KNOWLEDGE_BASE.items():
-            
+
             # 🌟 SAFE CREATION: Get or Create to prevent ChromaDB crashes
             col = chroma_client.get_or_create_collection(name=f"rag_{persona_name}")
-            
+
             # Wipe any ghost data from previous soft-restarts
             existing_data = col.get()
             if existing_data and existing_data["ids"]:
@@ -165,7 +165,7 @@ def init_rag_pipeline():
                     ids=[f"{persona_name}_chunk_{i}" for i in range(len(chunks))]
                 )
             rag_collections[persona_name] = col
-            
+
         print("✅ RAG Ready: Loaded multiple personas into Vector DB.")
     except Exception as e:
         print(f"❌ RAG Initialization Failed: {e}")
@@ -173,24 +173,24 @@ def init_rag_pipeline():
 def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
     target_collection = rag_collections.get(persona)
     if not target_collection:
-        return "", [], [] 
-    
+        return "", [], []
+
     filtered_docs = []
     rejected_docs = []
-    
+
     try:
         query_emb = embedder.encode([user_prompt]).tolist()
         results = target_collection.query(
-            query_embeddings=query_emb, 
+            query_embeddings=query_emb,
             n_results=top_k,
             include=["documents", "distances"]
         )
-        
+
         raw_docs = results.get("documents", [[]])[0]
         distances = results.get("distances", [[]])[0]
-        
-        MAX_DISTANCE = 0.50 
-        
+
+        MAX_DISTANCE = 0.50
+
         for doc, dist in zip(raw_docs, distances):
             if dist <= MAX_DISTANCE:
                 filtered_docs.append(doc)
@@ -198,14 +198,14 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
                 # 🌟 Save both the text and the math score!
                 rejected_docs.append({"text": doc, "distance": round(dist, 2)})
                 print(f"🛑 RAG Chunk Rejected: Too far from prompt (Distance: {dist:.2f})")
-        
+
         if filtered_docs:
             formatted_text = "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(filtered_docs)
-            return formatted_text, filtered_docs, rejected_docs 
-            
+            return formatted_text, filtered_docs, rejected_docs
+
     except Exception as e:
         print(f"RAG Retrieval Error: {e}")
-    
+
     # 🌟 Always return 3 items, even if it completely fails!
     return "", filtered_docs, rejected_docs
 
@@ -219,7 +219,7 @@ async def lifespan(app: FastAPI):
     print("Checking Hardware Acceleration...", flush=True)
     print(f"RESULT: {check_gpu_status()}", flush=True)
     print("-" * 50, flush=True)
-    
+
     # 1. Prisma AIRS Handshake (ALWAYS initialize so UI toggle can work instantly)
     if AIRS_KEY and AIRS_PROFILE_NAME:
         print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...", flush=True)
@@ -242,7 +242,7 @@ async def lifespan(app: FastAPI):
     print("Performing Deep Model Discovery via AI Gateway...")
     validated_models = discover_gateway_models()
     print(f"RESULT: ✅ {len(validated_models)} routing models loaded.")
-    
+
     # 3. RAG Initialization
     init_rag_pipeline()
 
@@ -252,7 +252,7 @@ async def lifespan(app: FastAPI):
         read, write = await stack.enter_async_context(stdio_client(server_params))
         mcp_session = await stack.enter_async_context(ClientSession(read, write))
         await mcp_session.initialize()
-        
+
         mcp_tools = await mcp_session.list_tools()
         for t in mcp_tools.tools:
             openai_tools.append({
@@ -265,8 +265,8 @@ async def lifespan(app: FastAPI):
             })
         print(f"RESULT: ✅ MCP ONLINE. Tools loaded: {[t.name for t in mcp_tools.tools]}")
         print("="*50 + "\n")
-        
-        yield 
+
+        yield
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
@@ -314,7 +314,8 @@ async def chat(
     airs_enabled: bool = Form(False),
     model_id: str = Form("none"),
     history_enabled: bool = Form(True),
-    enforcement_placement: str = Form("gateway")
+    enforcement_placement: str = Form("gateway"),
+    end_user: str = Form("user1")
 ):
     selected_prompt = PERSONAS.get(persona, PERSONAS["banking"])
     security_status = "Bypassed"
@@ -323,13 +324,13 @@ async def chat(
     print(f"\n{'='*40}")
     print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona} | AIRS placement: {enforcement_placement.upper()}")
     print(f"💬 PROMPT: {message}")
-    
+
     architecture_trace = {
         "ai_gateway": {"routed_to": model_id},
-        "rag_pipeline": {"chunks_injected": [], "chunks_rejected": []}, 
+        "rag_pipeline": {"chunks_injected": [], "chunks_rejected": []},
         "mcp_execution": []
     }
-    
+
     if not model_id or model_id == "none":
         model_id = validated_models[0] if validated_models else None
         architecture_trace["ai_gateway"]["routed_to"] = model_id
@@ -340,13 +341,17 @@ async def chat(
     try:
         # 🌟 STATE TRACKER: Initial Inference Phase
         execution_phase = "Initial Inference"
-        
+
         # --- 1. INGRESS SCAN (App-Level) ---
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-            scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt=message))
+            scan_response = Scanner().sync_scan(
+                ai_profile=ai_profile_obj,
+                content=Content(prompt=message),
+                metadata={"app_user": end_user}
+            )
             res_data = scan_response.to_dict()
             ingress_data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
-            
+
             if str(ingress_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ App-Level AIRS Blocked Input: {ingress_data.get('category', 'Policy')} violation."
                 print(f"🛑 AIRS APP BLOCK: INGRESS | Category: {ingress_data.get('category', 'Policy')}")
@@ -358,16 +363,16 @@ async def chat(
 
         # --- 2. RAG CONTEXT RETRIEVAL ---
         rag_context, raw_rag_docs, rejected_rag_docs = await asyncio.to_thread(retrieve_rag_context, message, persona)
-        
+
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         architecture_trace["rag_pipeline"]["chunks_rejected"] = rejected_rag_docs
         system_instruction = f"{selected_prompt}\n{rag_context}"
-        
+
         # --- 3. SESSION HISTORY & MESSAGE BUILDING ---
         if history_enabled:
             if session_id not in SESSION_HISTORY:
                 SESSION_HISTORY[session_id] = []
-            
+
             SESSION_HISTORY[session_id].append({"role": "user", "content": message})
             current_context = SESSION_HISTORY[session_id]
         else:
@@ -381,89 +386,90 @@ async def chat(
 
         # --- 4. AI GATEWAY INFERENCE & TOOL CALLING ---
         print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
-        
+
         gateway_params_ingress = {}
         gateway_params_egress = {}
-        
+
         if enforcement_placement == "gateway" and airs_enabled:
             gateway_params_ingress = {"guardrails": ["airs-ingress-scan"]}
             gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
-        
+
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
             messages=messages,
             tools=active_tools if active_tools else None,
             temperature=0.7,
+            user=end_user,
             extra_body=gateway_params_ingress
         )
-        
+
         response = raw_response.parse()
         actual_model = getattr(response, "model", model_id)
         hidden_model = raw_response.headers.get("x-litellm-model-name")
-        
+
         if hidden_model:
             actual_model = hidden_model
         elif actual_model == "auto-router":
-            actual_model = "Dynamically Routed (Gateway Load Balancer)" 
+            actual_model = "Dynamically Routed (Gateway Load Balancer)"
 
         if model_id == "auto-router":
             architecture_trace["ai_gateway"]["routed_to"] = f"auto-router ➔ {actual_model}"
         else:
             architecture_trace["ai_gateway"]["routed_to"] = actual_model
-        
+
         response_msg = response.choices[0].message
 
         if response_msg.tool_calls:
-            messages.append(response_msg) 
-            
+            messages.append(response_msg)
+
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
-                
+
                 # --- 🚀 CUSTOM ACTION TOOLS (WRITES TO DB) ---
                 action_tools = [
                     "transfer_funds", "freeze_account", "issue_replacement_card",
                     "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
                     "issue_store_refund", "apply_admin_discount", "update_billing_zip"
                 ]
-                
+
                 if tool_name in action_tools:
-                    
+
                     setup_query = "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"
                     await mcp_session.call_tool("write_query", arguments={"query": setup_query})
-                    
+
                     # === BANKING TOOLS ===
                     if tool_name == "transfer_funds":
                         src = tool_args.get("source_account")
                         dst = tool_args.get("dest_account")
                         amt = tool_args.get("amount")
-                        
+
                         deduct_query = f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"
                         await mcp_session.call_tool("write_query", arguments={"query": deduct_query})
-                        
+
                         add_query = f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"
                         await mcp_session.call_tool("write_query", arguments={"query": add_query})
 
                         details = f"Transferred ${amt} from {src} to {dst}"
                         tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed and settled."
-                        
+
                     elif tool_name == "freeze_account":
                         acc = tool_args.get("account_id")
                         reason = tool_args.get("reason")
-                        
+
                         freeze_query = f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"
                         await mcp_session.call_tool("write_query", arguments={"query": freeze_query})
-                        
+
                         details = f"Froze account {acc}. Reason: {reason}"
                         tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} has been frozen."
 
                     elif tool_name == "issue_replacement_card":
                         acc = tool_args.get("account_id")
-                        
+
                         card_query = f"UPDATE users SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"
                         await mcp_session.call_tool("write_query", arguments={"query": card_query})
-                        
+
                         details = f"Canceled and replaced card for account {acc}"
                         tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
 
@@ -471,7 +477,7 @@ async def chat(
                     elif tool_name == "upgrade_flight_seat":
                         tkt = tool_args.get("ticket_number")
                         cabin = tool_args.get("new_class")
-                        
+
                         upgrade_query = f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"
                         await mcp_session.call_tool("write_query", arguments={"query": upgrade_query})
 
@@ -481,7 +487,7 @@ async def chat(
                     elif tool_name == "cancel_flight_booking":
                         tkt = tool_args.get("ticket_number")
                         refund = tool_args.get("refund_to_card")
-                        
+
                         cancel_query = f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"
                         await mcp_session.call_tool("write_query", arguments={"query": cancel_query})
 
@@ -491,7 +497,7 @@ async def chat(
                     elif tool_name == "update_passport_details":
                         tkt = tool_args.get("ticket_number")
                         new_pass = tool_args.get("new_passport_id")
-                        
+
                         pass_query = f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"
                         await mcp_session.call_tool("write_query", arguments={"query": pass_query})
 
@@ -502,17 +508,17 @@ async def chat(
                     elif tool_name == "issue_store_refund":
                         order = tool_args.get("order_id")
                         amt = tool_args.get("amount")
-                        
+
                         refund_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"
                         await mcp_session.call_tool("write_query", arguments={"query": refund_query})
 
                         details = f"Refunded ${amt} for order {order}"
                         tool_output = f"✅ REFUND PROCESSED: ${amt} credited back to payment method for order {order}."
-                        
+
                     elif tool_name == "apply_admin_discount":
                         order = tool_args.get("order_id")
                         disc = tool_args.get("discount_percentage")
-                        
+
                         disc_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"
                         await mcp_session.call_tool("write_query", arguments={"query": disc_query})
 
@@ -522,7 +528,7 @@ async def chat(
                     elif tool_name == "update_billing_zip":
                         order = tool_args.get("order_id")
                         new_zip = tool_args.get("new_zip_code")
-                        
+
                         zip_query = f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"
                         await mcp_session.call_tool("write_query", arguments={"query": zip_query})
 
@@ -532,16 +538,16 @@ async def chat(
                     # === GLOBALLY LOG THE ACTION ===
                     insert_query = f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', '{details}');"
                     await mcp_session.call_tool("write_query", arguments={"query": insert_query})
-                    
+
                     tool_output += " (Transaction permanently recorded in backend database)."
 
                 else:
                     # Normal READ tools fallback
                     mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_result.content[0].text
-                
+
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
-                
+
                 architecture_trace["mcp_execution"].append({
                     "tool": tool_name,
                     "arguments": tool_args,
@@ -550,15 +556,16 @@ async def chat(
 
             # 🌟 STATE TRACKER: Secondary Inference Phase (after tools return)
             execution_phase = "Tool Summarization Inference"
-            
+
             gateway_params_egress = {}
             if enforcement_placement == "gateway" and airs_enabled:
                 gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
-            
+
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
                 temperature=0.7,
+                user=end_user,
                 extra_body=gateway_params_egress  # <-- Use the new variable
             )
             bot_response = final_response.choices[0].message.content or ""
@@ -569,29 +576,33 @@ async def chat(
             bot_response = "⚠️ [System: The LLM executed the prompt and tools, but returned an empty text string.]"
 
         architecture_trace["llm_generation"] = bot_response
-        
+
         # --- 5. EGRESS SCAN (App-Level) ---
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
-            out_scan_response = Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(response=bot_response))
+            out_scan_response = Scanner().sync_scan(
+                ai_profile=ai_profile_obj,
+                content=Content(response=bot_response),
+                metadata={"app_user": end_user}
+            )
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
-            
+
             if str(out_data.get("action", "pass")).lower() == "block":
                 block_txt = f"🛡️ App-Level AIRS Blocked Output: The LLM generated a {out_data.get('category', 'Policy')} violation."
                 print(f"🛑 AIRS APP BLOCK: EGRESS | Category: {out_data.get('category', 'Policy')}")
                 print(f"🏁 REQUEST ABORTED | Security Status: Blocked by App SDK")
                 print(f"{'='*40}\n")
                 return {
-                    "bot": block_txt, 
-                    "output": block_txt, 
+                    "bot": block_txt,
+                    "output": block_txt,
                     "logs": {
-                        "security_scan": "EGRESS BLOCK (LLM ➔ User)", 
-                        "raw_response": json.dumps(out_data, indent=2), 
+                        "security_scan": "EGRESS BLOCK (LLM ➔ User)",
+                        "raw_response": json.dumps(out_data, indent=2),
                         "trace": architecture_trace,
                         "intercepted_text": bot_response
                     }
                 }
-            
+
             security_status = "Passed App Input & Output"
             raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
 
@@ -618,7 +629,7 @@ async def chat(
             print("⏳ Passing HTTP 429 back to Prisma AIRS scanner to trigger backoff...")
             print(f"🏁 REQUEST ABORTED | Security Status: Rate Limited")
             print(f"{'='*40}\n")
-            
+
             return JSONResponse(
                 status_code=429,
                 content={
@@ -629,17 +640,17 @@ async def chat(
                   }
                 }
             )
-            
+
         # 🌟 THE FIX: Rollback the poisoned prompt!
-        # If the Gateway blocked the request, delete the toxic prompt from history 
+        # If the Gateway blocked the request, delete the toxic prompt from history
         # so the user isn't permanently paralyzed for the rest of the session.
         if history_enabled and session_id in SESSION_HISTORY:
             if len(SESSION_HISTORY[session_id]) > 0 and SESSION_HISTORY[session_id][-1]["content"] == message:
                 SESSION_HISTORY[session_id].pop()
-        
+
         # 🌟 1. Catch and Beautify LiteLLM Gateway Security Rejections
         if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
-            
+
             # Determine the Scan Type
             scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
             log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
@@ -653,7 +664,7 @@ async def chat(
             # 🌟 3. Extract the category for the Chat UI
             category_match = re.search(r"'category':\s*'([^']+)'", error_str)
             category = category_match.group(1).capitalize() if category_match else "Security"
-            
+
             if "http_400_error" in error_str or "scan_failed" in error_str:
                 # 🌟 THE NEW FIX: Gracefully handle the Gateway's empty-string crash!
                 clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
@@ -661,7 +672,7 @@ async def chat(
                 clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
 
             # 🌟 4. Pierce the nested string to build a clean JSON log for the Sidebar
-            sidebar_log = {"raw_error": error_str} 
+            sidebar_log = {"raw_error": error_str}
             try:
                 # Find where the dictionary actually starts inside the LiteLLM error string
                 start_idx = error_str.find("{")
@@ -677,19 +688,19 @@ async def chat(
             print(f"🏁 REQUEST ABORTED | Security Status: Blocked by Gateway")
             print(f"{'='*40}\n")
             return {
-                "bot": clean_msg, 
-                "output": clean_msg, 
+                "bot": clean_msg,
+                "output": clean_msg,
                 "logs": {
-                    "security_scan": f"{scan_type} ({direction})", 
-                    "raw_response": json.dumps(sidebar_log, indent=2), 
+                    "security_scan": f"{scan_type} ({direction})",
+                    "raw_response": json.dumps(sidebar_log, indent=2),
                     "trace": architecture_trace
                 }
             }
 
         # Catch standard non-security errors
         return {
-            "bot": f"Error: {error_str}", 
-            "output": f"Error: {error_str}", 
+            "bot": f"Error: {error_str}",
+            "output": f"Error: {error_str}",
             "logs": {"security_scan": "Error", "raw_response": raw_sec_log, "trace": architecture_trace}
         }
 

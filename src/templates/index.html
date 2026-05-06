@@ -32,6 +32,19 @@
         </div>
 
         <div class="flex flex-col gap-6 flex-1 min-h-0">
+            
+            <div class="sidebar-section">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="user-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">App User ID</p>
+                    </div>
+                </div>
+                <div class="bg-black/40 rounded-lg border border-white/5 overflow-hidden flex flex-col relative shadow-inner">
+                    <input type="text" id="end-user-input" value="user1" class="w-full bg-transparent p-2.5 text-[11px] font-mono text-slate-300 outline-none selection:bg-emerald-500/30 transition-colors focus:bg-slate-900/50" spellcheck="false" placeholder="e.g. user1, admin, nico...">
+                </div>
+            </div>
+            
             <div class="sidebar-section">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
@@ -337,8 +350,8 @@
             const message = msgInput.value;
             const persona = document.querySelector('input[name="persona"]:checked').value;
             const airsEnabled = document.getElementById('airs-toggle').checked;
-            
             const enforcementPlacement = document.querySelector('input[name="enforcement"]:checked').value;
+            const endUser = document.getElementById('end-user-input').value || "user1";
 
             appendMessage('user', message);
             msgInput.value = '';
@@ -354,7 +367,7 @@
                     body: new URLSearchParams({
                         'message': message, 'persona': persona, 'session_id': sessionId,
                         'airs_enabled': airsEnabled, 'model_id': modelId, 'history_enabled': historyEnabled,
-                        'enforcement_placement': enforcementPlacement 
+                        'enforcement_placement': enforcementPlacement, 'end_user': endUser
                     })
                 });
                 const data = await res.json();
