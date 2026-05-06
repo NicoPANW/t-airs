@@ -11,7 +11,7 @@ output "deployment_summary" {
   💻 SSH Command     : gcloud compute ssh ${google_compute_instance.t_airs_node.name} --zone=${google_compute_instance.t_airs_node.zone}
   
   🛡️ Security Notice : CSP firewalls are RESTRICTED to your auto-detected subnet
-                       (${local.my_auto_subnet}) and Prisma AIRS nodes.
+                       (${local.my_auto_subnet}) and Prisma AIRS nodes (${join(", ", var.prisma_airs_ips)}).
   
   ⏳ Readiness Note  : Please note it takes approximately 10 minutes for the startup 
                        scripts to finish installing the application. The dashboard 
