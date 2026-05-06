@@ -1,51 +1,74 @@
-# ==========================================
-# GCP IMAGE DATA SOURCES
-# ==========================================
-# 1. Standard Ubuntu 24.04 (For API-only)
+terraform {
+  required_providers {
+    google   = { source = "hashicorp/google", version = "~> 5.0" }
+    http     = { source = "hashicorp/http", version = "~> 3.0" }
+    external = { source = "hashicorp/external", version = "~> 2.0" }
+  }
+}
+
+# --- Standard GCP Provider (No more mocks!) ---
+provider "google" {
+  project = var.gcp_project_id
+  region  = var.gcp_region
+}
+
+# --- Global Logic ---
+data "http" "my_ip" {
+  url = "https://ipv4.icanhazip.com"
+}
+
+locals {
+  raw_ip = chomp(data.http.my_ip.response_body)
+  my_auto_subnet = "${regex("^([0-9]+\\.[0-9]+\\.[0-9]+\\.)", local.raw_ip)[0]}0/24"
+  allowed_ingress = concat([local.my_auto_subnet], var.prisma_airs_ips)
+
+  # 🌟 FIXED: Path looks up to the root folder. Unused AWS variables are passed as empty strings.
+  userdata = templatefile("${path.module}/../../scripts/bootstrap.sh", {
+    airs_key         = var.airs_key
+    airs_profile     = var.airs_profile
+    gcp_project      = var.gcp_project_id
+    gcp_region       = var.gcp_region
+    enable_local_llm = var.enable_local_llm
+    target_cloud     = "gcp"
+    aws_region       = ""
+    bedrock_model_id = ""
+  })
+}
+
+# --- GCP Image Data Sources ---
 data "google_compute_image" "ubuntu_standard_gcp" {
-  count   = var.target_cloud == "gcp" ? 1 : 0
   family  = "ubuntu-2404-lts-amd64"    
   project = "ubuntu-os-cloud"
 }
 
-# 🌟 2. NEW: Dynamically execute gcloud to find the newest DLVM family
 data "external" "latest_dlvm_family" {
-  count   = var.target_cloud == "gcp" ? 1 : 0
   program = [
     "bash", "-e", "-c",
     "FAMILY=$(gcloud compute images list --project=deeplearning-platform-release --format='value(family)' | grep -i 'ubuntu-2204' | grep 'common-cu' | sort -r | head -n 1) && printf '{\"family\": \"%s\"}' \"$FAMILY\""
   ]
 }
 
-# 3. Deep Learning VM (For Local GPU)
 data "google_compute_image" "ubuntu_dlvm_gcp" {
-  count   = var.target_cloud == "gcp" ? 1 : 0
-  # 🌟 NEW: Pull the family name dynamically from the bash script above
-  family  = data.external.latest_dlvm_family[0].result.family
+  family  = data.external.latest_dlvm_family.result.family
   project = "deeplearning-platform-release"
 }
 
-# ==========================================
-# GCP NETWORK RESOURCES
-# ==========================================
+# --- GCP Networking Resources ---
 resource "google_compute_network" "t_airs_vpc" {
-  count                   = var.target_cloud == "gcp" ? 1 : 0
   name                    = var.gcp_vpc_name
   auto_create_subnetworks = false
 }
 
 resource "google_compute_subnetwork" "t_airs_sub" {
-  count         = var.target_cloud == "gcp" ? 1 : 0
   name          = "${var.gcp_vpc_name}-sub"
   ip_cidr_range = var.gcp_subnet_cidr
   region        = var.gcp_region
-  network       = google_compute_network.t_airs_vpc[0].id
+  network       = google_compute_network.t_airs_vpc.id
 }
 
 resource "google_compute_firewall" "restricted_access" {
-  count   = var.target_cloud == "gcp" ? 1 : 0
   name    = "t-airs-restricted-firewall"
-  network = google_compute_network.t_airs_vpc[0].name
+  network = google_compute_network.t_airs_vpc.name
 
   allow {
     protocol = "tcp"
@@ -54,18 +77,12 @@ resource "google_compute_firewall" "restricted_access" {
   source_ranges = local.allowed_ingress
 }
 
-# ==========================================
-# GCP COMPUTE INSTANCE
-# ==========================================
+# --- GCP Compute Instance ---
 resource "google_compute_instance" "t_airs_node" {
-  count        = var.target_cloud == "gcp" ? 1 : 0
   name         = "t-airs-node"
   zone         = "${var.gcp_region}-a"
-
-  # DYNAMIC FLAVOR: N1 for GPU, E2 for CPU-only
   machine_type = var.enable_local_llm ? "n1-standard-4" : "e2-standard-2"
 
-  # DYNAMIC GPU: Only attach the T4 if enable_local_llm is true
   dynamic "guest_accelerator" {
     for_each = var.enable_local_llm ? [1] : []
     content {
@@ -74,17 +91,13 @@ resource "google_compute_instance" "t_airs_node" {
     }
   }
 
-  # DYNAMIC SCHEDULING: GPUs require TERMINATE, CPUs can use MIGRATE
   scheduling {
     on_host_maintenance = var.enable_local_llm ? "TERMINATE" : "MIGRATE"
   }
 
   boot_disk {
     initialize_params { 
-      # 🌟 DYNAMIC IMAGE: DLVM if local_llm is true, standard Ubuntu if false
-      image = var.enable_local_llm ? data.google_compute_image.ubuntu_dlvm_gcp[0].self_link : data.google_compute_image.ubuntu_standard_gcp[0].self_link
-      
-      # DYNAMIC SIZE: 50GB for models, 20GB for standard
+      image = var.enable_local_llm ? data.google_compute_image.ubuntu_dlvm_gcp.self_link : data.google_compute_image.ubuntu_standard_gcp.self_link
       size  = var.enable_local_llm ? 50 : 20 
     }
   }
@@ -96,7 +109,7 @@ resource "google_compute_instance" "t_airs_node" {
   metadata_startup_script = local.userdata
 
   network_interface {
-    subnetwork = google_compute_subnetwork.t_airs_sub[0].id
+    subnetwork = google_compute_subnetwork.t_airs_sub.id
     access_config {} # Assign Public IP
   }
 }

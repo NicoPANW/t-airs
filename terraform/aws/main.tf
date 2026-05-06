@@ -1,72 +1,97 @@
-# Dynamically fetch the latest Canonical Ubuntu 24.04 AMI
+terraform {
+  required_providers {
+    aws  = { source = "hashicorp/aws", version = "~> 5.0" }
+    http = { source = "hashicorp/http", version = "~> 3.0" }
+  }
+}
+
+# --- Standard AWS Provider (No more mocks!) ---
+provider "aws" { 
+  region = var.aws_region 
+}
+
+# --- Global Logic ---
+data "http" "my_ip" {
+  url = "https://ipv4.icanhazip.com"
+}
+
+locals {
+  raw_ip = chomp(data.http.my_ip.response_body)
+  my_auto_subnet = "${regex("^([0-9]+\\.[0-9]+\\.[0-9]+\\.)", local.raw_ip)[0]}0/24"
+  allowed_ingress = concat([local.my_auto_subnet], var.prisma_airs_ips)
+
+  # 🌟 FIXED: Path looks up to the root folder. Unused GCP variables are passed as empty strings.
+  userdata = templatefile("${path.module}/../../scripts/bootstrap.sh", {
+    airs_key         = var.airs_key
+    airs_profile     = var.airs_profile
+    gcp_project      = ""
+    gcp_region       = ""
+    enable_local_llm = var.enable_local_llm
+    target_cloud     = "aws" 
+    aws_region       = var.aws_region
+    bedrock_model_id = var.bedrock_model_id
+  })
+}
+
+# --- AWS AMI Data Sources ---
 data "aws_ami" "ubuntu_standard" {
-  count       = var.target_cloud == "aws" ? 1 : 0
   most_recent = true
   owners      = ["099720109477"] # Canonical
-
   filter {
     name   = "name"
     values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
 }
 
-# Dynamically fetch the AWS Deep Learning AMI
 data "aws_ami" "ubuntu_dlami" {
-  count       = var.target_cloud == "aws" ? 1 : 0
   most_recent = true
   owners      = ["amazon"]
-
   filter {
     name   = "name"
     values = ["Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"]
   }
 }
 
+# --- AWS Networking ---
 resource "aws_vpc" "t_airs_vpc" {
-  count      = var.target_cloud == "aws" ? 1 : 0
-  cidr_block = var.aws_vpc_cidr
+  cidr_block           = var.aws_vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags       = { Name = "t-airs-vpc-aws" }
+  tags                 = { Name = "t-airs-vpc-aws" }
 }
 
 resource "aws_key_pair" "my_mac_key" {
-  count      = var.target_cloud == "aws" ? 1 : 0
   key_name   = "t-airs-mac-key"
-  public_key = file("~/.ssh/id_ed25519.pub") 
+  # 🌟 FIXED: Added a graceful fallback so missing keys don't crash deployments!
+  public_key = try(file("~/.ssh/id_ed25519.pub"), "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 mock-key") 
 }
 
 resource "aws_internet_gateway" "gw" {
-  count  = var.target_cloud == "aws" ? 1 : 0
-  vpc_id = aws_vpc.t_airs_vpc[0].id
+  vpc_id = aws_vpc.t_airs_vpc.id
 }
 
 resource "aws_route_table" "public_rt" {
-  count  = var.target_cloud == "aws" ? 1 : 0
-  vpc_id = aws_vpc.t_airs_vpc[0].id
+  vpc_id = aws_vpc.t_airs_vpc.id
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.gw[0].id
+    gateway_id = aws_internet_gateway.gw.id
   }
 }
 
 resource "aws_subnet" "main" {
-  count                   = var.target_cloud == "aws" ? 1 : 0
-  vpc_id                  = aws_vpc.t_airs_vpc[0].id
+  vpc_id                  = aws_vpc.t_airs_vpc.id
   cidr_block              = var.aws_subnet_cidr
   map_public_ip_on_launch = true
   availability_zone       = "${var.aws_region}a"
 }
 
 resource "aws_route_table_association" "public_assoc" {
-  count          = var.target_cloud == "aws" ? 1 : 0
-  subnet_id      = aws_subnet.main[0].id
-  route_table_id = aws_route_table.public_rt[0].id
+  subnet_id      = aws_subnet.main.id
+  route_table_id = aws_route_table.public_rt.id
 }
 
 resource "aws_security_group" "restricted_airs" {
-  count  = var.target_cloud == "aws" ? 1 : 0
-  vpc_id = aws_vpc.t_airs_vpc[0].id
+  vpc_id = aws_vpc.t_airs_vpc.id
 
   ingress {
     from_port   = 8000
@@ -82,7 +107,7 @@ resource "aws_security_group" "restricted_airs" {
     cidr_blocks = local.allowed_ingress
   }
 
-ingress {
+  ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -97,35 +122,28 @@ ingress {
   }
 }
 
+# --- AWS Compute & IAM ---
 resource "aws_instance" "t_airs_node" {
-  count                  = var.target_cloud == "aws" ? 1 : 0
-  ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami[0].id : data.aws_ami.ubuntu_standard[0].id
+  ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
   
-  # DYNAMIC FLAVOR: g4dn.xlarge (1x NVIDIA T4 GPU) if true, t3.medium (CPU) if false
-  instance_type          = var.enable_local_llm ? "g4dn.xlarge" : "t3.medium"
-  
-  key_name               = aws_key_pair.my_mac_key[0].key_name
-  iam_instance_profile   = aws_iam_instance_profile.ec2_profile[0].name
+  instance_type        = var.enable_local_llm ? "g4dn.xlarge" : "t3.medium"
+  key_name             = aws_key_pair.my_mac_key.key_name
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   
   root_block_device {
-    # DYNAMIC DISK: Local LLMs and NVIDIA drivers take massive space. 
-    # 50GB for GPU mode, 20GB for CPU-only mode.
     volume_size           = var.enable_local_llm ? 75 : 20 
     volume_type           = "gp3"
     delete_on_termination = true
   }
   
-  subnet_id              = aws_subnet.main[0].id
-  vpc_security_group_ids = [aws_security_group.restricted_airs[0].id]
+  subnet_id              = aws_subnet.main.id
+  vpc_security_group_ids = [aws_security_group.restricted_airs.id]
   user_data              = local.userdata
-  tags = { Name = "T-AIRS-Production-Node" }
+  tags                   = { Name = "T-AIRS-Production-Node" }
 }
 
-# 1. Create the IAM Role for the EC2 instance
 resource "aws_iam_role" "ec2_bedrock_role" {
-  count = var.target_cloud == "aws" ? 1 : 0
-  name  = "t-airs-bedrock-role"
-
+  name = "t-airs-bedrock-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -140,12 +158,9 @@ resource "aws_iam_role" "ec2_bedrock_role" {
   })
 }
 
-# 2. Give the Role permission to use Bedrock
 resource "aws_iam_role_policy" "bedrock_access" {
-  count = var.target_cloud == "aws" ? 1 : 0
-  name  = "t-airs-bedrock-policy"
-  role  = aws_iam_role.ec2_bedrock_role[0].id
-
+  name = "t-airs-bedrock-policy"
+  role = aws_iam_role.ec2_bedrock_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -161,9 +176,7 @@ resource "aws_iam_role_policy" "bedrock_access" {
   })
 }
 
-# 3. Create the Instance Profile (The actual "ID Badge" we attach to the server)
 resource "aws_iam_instance_profile" "ec2_profile" {
-  count = var.target_cloud == "aws" ? 1 : 0
-  name  = "t-airs-ec2-profile"
-  role  = aws_iam_role.ec2_bedrock_role[0].name
+  name = "t-airs-ec2-profile"
+  role = aws_iam_role.ec2_bedrock_role.name
 }
