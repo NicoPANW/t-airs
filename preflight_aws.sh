@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 echo "🛫 Starting Pre-Flight Checks for AWS..."
 
 # --- 1. GLOBAL CHECKS ---
@@ -39,6 +38,10 @@ if ! aws sts get-caller-identity &> /dev/null; then
     exit 1
 fi
 
+# 🌟 FIXED: Change directory into the AWS folder and initialize so Terraform can read the variables!
+cd terraform/aws || { echo "❌ ERROR: terraform/aws directory not found."; exit 1; }
+terraform init -quiet
+
 # 1. Ask Terraform for the current value
 echo "🔍 Resolving Bedrock Model ID from Terraform..."
 MODEL_ID=$(echo "var.bedrock_model_id" | terraform console | tr -d '"')
@@ -70,6 +73,5 @@ if [ -z "$TF_VAR_prisma_airs_ips" ]; then
 else
     echo "✅ Dynamic AIRS IPs detected: $TF_VAR_prisma_airs_ips"
 fi
-
 
 echo "✅ AWS Pre-flight passed! Ready to deploy."
