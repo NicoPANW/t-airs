@@ -14,6 +14,11 @@
         #model-select option.local-option { background-color: #1e293b; color: #60a5fa; font-weight: bold; }
         #persona-context-display::-webkit-scrollbar { width: 4px; }
         #persona-context-display::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
+
         .sidebar-section {
             background-color: rgba(30, 41, 59, 0.4);
             border: 1px solid rgba(51, 65, 85, 0.5);
@@ -31,7 +36,7 @@
             <h1 class="text-xl font-black tracking-tighter text-white uppercase italic">T-AIRS</h1>
         </div>
 
-        <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <div class="flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto pr-2 sidebar-scroll pb-4">
             
             <div class="sidebar-section">
                 <div class="flex items-center justify-between mb-3">
@@ -120,7 +125,7 @@
                 <p class="text-[9px] text-slate-500 mt-2 italic leading-tight">When enabled, the AI remembers previous messages in this session.</p>
             </div>
 
-            <div class="sidebar-section flex-1 flex flex-col min-h-0 mb-4">
+            <div class="sidebar-section flex flex-col shrink-0 h-[280px] mb-4">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
                         <i data-lucide="binary" class="w-3.5 h-3.5 text-orange-400"></i>
