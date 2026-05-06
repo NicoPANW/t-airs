@@ -247,14 +247,14 @@ This test highlights the difference between linguistic AI firewalls and structur
 
 Destroy the lab with one command:
 
-#### If deploying to GCP:
+#### If deployed to GCP:
 ```bash
 cd terraform/gcp
 terraform init
 terraform destroy -var="enable_local_llm=false" -auto-approve
 ```
 
-#### If deploying to AWS:
+#### If deployed to AWS:
 ```bash
 cd terraform/aws
 terraform init
