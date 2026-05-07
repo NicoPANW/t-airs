@@ -297,19 +297,19 @@ Description=T-AIRS
 After=$TAIRS_AFTER
 
 [Service]
+# 1. Explicitly define the cache locations
 Environment="HOME=/root"
 Environment="HF_HOME=/root/.cache/huggingface"
 WorkingDirectory=/opt/t-airs/src
+
+# ==========================================
+# 🔍 NEW: SYSTEMD DEBUG DUMP
+# ==========================================
+ExecStartPre=/bin/bash -c 'echo "=== 🕵️ SYSTEMD DEBUG DUMP ==="; echo "Current User: \$(whoami)"; echo "HOME Variable: \$HOME"; echo "HF_HOME Variable: \$HF_HOME"; echo "--- Checking Cache Directory ---"; ls -lah /root/.cache/huggingface/ || echo "❌ /root/.cache/huggingface IS EMPTY OR MISSING!"; echo "================================="'
+# ==========================================
+
 ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done; echo "LiteLLM started!"'
-EOF
-
-
-cat <<EOF >> /etc/systemd/system/t-airs.service
 ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
-EOF
-
-
-cat <<EOF >> /etc/systemd/system/t-airs.service
 Restart=always
 User=root
 
