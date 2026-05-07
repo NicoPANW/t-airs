@@ -1,27 +1,40 @@
+# ==========================================
+# TERRAFORM & PROVIDER CONFIGURATION
+# ==========================================
+
+# Defines the required providers for this configuration.
 terraform {
   required_providers {
-    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
-    http  = { source = "hashicorp/http", version = "~> 3.0" }
-    tls   = { source = "hashicorp/tls", version = "~> 4.0" }
-    local = { source = "hashicorp/local", version = "~> 2.0" }
+    aws   = { source = "hashicorp/aws", version = "~> 5.0" }   # For managing AWS resources.
+    http  = { source = "hashicorp/http", version = "~> 3.0" }   # For making HTTP requests (e.g., to get public IP).
+    tls   = { source = "hashicorp/tls", version = "~> 4.0" }   # For generating cryptographic keys.
+    local = { source = "hashicorp/local", version = "~> 2.0" } # For writing files to the local machine.
   }
 }
 
-
+# Configures the AWS provider with the specified region.
 provider "aws" { 
   region = var.aws_region 
 }
 
-# --- Global Logic ---
+# ==========================================
+# GLOBAL LOGIC & DATA SOURCES
+# ==========================================
+
+# Fetches the public IP of the machine running Terraform to automatically allow SSH access.
 data "http" "my_ip" {
   url = "https://ipv4.icanhazip.com"
 }
 
 locals {
+  # Cleans up the fetched IP address.
   raw_ip = chomp(data.http.my_ip.response_body)
+  # Creates a /24 subnet from the user's public IP for SSH access.
   my_auto_subnet = "${regex("^([0-9]+\\.[0-9]+\\.[0-9]+\\.)", local.raw_ip)[0]}0/24"
+  # Combines the user's IP with Prisma AIRS IPs for the security group ingress rules.
   allowed_ingress = concat([local.my_auto_subnet], var.prisma_airs_ips)
 
+  # Renders the bootstrap script, passing in all necessary variables for the AWS environment.
   userdata = templatefile("${path.module}/../scripts/bootstrap.sh", {
     airs_key         = var.airs_key
     airs_profile     = var.airs_profile
@@ -34,7 +47,11 @@ locals {
   })
 }
 
-# --- AWS AMI Data Sources ---
+# ==========================================
+# AWS AMI (MACHINE IMAGE) SELECTION
+# ==========================================
+
+# Finds the latest Ubuntu 24.04 LTS server image for standard (non-GPU) instances.
 data "aws_ami" "ubuntu_standard" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -44,6 +61,7 @@ data "aws_ami" "ubuntu_standard" {
   }
 }
 
+# Finds the latest AWS Deep Learning AMI with NVIDIA drivers for GPU-enabled instances.
 data "aws_ami" "ubuntu_dlami" {
   most_recent = true
   owners      = ["amazon"]
@@ -53,7 +71,11 @@ data "aws_ami" "ubuntu_dlami" {
   }
 }
 
-# --- AWS Networking ---
+# ==========================================
+# AWS NETWORKING
+# ==========================================
+
+# Creates a dedicated Virtual Private Cloud (VPC) for the application.
 resource "aws_vpc" "t_airs_vpc" {
   cidr_block           = var.aws_vpc_cidr
   enable_dns_support   = true
@@ -61,32 +83,35 @@ resource "aws_vpc" "t_airs_vpc" {
   tags                 = { Name = "t-airs-vpc-aws" }
 }
 
-# ==========================================
-# Dynamic SSH Key Generation
-# ==========================================
+# =================================================
+# DYNAMIC SSH KEY GENERATION & MANAGEMENT
+# =================================================
 
-# 1. Generate a shiny new ED25519 key pair on the fly
+# 1. Generates a new, secure ED25519 key pair in memory during the Terraform run.
 resource "tls_private_key" "t_airs_key" {
   algorithm = "ED25519"
 }
 
-# 2. Upload the Public Key to AWS
+# 2. Uploads the public part of the generated key to AWS EC2 Key Pairs.
 resource "aws_key_pair" "generated_key" {
   key_name   = "t-airs-dynamic-key"
   public_key = tls_private_key.t_airs_key.public_key_openssh
 }
 
-# 3. Save the Private Key locally so the user can actually SSH in!
+# 3. Saves the private part of the key to a local file (`t-airs-key.pem`).
+# This allows the user to SSH into the created instance.
 resource "local_sensitive_file" "private_key" {
   content         = tls_private_key.t_airs_key.private_key_openssh
   filename        = "${path.module}/t-airs-key.pem"
   file_permission = "0400" # Strict read-only permissions required by SSH
 }
 
+# Creates an Internet Gateway to provide internet access to the VPC.
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.t_airs_vpc.id
 }
 
+# Creates a route table and a default route to the Internet Gateway.
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.t_airs_vpc.id
   route {
@@ -95,6 +120,7 @@ resource "aws_route_table" "public_rt" {
   }
 }
 
+# Creates a public subnet within the VPC. Instances in this subnet get a public IP.
 resource "aws_subnet" "main" {
   vpc_id                  = aws_vpc.t_airs_vpc.id
   cidr_block              = var.aws_subnet_cidr
@@ -102,14 +128,17 @@ resource "aws_subnet" "main" {
   availability_zone       = "${var.aws_region}a"
 }
 
+# Associates the public route table with the main subnet.
 resource "aws_route_table_association" "public_assoc" {
   subnet_id      = aws_subnet.main.id
   route_table_id = aws_route_table.public_rt.id
 }
 
+# Defines a security group to act as a firewall for the EC2 instance.
 resource "aws_security_group" "restricted_airs" {
   vpc_id = aws_vpc.t_airs_vpc.id
 
+  # Allows ingress traffic for the web application from the user's IP and Prisma AIRS IPs.
   ingress {
     from_port   = 8000
     to_port     = 8000
@@ -117,6 +146,7 @@ resource "aws_security_group" "restricted_airs" {
     cidr_blocks = local.allowed_ingress
   }
 
+  # Allows ingress traffic for Ollama (if used) from the user's IP and Prisma AIRS IPs.
   ingress {
     from_port   = 11434
     to_port     = 11434
@@ -124,6 +154,7 @@ resource "aws_security_group" "restricted_airs" {
     cidr_blocks = local.allowed_ingress
   }
 
+  # Allows SSH access only from the user's public IP.
   ingress {
     from_port   = 22
     to_port     = 22
@@ -131,6 +162,7 @@ resource "aws_security_group" "restricted_airs" {
     cidr_blocks = [local.my_auto_subnet]
   }
 
+  # Allows all outbound traffic from the instance.
   egress {
     from_port   = 0
     to_port     = 0
@@ -139,15 +171,23 @@ resource "aws_security_group" "restricted_airs" {
   }
 }
 
-# --- AWS Compute & IAM  - Do NOT scale down flavors otherwise it will not work, in paricular for the RAG BAAI Model---
+# ==========================================
+# AWS COMPUTE & IAM
+# ==========================================
+
+# Defines the EC2 instance that will run the application.
+# Note: Do not scale down instance types, as the RAG model requires significant RAM.
 resource "aws_instance" "t_airs_node" {
+  # Conditionally selects the AMI based on whether a local LLM (GPU) is enabled.
   ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
   
+  # Conditionally selects the instance type: g4dn.xlarge for GPU, t3.large for standard.
   instance_type        = var.enable_local_llm ? "g4dn.xlarge" : "t3.large"
-  key_name = aws_key_pair.generated_key.key_name
+  key_name             = aws_key_pair.generated_key.key_name
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   
   root_block_device {
+    # Conditionally sets a larger disk size for GPU instances to accommodate models.
     volume_size           = var.enable_local_llm ? 75 : 20 
     volume_type           = "gp3"
     delete_on_termination = true
@@ -159,6 +199,7 @@ resource "aws_instance" "t_airs_node" {
   tags                   = { Name = "T-AIRS-Production-Node" }
 }
 
+# Creates an IAM role that the EC2 instance can assume.
 resource "aws_iam_role" "ec2_bedrock_role" {
   name = "t-airs-bedrock-role"
   assume_role_policy = jsonencode({
@@ -175,6 +216,8 @@ resource "aws_iam_role" "ec2_bedrock_role" {
   })
 }
 
+# Attaches a policy to the role granting permissions to invoke AWS Bedrock models.
+# This allows the application to use Bedrock without hardcoded credentials.
 resource "aws_iam_role_policy" "bedrock_access" {
   name = "t-airs-bedrock-policy"
   role = aws_iam_role.ec2_bedrock_role.id
@@ -193,6 +236,7 @@ resource "aws_iam_role_policy" "bedrock_access" {
   })
 }
 
+# Creates an instance profile to attach the IAM role to the EC2 instance.
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "t-airs-ec2-profile"
   role = aws_iam_role.ec2_bedrock_role.name
