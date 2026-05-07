@@ -165,7 +165,7 @@ terraform apply -var="enable_local_llm=false" -auto-approve
 
 > [!NOTE]
 > It takes about 10 minutes after terraform is completed.  
-> If multiple version of airs_profile exist, it will use the latest one
+> If multiple version of airs_profile exist, it will use the latest one.
 > If you want to use local LLM with GPU, use this command instead `terraform apply -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, pull 3 local AI models and load them in GPU.
 
 
