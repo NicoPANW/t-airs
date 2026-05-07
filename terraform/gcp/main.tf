@@ -29,6 +29,8 @@ locals {
     gcp_region       = var.gcp_region
     enable_local_llm = var.enable_local_llm
     target_cloud     = "gcp"
+    aws_region       = ""
+    bedrock_model_id = ""
   })
 }
 
