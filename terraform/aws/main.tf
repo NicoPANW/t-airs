@@ -176,7 +176,7 @@ resource "aws_security_group" "restricted_airs" {
 # ==========================================
 
 # Defines the EC2 instance that will run the application.
-# Note: Do not scale down instance types, as the RAG model requires significant RAM.
+# Note: Do not scale down flavors, otherwise it won't work for laoding BAAI/bge-small-en-v1.5) for RAG
 resource "aws_instance" "t_airs_node" {
   # Conditionally selects the AMI based on whether a local LLM (GPU) is enabled.
   ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id

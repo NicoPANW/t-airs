@@ -128,11 +128,11 @@ resource "google_project_iam_member" "vertex_access" {
 # ==========================================
 
 # Defines the GCE instance that will run the application.
-# Note: Do not scale down instance types, as the RAG model requires significant RAM.
+# Note: Do not scale down flavors, otherwise it won't work for laoding BAAI/bge-small-en-v1.5) for RAG
 resource "google_compute_instance" "t_airs_node" {
   name         = "t-airs-node"
   zone         = "${var.gcp_region}-a"
-  # Conditionally selects a more powerful machine type for GPU workloads. Do not scale down flavors, otherwise it won't work for laoding BAAI/bge-small-en-v1.5) for RAG
+  # Conditionally selects a more powerful machine type for GPU workloads.
   machine_type = var.enable_local_llm ? "n1-standard-4" : "e2-standard-2"
 
   # Dynamically attaches an NVIDIA T4 GPU only if local LLMs are enabled.
