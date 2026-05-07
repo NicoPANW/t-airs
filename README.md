@@ -251,14 +251,12 @@ Destroy the lab with one command:
 #### If deployed to GCP:
 ```bash
 cd terraform/gcp
-terraform init
 terraform destroy -var="enable_local_llm=false" -auto-approve
 ```
 
 #### If deployed to AWS:
 ```bash
 cd terraform/aws
-terraform init
 terraform destroy -var="enable_local_llm=false" -auto-approve
 ```
 
