@@ -59,9 +59,3 @@ variable "bedrock_model_id" {
   type        = string
   default     = "meta.llama3-8b-instruct-v1:0"
 }
-
-variable "target_cloud" {
-  description = "aws cloud"
-  type        = string
-  default     = "aws"
-}
