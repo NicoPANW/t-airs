@@ -77,6 +77,7 @@ Before you begin, you need to meet a few requirements:
    * **For AWS:** Install the AWS CLI and run `aws configure`. 
    * **For GCP:** Install the Google Cloud SDK and run `gcloud auth application-default login`.
 4. **Bedrock (AWS Only):** You must enable Bedrock in AWS console beforehand (accept EULA) for the desired target region (it is per region basis)
+5. **Flavors**: Do NOT scale down flavors otherwise it will not work, in paricular for the RAG BAAI Model to load in RAM
 
 
 ### 🤖 AI Runtime (API) specific prerequisites

@@ -139,7 +139,7 @@ resource "aws_security_group" "restricted_airs" {
   }
 }
 
-# --- AWS Compute & IAM ---
+# --- AWS Compute & IAM  - Do NOT scale down flavors otherwise it will not work, in paricular for the RAG BAAI Model---
 resource "aws_instance" "t_airs_node" {
   ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
   

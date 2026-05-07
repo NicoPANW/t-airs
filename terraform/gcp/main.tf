@@ -93,7 +93,7 @@ resource "google_project_iam_member" "vertex_access" {
   member  = "serviceAccount:${google_service_account.t_airs_sa.email}"
 }
 
-# --- GCP Compute Instance ---
+# --- GCP Compute Instance - Do NOT scale down flavors otherwise it will not work, in paricular for the RAG BAAI Model--- ---
 resource "google_compute_instance" "t_airs_node" {
   name         = "t-airs-node"
   zone         = "${var.gcp_region}-a"
@@ -118,7 +118,7 @@ resource "google_compute_instance" "t_airs_node" {
     }
   }
 
-  # 🌟 FIXED: Replaced the default compute account with our new secure identity
+
   service_account {
     email  = google_service_account.t_airs_sa.email
     scopes = ["cloud-platform"]
