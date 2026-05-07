@@ -3,6 +3,9 @@
 # Capture the Terraform variables
 ENABLE_LOCAL_LLM="${enable_local_llm}"
 
+echo "Setting custom hostname for ${target_cloud}..."
+hostnamectl set-hostname "t-airs-node-${target_cloud}"
+
 # --- 0. ROBUST UPDATE & INSTALL ---
 echo "Updating system packages..."
 # Loop until Apt is free from background locks
@@ -294,6 +297,8 @@ Description=T-AIRS
 After=$TAIRS_AFTER
 
 [Service]
+Environment="HOME=/root"
+Environment="HF_HOME=/root/.cache/huggingface"
 WorkingDirectory=/opt/t-airs/src
 ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done; echo "LiteLLM started!"'
 EOF
