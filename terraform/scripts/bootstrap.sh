@@ -125,6 +125,15 @@ fi
 echo "Installing remaining Python requirements..."
 pip3 install -r /opt/t-airs/src/requirements.txt
 
+
+if [ "${target_cloud}" == "aws" ]; then
+    echo "Applying AWS specific network fixes (IPv6 & MTU)..."
+    echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
+    PRIMARY_IF=$(ip route show default | awk '/default/ {print $5}')
+    ip link set dev $PRIMARY_IF mtu 1500
+fi
+
+
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."
 # We run this in the foreground so systemd doesn't choke the network connection!
 python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-base-en-v1.5')"

@@ -283,7 +283,7 @@ gcloud compute ssh ubuntu@t-airs-production-node --zone=us-central1-a
 Once logged in, you can check your live app logs, reset the service, or check your local models:
 
 ```bash
-sudo journalctl -u t-airs.service -n 50 -f
+sudo journalctl -u t-airs.service -n 75 -f
 sudo systemctl restart t-airs
 ollama list && ollama ps  && nvidia-smi #if local-llm, checking Nvidi T4 is ready
 sudo journalctl -u litellm.service -n 50 --no-pager
