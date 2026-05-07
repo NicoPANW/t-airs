@@ -1,11 +1,13 @@
 terraform {
   required_providers {
-    aws  = { source = "hashicorp/aws", version = "~> 5.0" }
-    http = { source = "hashicorp/http", version = "~> 3.0" }
+    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
+    http  = { source = "hashicorp/http", version = "~> 3.0" }
+    tls   = { source = "hashicorp/tls", version = "~> 4.0" }
+    local = { source = "hashicorp/local", version = "~> 2.0" }
   }
 }
 
-# --- Standard AWS Provider (No more mocks!) ---
+
 provider "aws" { 
   region = var.aws_region 
 }
@@ -20,7 +22,6 @@ locals {
   my_auto_subnet = "${regex("^([0-9]+\\.[0-9]+\\.[0-9]+\\.)", local.raw_ip)[0]}0/24"
   allowed_ingress = concat([local.my_auto_subnet], var.prisma_airs_ips)
 
-  # 🌟 FIXED: Path looks up to the root folder. Unused GCP variables are passed as empty strings.
   userdata = templatefile("${path.module}/../scripts/bootstrap.sh", {
     airs_key         = var.airs_key
     airs_profile     = var.airs_profile
@@ -60,10 +61,26 @@ resource "aws_vpc" "t_airs_vpc" {
   tags                 = { Name = "t-airs-vpc-aws" }
 }
 
-resource "aws_key_pair" "my_mac_key" {
-  key_name   = "t-airs-mac-key"
-  # 🌟 FIXED: Added a graceful fallback so missing keys don't crash deployments!
-  public_key = try(file("~/.ssh/id_ed25519.pub"), "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 mock-key") 
+# ==========================================
+# Dynamic SSH Key Generation
+# ==========================================
+
+# 1. Generate a shiny new ED25519 key pair on the fly
+resource "tls_private_key" "t_airs_key" {
+  algorithm = "ED25519"
+}
+
+# 2. Upload the Public Key to AWS
+resource "aws_key_pair" "generated_key" {
+  key_name   = "t-airs-dynamic-key"
+  public_key = tls_private_key.t_airs_key.public_key_openssh
+}
+
+# 3. Save the Private Key locally so the user can actually SSH in!
+resource "local_sensitive_file" "private_key" {
+  content         = tls_private_key.t_airs_key.private_key_openssh
+  filename        = "${path.module}/t-airs-key.pem"
+  file_permission = "0400" # Strict read-only permissions required by SSH
 }
 
 resource "aws_internet_gateway" "gw" {
@@ -127,7 +144,7 @@ resource "aws_instance" "t_airs_node" {
   ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
   
   instance_type        = var.enable_local_llm ? "g4dn.xlarge" : "t3.medium"
-  key_name             = aws_key_pair.my_mac_key.key_name
+  key_name = aws_key_pair.generated_key.key_name
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   
   root_block_device {
