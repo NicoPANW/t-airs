@@ -143,7 +143,7 @@ resource "aws_security_group" "restricted_airs" {
 resource "aws_instance" "t_airs_node" {
   ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
   
-  instance_type        = var.enable_local_llm ? "g4dn.xlarge" : "t3.medium"
+  instance_type        = var.enable_local_llm ? "g4dn.xlarge" : "t3.large"
   key_name = aws_key_pair.generated_key.key_name
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   
