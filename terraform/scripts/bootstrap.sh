@@ -309,7 +309,6 @@ After=$TAIRS_AFTER
 # 1. Explicitly define the cache locations
 Environment="HOME=/root"
 Environment="HF_HOME=/root/.cache/huggingface"
-Environment="HF_HUB_OFFLINE=1"
 WorkingDirectory=/opt/t-airs/src
 
 # ==========================================
