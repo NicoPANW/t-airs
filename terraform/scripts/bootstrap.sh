@@ -305,7 +305,7 @@ WorkingDirectory=/opt/t-airs/src
 # ==========================================
 # 🔍 NEW: SYSTEMD DEBUG DUMP
 # ==========================================
-ExecStartPre=/bin/bash -c 'echo "=== 🕵️ SYSTEMD DEBUG DUMP ==="; echo "Current User: \$(whoami)"; echo "HOME Variable: \$HOME"; echo "HF_HOME Variable: \$HF_HOME"; echo "--- Checking Cache Directory ---"; ls -lah /root/.cache/huggingface/ || echo "❌ /root/.cache/huggingface IS EMPTY OR MISSING!"; echo "================================="'
+ExecStartPre=/bin/bash -c 'echo "=== 🕵️ SYSTEMD DEBUG DUMP ==="; echo "Current User: \$(whoami)"; echo "HOME Variable: \$HOME"; echo "HF_HOME Variable: \$HF_HOME"; echo "--- Checking Cache Directory ---"; ls -lah /root/.cache/huggingface/ || echo "❌ /root/.cache/huggingface IS EMPTY OR MISSING!"; echo "--- Cache Folder Size ---"; du -sh /root/.cache/huggingface/ 2>/dev/null || echo "❌ Cannot calculate size!"; echo "================================="'
 # ==========================================
 
 ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done; echo "LiteLLM started!"'
