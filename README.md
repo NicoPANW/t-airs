@@ -76,9 +76,8 @@ Before you begin, you need to meet a few requirements:
 3. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
    * **For AWS:** Install the AWS CLI and run `aws configure`. 
    * **For GCP:** Install the Google Cloud SDK and run `gcloud auth application-default login`.
-4. **Bedrock (AWS Only):** You must enable Bedrock in AWS console beforehand for the desired target region (it is per region basis)
-5. **SSH Key (AWS Only):** You must have an Ed25519 SSH key pair generated on your local machine. Terraform will automatically inject this key into the AWS server. If you don't have one, generate it by running:
-   `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""`
+4. **Bedrock (AWS Only):** You must enable Bedrock in AWS console beforehand (accept EULA) for the desired target region (it is per region basis)
+
 
 ### 🤖 AI Runtime (API) specific prerequisites
 
