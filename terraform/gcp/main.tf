@@ -6,7 +6,7 @@ terraform {
   }
 }
 
-# --- Standard GCP Provider (No more mocks!) ---
+# --- Standard GCP Provider ---
 provider "google" {
   project = var.gcp_project_id
   region  = var.gcp_region
@@ -22,7 +22,6 @@ locals {
   my_auto_subnet = "${regex("^([0-9]+\\.[0-9]+\\.[0-9]+\\.)", local.raw_ip)[0]}0/24"
   allowed_ingress = concat([local.my_auto_subnet], var.prisma_airs_ips)
 
-  # 🌟 FIXED: Path looks up to the root folder. Unused AWS variables are passed as empty strings.
   userdata = templatefile("${path.module}/../scripts/bootstrap.sh", {
     airs_key         = var.airs_key
     airs_profile     = var.airs_profile
@@ -77,6 +76,23 @@ resource "google_compute_firewall" "restricted_access" {
   source_ranges = local.allowed_ingress
 }
 
+# ==========================================
+# 🌟 NEW: GCP IAM & Service Accounts
+# ==========================================
+
+# 1. Create a dedicated identity for the T-AIRS VM
+resource "google_service_account" "t_airs_sa" {
+  account_id   = "t-airs-vertex-sa"
+  display_name = "T-AIRS Application Identity"
+}
+
+# 2. Grant the identity permission to generate AI content via Vertex
+resource "google_project_iam_member" "vertex_access" {
+  project = var.gcp_project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.t_airs_sa.email}"
+}
+
 # --- GCP Compute Instance ---
 resource "google_compute_instance" "t_airs_node" {
   name         = "t-airs-node"
@@ -102,7 +118,9 @@ resource "google_compute_instance" "t_airs_node" {
     }
   }
 
+  # 🌟 FIXED: Replaced the default compute account with our new secure identity
   service_account {
+    email  = google_service_account.t_airs_sa.email
     scopes = ["cloud-platform"]
   }
 
