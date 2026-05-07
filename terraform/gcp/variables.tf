@@ -58,3 +58,10 @@ variable "gcp_subnet_cidr" {
   type        = string
   default     = "10.10.0.0/24"
 }
+
+
+variable "target_cloud" {
+  description = "gcp cloud"
+  type        = string
+  default     = "gcp"
+}
