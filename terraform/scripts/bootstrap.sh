@@ -118,13 +118,14 @@ else
 fi
 
 
+
+echo "Installing remaining Python requirements..."
+pip3 install -r /opt/t-airs/src/requirements.txt
+
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."
 # We run this in the foreground so systemd doesn't choke the network connection!
 python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-base-en-v1.5')"
 echo "✅ BAAI Model successfully cached!"
-
-echo "Installing remaining Python requirements..."
-pip3 install -r /opt/t-airs/src/requirements.txt
 
 # --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
 echo "Building LiteLLM routing configuration..."
