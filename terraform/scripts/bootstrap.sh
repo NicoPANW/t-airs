@@ -6,6 +6,7 @@ ENABLE_LOCAL_LLM="${enable_local_llm}"
 echo "Setting custom hostname for ${target_cloud}..."
 hostnamectl set-hostname "t-airs-node-${target_cloud}"
 
+
 # --- 0. ROBUST UPDATE & INSTALL ---
 echo "Updating system packages..."
 # Loop until Apt is free from background locks
@@ -124,14 +125,6 @@ fi
 
 echo "Installing remaining Python requirements..."
 pip3 install -r /opt/t-airs/src/requirements.txt
-
-
-if [ "${target_cloud}" == "aws" ]; then
-    echo "Applying AWS specific network fixes (IPv6 & MTU)..."
-    echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
-    PRIMARY_IF=$(ip route show default | awk '/default/ {print $5}')
-    ip link set dev $PRIMARY_IF mtu 1500
-fi
 
 
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."
@@ -303,21 +296,22 @@ fi
 cat <<EOF > /etc/systemd/system/t-airs.service
 [Unit]
 Description=T-AIRS
-After=$TAIRS_AFTER
+After=network.target litellm.service
 
 [Service]
-# 1. Explicitly define the cache locations
+# 1. Force the paths we just verified in the manual test
 Environment="HOME=/root"
 Environment="HF_HOME=/root/.cache/huggingface"
+Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
+
+# 2. Prevent the AWS "Network Blackhole" hang by staying offline
+Environment="HF_HUB_OFFLINE=1"
+Environment="TRANSFORMERS_OFFLINE=1"
+
 WorkingDirectory=/opt/t-airs/src
-
-# ==========================================
-# 🔍 NEW: SYSTEMD DEBUG DUMP
-# ==========================================
-ExecStartPre=/bin/bash -c 'echo "=== 🕵️ SYSTEMD DEBUG DUMP ==="; echo "Current User: \$(whoami)"; echo "HOME Variable: \$HOME"; echo "HF_HOME Variable: \$HF_HOME"; echo "--- Checking Cache Directory ---"; ls -lah /root/.cache/huggingface/ || echo "❌ /root/.cache/huggingface IS EMPTY OR MISSING!"; echo "--- Cache Folder Size ---"; du -sh /root/.cache/huggingface/ 2>/dev/null || echo "❌ Cannot calculate size!"; echo "================================="'
-# ==========================================
-
-ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done; echo "LiteLLM started!"'
+# Wait for the gateway to be ready
+ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
+# Launch the app
 ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
 Restart=always
 User=root
