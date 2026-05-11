@@ -247,21 +247,3 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   name = "t-airs-ec2-profile-${local.env}"
   role = aws_iam_role.ec2_bedrock_role.name
 }
-
-output "instance_public_ip" {
-  description = "Public IP address of the EC2 instance."
-  value       = aws_instance.t_airs_node.public_ip
-  sensitive   = true
-}
-
-output "instance_name" {
-  description = "Name tag of the EC2 instance."
-  value       = aws_instance.t_airs_node.tags.Name
-  sensitive   = true
-}
-
-output "ssh_command" {
-  description = "Command to SSH into the EC2 instance."
-  value       = "ssh -i ${local_sensitive_file.private_key.filename} ubuntu@${aws_instance.t_airs_node.public_ip}"
-  sensitive   = true
-}
