@@ -1,21 +1,27 @@
 #!/bin/bash
 
-# Capture the Terraform variables
+# Capture the Terraform variables passed into the template.
+# These variables control which blocks of this script are executed.
 ENABLE_LOCAL_LLM="${enable_local_llm}"
 
+# Set a unique and descriptive hostname for the VM based on its cloud and environment.
+# This makes it easier to identify instances in the cloud console.
 echo "Setting custom hostname for ${target_cloud}..."
 hostnamectl set-hostname "t-airs-node-${target_cloud}-${env}"
 
 
 # --- 0. ROBUST UPDATE & INSTALL ---
+# This section ensures the base OS is up-to-date and has essential tools.
 echo "Updating system packages..."
-# Loop until Apt is free from background locks
+# Use a loop to handle potential 'apt lock' issues on fresh VMs.
+# This ensures that automated background updates don't interfere with our setup.
 until apt-get update && apt-get install -y python3-pip python3-venv git curl unattended-upgrades sqlite3; do
     echo "Apt is locked or network is busy. Retrying in 5s..."
     sleep 5
 done
 
-# 1.5 Configure Automatic Security Updates (Zero-Touch Patching)
+# Configure the system to automatically install security updates.
+# This is a best practice for maintaining a secure, "zero-touch" server.
 cat <<EOF > /etc/apt/apt.conf.d/20auto-upgrades
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Download-Upgradeable-Packages "1";
@@ -26,19 +32,21 @@ systemctl restart unattended-upgrades
 
 
 # ==========================================
-# DYNAMIC LLM BLOCK (Logic fully contained)
+# DYNAMIC LLM BLOCK (GPU & OLLAMA SETUP)
+# This entire block only runs if 'enable_local_llm' is true.
 # ==========================================
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     
 
-    # 🌟 Check if drivers are already working. If so, skip the whole block!
+    # First, check if NVIDIA drivers are already loaded.
+    # This is expected on a Deep Learning VM/AMI, so we can skip installation.
     if lsmod | grep -q nvidia; then
         echo "✅ NVIDIA drivers are already loaded and active."
     else
         echo "⚠️ Nvidia drivers missing (Check your DLAMI/DLVM mapping!)"
     fi
 
-    # ---  Setup Ollama ---
+    # Install and enable the Ollama service if it's not already present.
     export HOME=/root
     if ! command -v ollama &> /dev/null; then
         echo "Ollama not found. Installing..."
@@ -49,13 +57,14 @@ if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
         systemctl start ollama
     fi
 
-    # Wait dynamically for the Ollama API to wake up
+    # Wait for the Ollama API to become responsive before proceeding.
     echo "Waiting for Ollama engine to initialize..."
     until curl -s http://127.0.0.1:11434/api/tags > /dev/null; do 
         sleep 2
     done
 
-    # ---  Configure Ollama for Multi-Model Preloading ---
+    # Configure Ollama to keep multiple models loaded in VRAM simultaneously.
+    # This improves performance by avoiding constant loading/unloading.
     echo "Configuring Ollama to hold multiple models in VRAM..."
     mkdir -p /etc/systemd/system/ollama.service.d
     cat <<EOF > /etc/systemd/system/ollama.service.d/override.conf
@@ -69,7 +78,7 @@ EOF
     systemctl restart ollama
     sleep 3 # Give it a second to wake back up
 
-    # --- 6. Pull Models (Using Terraform-Safe String Syntax) ---
+    # Pull the required local LLM models from the Ollama registry.
     echo "Pre-loading LLM models (this may take 10-15 minutes)..."
     
     MODELS_TO_PULL="llama3.2:3b ministral-3:3b qwen2.5:1.5b"
@@ -82,10 +91,12 @@ EOF
             echo "✅ $model is already downloaded."
         fi
 
+        # Verify the model is fully pulled and registered.
         echo "Verifying $model readiness..."
         until ollama list | grep -q "$model"; do 
             sleep 5
         done
+        # Send a request with 'keep_alive: -1' to lock the model in VRAM indefinitely.
         echo "🧠 Locking $model into GPU VRAM..."
         curl -s -X POST http://127.0.0.1:11434/api/generate -d "{\"model\": \"$model\", \"keep_alive\": -1}" > /dev/null
         echo "🚀 $model is ready to use."
@@ -94,26 +105,30 @@ EOF
     echo "✅ All local GPU models are successfully loaded!"
 
 else
-    # This correctly closes the main ENABLE_LOCAL_LLM check
+    # This message is shown if local LLMs are disabled.
     echo "ENABLE_LOCAL_LLM is false. Skipping GPU/Ollama setup."
 fi
 # ==========================================
 
 
 # --- 3. Deploy Application Code, AI Gateway, MCP & RAG ---
+# This section sets up the core T-AIRS application.
 mkdir -p /opt/t-airs
+# Clone the application source code from the GitHub repository.
 git clone https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
 
-# B. Create the Dummy Customer Database
+# Create the SQLite database and populate it with initial customer data.
+# This provides the structured data for the MCP agent to interact with.
 echo "Executing SQL Seeder"
 python3 /opt/t-airs/src/sql_data.py
 
-# D. Setup Python Virtual Environment & Install Requirements
+# Set up a Python virtual environment to isolate dependencies.
 python3 -m venv venv
 source venv/bin/activate
 
-# 🌟 CONDITIONAL PYTORCH INSTALL
+# Conditionally install the correct PyTorch version.
+# GPU instances need the large CUDA-enabled version, while CPU instances use a lightweight one.
 if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
     echo "GPU Enabled: Installing massive CUDA 12.4 optimized PyTorch wheels..."
     pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
@@ -123,21 +138,26 @@ fi
 
 
 
+# Install all other Python packages required by the application.
 echo "Installing remaining Python requirements..."
 pip3 install -r /opt/t-airs/src/requirements.txt
 
 
+# Pre-download the embedding model for the RAG system from HuggingFace.
+# This prevents a long delay on the first application startup.
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."
 python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-base-en-v1.5')"
 echo "✅ BAAI Model successfully cached!"
 
 # --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
+# This section creates the LiteLLM configuration file on the fly.
+# The configuration is tailored to the specific cloud provider (GCP/AWS) and whether local LLMs are used.
 echo "Building LiteLLM routing configuration..."
 cat <<EOF > /opt/t-airs/src/litellm_config.yaml
 model_list:
 EOF
 
-# Inject GCP Models if deploying to Google
+# Inject GCP model definitions if the target cloud is GCP.
 if [ "${target_cloud}" == "gcp" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   # --- EXPLICIT MODELS (For the manual UI dropdown) ---
@@ -194,7 +214,7 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       vertex_project: "${gcp_project}"
       vertex_location: "global"
 EOF
-# Inject AWS Models if deploying to Amazon
+# Inject AWS model definitions if the target cloud is AWS.
 elif [ "${target_cloud}" == "aws" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   # --- EXPLICIT MODELS (For the manual UI dropdown) ---
@@ -211,7 +231,7 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 EOF
 fi
 
-# Inject Local Models if GPU is enabled
+# Inject local Ollama model definitions if GPU mode is enabled.
 if [ "${enable_local_llm}" == "true" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: local-llama3.2:3b
@@ -229,7 +249,8 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 EOF
 fi
 
-# Close out the YAML
+# Add the final settings for routing and Prisma AIRS guardrails.
+# The guardrails are defined but set to 'default_on: false' so they can be toggled from the UI.
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 litellm_settings:
   drop_params: true
@@ -257,10 +278,13 @@ EOF
 
 
 # --- 4. Create Systemd Services ---
+# This section creates systemd service files to ensure the application and its
+# dependencies run automatically on boot and restart if they crash.
 
 echo "Configuring Prisma AIRS Integration Mode: $AIRS_MODE"
 
-# A. Create the AI Gateway Service (LiteLLM)
+# Create the service file for the LiteLLM AI Gateway.
+# This service is responsible for routing requests to the correct LLM.
 cat <<EOF > /etc/systemd/system/litellm.service
 [Unit]
 Description=LiteLLM AI Gateway
@@ -268,10 +292,8 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/t-airs/src
-EOF
-
-# 🌟 UNCONDITIONAL INJECTION: Gateway must always have keys ready for the Live UI Toggle
-cat <<EOF >> /etc/systemd/system/litellm.service
+# Inject the AIRS credentials directly into the gateway's environment.
+# This is necessary for the live UI toggle to enable/disable gateway-level scanning.
 Environment="PANW_PRISMA_AIRS_API_KEY=${airs_key}"
 Environment="AIRS_API_KEY=${airs_key}"
 Environment="AIRS_PROFILE=${airs_profile}"
@@ -284,8 +306,8 @@ WantedBy=multi-user.target
 EOF
 
 
-# B. Create the T-AIRS App Service
-# We conditionally add ollama.service dependency if local LLMs are enabled
+# Create the service file for the main T-AIRS application (FastAPI server).
+# Conditionally add 'ollama.service' as a dependency if local LLMs are enabled.
 if [ "${enable_local_llm}" == "true" ]; then
     TAIRS_AFTER="network.target litellm.service ollama.service"
 else
@@ -298,15 +320,16 @@ Description=T-AIRS
 After=network.target litellm.service
 
 [Service]
+# Set environment variables required by HuggingFace libraries to cache models correctly.
 Environment="HOME=/root"
 Environment="HF_HOME=/root/.cache/huggingface"
 Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
 
 
 WorkingDirectory=/opt/t-airs/src
-# Wait for the gateway to be ready
+# Before starting the app, wait until the AI Gateway is fully responsive.
 ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
-# Launch the app
+# Launch the main Python application, passing in credentials.
 ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
 Restart=always
 User=root
@@ -316,6 +339,8 @@ WantedBy=multi-user.target
 EOF
 
 # --- 5. Start Services ---
+# Reload the systemd daemon to recognize the new service files,
+# then enable and start the services.
 systemctl daemon-reload
 systemctl enable litellm
 systemctl start litellm
