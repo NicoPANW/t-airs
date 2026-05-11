@@ -230,13 +230,13 @@ elif [ "${target_cloud}" == "aws" ]; then
 # Loop through each model ID passed from Terraform and add it to the config.
 for model_id in ${bedrock_model_ids}; do
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
-  - model_name: ${model_id}
+  - model_name: $${model_id}
     litellm_params:
-      model: bedrock/${model_id}
+      model: bedrock/$${model_id}
       aws_region_name: "${aws_region}"
   - model_name: auto-router
     litellm_params:
-      model: bedrock/${model_id}
+      model: bedrock/$${model_id}
       aws_region_name: "${aws_region}"
 EOF
 done
