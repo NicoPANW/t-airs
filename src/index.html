@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T-AIRS</title>
+    <style>
+        /* 
+         * This is a basic template. You can integrate the header section 
+         * into your existing, more complex index.html file.
+        */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px; /* Provides space between title and version */
+            padding: 16px 24px;
+            background-color: #ffffff;
+            border-bottom: 1px solid #dcdfe3;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .version-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background-color: #e4e6eb;
+            color: #606770;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🛡️ T-AIRS</h1>
+        <span class="version-badge">v{{ app_version }}</span>
+    </div>
+
+    <!-- The rest of your application's UI components (chat, sidebars, etc.) would go here. -->
+
+</body>
+</html>
