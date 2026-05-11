@@ -59,17 +59,28 @@ MODEL_IDS_CLEAN=$(echo "$MODEL_IDS_JSON" | tr -d '[]"' | sed 's/,/ /g')
 
 for MODEL_ID in $MODEL_IDS_CLEAN; do
     echo "🔍 Checking AWS Bedrock Model ($MODEL_ID) Status..."
+    
+    # 1. First, try to query it as a standard Foundation Model
     MODEL_STATUS=$(aws bedrock get-foundation-model \
         --model-id "$MODEL_ID" \
         --region "$TF_VAR_aws_region" \
         --query 'modelDetails.modelLifecycle.status' \
         --output text 2>/dev/null)
 
+    # 2. If it fails or is empty, try querying it as a Cross-Region Inference Profile
+    if [ -z "$MODEL_STATUS" ] || [ "$MODEL_STATUS" == "None" ] || [[ "$MODEL_STATUS" == *"An error occurred"* ]]; then
+        MODEL_STATUS=$(aws bedrock get-inference-profile \
+            --inference-profile-identifier "$MODEL_ID" \
+            --region "$TF_VAR_aws_region" \
+            --query 'status' \
+            --output text 2>/dev/null)
+    fi
+
     if [ "$MODEL_STATUS" == "ACTIVE" ]; then
         echo "✅ Model $MODEL_ID is ACTIVE."
         ACTIVE_MODELS=$((ACTIVE_MODELS + 1))
     else
-        echo "⚠️  WARNING: Model '$MODEL_ID' is not ACTIVE in region '$TF_VAR_aws_region'. It will be skipped during deployment."
+        echo "⚠️  WARNING: Model '$MODEL_ID' is not ACTIVE in region '$TF_VAR_aws_region'. It will be skipped."
     fi
 done
 
