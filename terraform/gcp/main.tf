@@ -48,7 +48,7 @@ locals {
     enable_local_llm = var.enable_local_llm
     target_cloud     = "gcp"
     aws_region       = "" # Not used in GCP deployment
-    bedrock_model_id = "" # Not used in GCP deployment
+    bedrock_model_ids = "" # Not used in GCP deployment
   })
 }
 
