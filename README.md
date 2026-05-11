@@ -17,7 +17,8 @@
 
 ## ✨ Capabilities of the App
 
-<img width="1920" height="958" alt="Screenshot 2026-04-10 at 11 14 42" src="https://github.com/user-attachments/assets/47d5aa9d-caa6-42ac-b03c-d596c513e0f2" />
+<img width="1920" height="956" alt="Screenshot 2026-05-11 at 13 22 33" src="https://github.com/user-attachments/assets/76713fa0-fa63-4e40-9002-fc1307e8442e" />
+
 
 
 
