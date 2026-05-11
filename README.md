@@ -269,7 +269,7 @@ terraform destroy -var="enable_local_llm=false" -auto-approve
 If the UI isn't loading, or a model isn't connecting, use this cheat sheet to play detective:
 
 ### Step 1: SSH into the VM
-Before you can run any debug commands, you must log into the server's terminal. 
+After a successful `terraform apply`, the `deployment_summary` output provides the exact `ssh_command` to use. Simply copy and paste this command into your terminal to connect to the instance.
 
 **For AWS:**
 ```bash
@@ -278,7 +278,7 @@ ssh -i ./t-airs-key-prod.pem ubuntu@<YOUR_AWS_PUBLIC_IP>
 
 **For GCP:**
 ```bash
-gcloud compute ssh ubuntu@t-airs-production-node --zone=us-central1-a
+gcloud compute ssh t-airs-production-node --zone=us-central1-a
 ```
 
 ### Step 2: General App Debugging (AWS & GCP)

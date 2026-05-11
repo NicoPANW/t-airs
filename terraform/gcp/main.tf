@@ -180,14 +180,17 @@ resource "google_compute_instance" "t_airs_node" {
 output "instance_public_ip" {
   description = "Public IP address of the GCE instance."
   value       = google_compute_instance.t_airs_node.network_interface[0].access_config[0].nat_ip
+  sensitive   = true
 }
 
 output "instance_name" {
   description = "Name of the GCE instance."
   value       = google_compute_instance.t_airs_node.name
+  sensitive   = true
 }
 
 output "ssh_command" {
   description = "Command to SSH into the GCE instance."
   value       = "gcloud compute ssh ubuntu@${google_compute_instance.t_airs_node.name} --zone=${google_compute_instance.t_airs_node.zone}"
+  sensitive   = true
 }
