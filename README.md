@@ -272,7 +272,7 @@ Before you can run any debug commands, you must log into the server's terminal.
 
 **For AWS:**
 ```bash
-ssh ubuntu@<YOUR_AWS_PUBLIC_IP>
+ssh -i ./t-airs-key-prod.pem ubuntu@<YOUR_AWS_PUBLIC_IP>
 ```
 
 **For GCP:**
