@@ -27,6 +27,9 @@ data "http" "my_ip" {
 }
 
 locals {
+  # Use terraform workspace to distinguish environments. 'default' workspace is considered production.
+  env = terraform.workspace == "default" ? "prod" : terraform.workspace
+
   # Cleans up the fetched IP address.
   raw_ip = chomp(data.http.my_ip.response_body)
   # Creates a /24 subnet from the user's public IP for the firewall source range.
@@ -41,6 +44,7 @@ locals {
     airs_profile     = var.airs_profile
     gcp_project      = var.gcp_project_id
     gcp_region       = var.gcp_region
+    env              = local.env
     enable_local_llm = var.enable_local_llm
     target_cloud     = "gcp"
     aws_region       = "" # Not used in GCP deployment
@@ -79,13 +83,13 @@ data "google_compute_image" "ubuntu_dlvm_gcp" {
 
 # Creates a dedicated Virtual Private Cloud (VPC) network for the application.
 resource "google_compute_network" "t_airs_vpc" {
-  name                    = var.gcp_vpc_name
+  name                    = "${var.gcp_vpc_name}-${local.env}"
   auto_create_subnetworks = false
 }
 
 # Creates a subnet within the VPC.
 resource "google_compute_subnetwork" "t_airs_sub" {
-  name          = "${var.gcp_vpc_name}-sub"
+  name          = "${var.gcp_vpc_name}-sub-${local.env}"
   ip_cidr_range = var.gcp_subnet_cidr
   region        = var.gcp_region
   network       = google_compute_network.t_airs_vpc.id
@@ -93,7 +97,7 @@ resource "google_compute_subnetwork" "t_airs_sub" {
 
 # Defines a firewall rule to allow specific ingress traffic to the instances.
 resource "google_compute_firewall" "restricted_access" {
-  name    = "t-airs-restricted-firewall"
+  name    = "t-airs-restricted-firewall-${local.env}"
   network = google_compute_network.t_airs_vpc.name
 
   allow {
@@ -111,14 +115,14 @@ resource "google_compute_firewall" "restricted_access" {
 # 1. Creates a dedicated service account to provide a unique identity for the VM.
 # This follows the principle of least privilege.
 resource "google_service_account" "t_airs_sa" {
-  account_id   = "t-airs-vertex-sa"
-  display_name = "T-AIRS Application Identity"
+  account_id   = "t-airs-vertex-sa-${local.env}"
+  display_name = "T-AIRS Application Identity (${local.env})"
 }
 
 # 2. Grants the service account the 'Vertex AI User' role.
 # This allows the application running on the VM to make calls to the Vertex AI API (e.g., Gemini).
 resource "google_project_iam_member" "vertex_access" {
-  project = var.gcp_project_id
+  project = var.gcp_project_id # Role is assigned at the project level
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.t_airs_sa.email}"
 }
@@ -130,7 +134,7 @@ resource "google_project_iam_member" "vertex_access" {
 # Defines the GCE instance that will run the application.
 # Note: Do not scale down flavors, otherwise it won't work for laoding BAAI/bge-small-en-v1.5) for RAG
 resource "google_compute_instance" "t_airs_node" {
-  name         = "t-airs-node"
+  name         = "t-airs-node-${local.env}"
   zone         = "${var.gcp_region}-a"
   # Conditionally selects a more powerful machine type for GPU workloads.
   machine_type = var.enable_local_llm ? "n1-standard-4" : "e2-standard-2"
@@ -171,4 +175,19 @@ resource "google_compute_instance" "t_airs_node" {
     subnetwork = google_compute_subnetwork.t_airs_sub.id
     access_config {} # An empty access_config block assigns an ephemeral public IP.
   }
+}
+
+output "instance_public_ip" {
+  description = "Public IP address of the GCE instance."
+  value       = google_compute_instance.t_airs_node.network_interface[0].access_config[0].nat_ip
+}
+
+output "instance_name" {
+  description = "Name of the GCE instance."
+  value       = google_compute_instance.t_airs_node.name
+}
+
+output "ssh_command" {
+  description = "Command to SSH into the GCE instance."
+  value       = "gcloud compute ssh ubuntu@${google_compute_instance.t_airs_node.name} --zone=${google_compute_instance.t_airs_node.zone}"
 }

@@ -2,9 +2,10 @@
 
 # Capture the Terraform variables
 ENABLE_LOCAL_LLM="${enable_local_llm}"
+ENV="${env}"
 
 echo "Setting custom hostname for ${target_cloud}..."
-hostnamectl set-hostname "t-airs-node-${target_cloud}"
+hostnamectl set-hostname "t-airs-node-${target_cloud}-${ENV}"
 
 
 # --- 0. ROBUST UPDATE & INSTALL ---

@@ -27,6 +27,9 @@ data "http" "my_ip" {
 }
 
 locals {
+  # Use terraform workspace to distinguish environments. 'default' workspace is considered production.
+  env = terraform.workspace == "default" ? "prod" : terraform.workspace
+
   # Cleans up the fetched IP address.
   raw_ip = chomp(data.http.my_ip.response_body)
   # Creates a /24 subnet from the user's public IP for SSH access.
@@ -41,6 +44,7 @@ locals {
     gcp_project      = ""
     gcp_region       = ""
     enable_local_llm = var.enable_local_llm
+    env              = local.env
     target_cloud     = "aws" 
     aws_region       = var.aws_region
     bedrock_model_id = var.bedrock_model_id
@@ -80,7 +84,7 @@ resource "aws_vpc" "t_airs_vpc" {
   cidr_block           = var.aws_vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags                 = { Name = "t-airs-vpc-aws" }
+  tags                 = { Name = "t-airs-vpc-aws-${local.env}" }
 }
 
 # =================================================
@@ -94,7 +98,7 @@ resource "tls_private_key" "t_airs_key" {
 
 # 2. Uploads the public part of the generated key to AWS EC2 Key Pairs.
 resource "aws_key_pair" "generated_key" {
-  key_name   = "t-airs-dynamic-key"
+  key_name   = "t-airs-dynamic-key-${local.env}"
   public_key = tls_private_key.t_airs_key.public_key_openssh
 }
 
@@ -102,7 +106,7 @@ resource "aws_key_pair" "generated_key" {
 # This allows the user to SSH into the created instance.
 resource "local_sensitive_file" "private_key" {
   content         = tls_private_key.t_airs_key.private_key_openssh
-  filename        = "${path.module}/t-airs-key.pem"
+  filename        = "${path.module}/t-airs-key-${local.env}.pem"
   file_permission = "0400" # Strict read-only permissions required by SSH
 }
 
@@ -126,6 +130,7 @@ resource "aws_subnet" "main" {
   cidr_block              = var.aws_subnet_cidr
   map_public_ip_on_launch = true
   availability_zone       = "${var.aws_region}a"
+  tags                    = { Name = "t-airs-subnet-aws-${local.env}" }
 }
 
 # Associates the public route table with the main subnet.
@@ -136,6 +141,7 @@ resource "aws_route_table_association" "public_assoc" {
 
 # Defines a security group to act as a firewall for the EC2 instance.
 resource "aws_security_group" "restricted_airs" {
+  name   = "t-airs-restricted-sg-${local.env}"
   vpc_id = aws_vpc.t_airs_vpc.id
 
   # Allows ingress traffic for the web application from the user's IP and Prisma AIRS IPs.
@@ -196,12 +202,12 @@ resource "aws_instance" "t_airs_node" {
   subnet_id              = aws_subnet.main.id
   vpc_security_group_ids = [aws_security_group.restricted_airs.id]
   user_data              = local.userdata
-  tags                   = { Name = "T-AIRS-Production-Node" }
+  tags                   = { Name = "t-airs-node-${local.env}" }
 }
 
 # Creates an IAM role that the EC2 instance can assume.
 resource "aws_iam_role" "ec2_bedrock_role" {
-  name = "t-airs-bedrock-role"
+  name = "t-airs-bedrock-role-${local.env}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -219,7 +225,7 @@ resource "aws_iam_role" "ec2_bedrock_role" {
 # Attaches a policy to the role granting permissions to invoke AWS Bedrock models.
 # This allows the application to use Bedrock without hardcoded credentials.
 resource "aws_iam_role_policy" "bedrock_access" {
-  name = "t-airs-bedrock-policy"
+  name = "t-airs-bedrock-policy-${local.env}"
   role = aws_iam_role.ec2_bedrock_role.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -238,6 +244,21 @@ resource "aws_iam_role_policy" "bedrock_access" {
 
 # Creates an instance profile to attach the IAM role to the EC2 instance.
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "t-airs-ec2-profile"
+  name = "t-airs-ec2-profile-${local.env}"
   role = aws_iam_role.ec2_bedrock_role.name
+}
+
+output "instance_public_ip" {
+  description = "Public IP address of the EC2 instance."
+  value       = aws_instance.t_airs_node.public_ip
+}
+
+output "instance_name" {
+  description = "Name tag of the EC2 instance."
+  value       = aws_instance.t_airs_node.tags.Name
+}
+
+output "ssh_command" {
+  description = "Command to SSH into the EC2 instance."
+  value       = "ssh -i ${local_sensitive_file.private_key.filename} ubuntu@${aws_instance.t_airs_node.public_ip}"
 }

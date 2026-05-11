@@ -339,6 +339,3 @@ On the data passed, better to disable sessions, desired model and AIRS so passin
 * **Make sure to enable rate limiting to avoid overwhelming the App**
 <img width="1920" height="1080" alt="Screenshot 2026-04-09 at 08 38 49" src="https://github.com/user-attachments/assets/4243cfc1-8bd7-4714-a394-508786091505" />
 <img width="1920" height="1080" alt="Screenshot 2026-04-01 at 15 37 48" src="https://github.com/user-attachments/assets/5f7b61c0-9a93-48ce-909a-4ede5a8130fb" />
-
-
-
