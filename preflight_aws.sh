@@ -54,7 +54,8 @@ fi
 # 2. Check Bedrock Model Status for each model
 ACTIVE_MODELS=0
 # Use sed to clean the JSON array into a space-separated list for the loop
-MODEL_IDS_CLEAN=$(echo "$MODEL_IDS_JSON" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | sed 's/,/ /g')
+# Use tr to delete brackets and quotes, then sed to replace commas with spaces. This is more robust.
+MODEL_IDS_CLEAN=$(echo "$MODEL_IDS_JSON" | tr -d '[]"' | sed 's/,/ /g')
 
 for MODEL_ID in $MODEL_IDS_CLEAN; do
     echo "🔍 Checking AWS Bedrock Model ($MODEL_ID) Status..."
