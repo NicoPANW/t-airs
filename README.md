@@ -172,7 +172,7 @@ terraform apply -var="enable_local_llm=false" -auto-approve
 
 
 ### Step 5: Access the Lab
-Once Terraform finishes, it will print out a helpful `deployment_summary` which includes the Public IP address of your new server. Open your web browser and go to:
+Once Terraform finishes, it will print out a helpful `deployment_summary` which includes the Public IP address of your new server. Note it is only accessible from your IP address because of builtin auto-generated FW rules. Open your web browser and go to:
 
 ```bash
 http://<YOUR_SERVER_IP>:8000
@@ -270,7 +270,7 @@ terraform destroy -var="enable_local_llm=false" -auto-approve
 If the UI isn't loading, or a model isn't connecting, use this cheat sheet to play detective:
 
 ### Step 1: SSH into the VM
-After a successful `terraform apply`, the `deployment_summary` output provides the exact `ssh_command` to use. Simply copy and paste this command into your terminal to connect to the instance.
+After a successful `terraform apply`, the `deployment_summary` output provides the exact `ssh_command` to use. Simply copy and paste this command into your terminal to connect to the instance. Note it is only accessible from your IP address because of builtin auto-generated FW rules.
 
 **For AWS:**
 ```bash
