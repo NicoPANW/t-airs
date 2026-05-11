@@ -8,6 +8,8 @@ import requests
 import asyncio
 import ast
 from contextlib import asynccontextmanager, AsyncExitStack
+from fastapi import Request
+from fastapi.templating import Jinja2Templates
 
 # FastAPI Imports for web server and UI rendering
 from fastapi import FastAPI, Request, Form, Response
@@ -42,9 +44,14 @@ from custom_tools import PERSONA_TOOLS
 # --- APPLICATION VERSION ---
 APP_VERSION = "unknown"
 try:
-    # Read the version from the file at the project root
-    with open(os.path.join(os.path.dirname(__file__), '..', 'VERSION'), 'r') as f:
-        APP_VERSION = f.read().strip()
+    # Use absolute paths to guarantee Systemd finds it
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    version_file = os.path.join(base_dir, '..', 'VERSION')
+    
+    with open(version_file, 'r') as f:
+        version_content = f.read().strip()
+        if version_content:
+            APP_VERSION = version_content
 except Exception as e:
     print(f"Warning: Could not read VERSION file. Error: {e}")
 
@@ -326,7 +333,10 @@ async def update_persona(persona_id: str = Form(...), new_context: str = Form(..
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serves the main index.html page."""
-    return templates.TemplateResponse(request=request, name="index.html", context={"app_version": APP_VERSION})
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "app_version": APP_VERSION
+    })
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
