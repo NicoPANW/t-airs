@@ -114,8 +114,19 @@ fi
 # --- 3. Deploy Application Code, AI Gateway, MCP & RAG ---
 # This section sets up the core T-AIRS application.
 mkdir -p /opt/t-airs
-# Clone the application source code from the GitHub repository.
-git clone https://github.com/NicoPANW/t-airs.git /opt/t-airs
+
+# Determine which branch to clone based on the environment.
+# 'prod' environment (from 'default' workspace) uses the 'main' branch.
+# 'dev' environment uses the 'dev' branch.
+if [ "${env}" == "dev" ]; then
+    BRANCH="dev"
+else
+    BRANCH="main"
+fi
+echo "Deploying from git branch: $BRANCH"
+
+# Clone the specific branch of the application source code from the GitHub repository.
+git clone --branch $BRANCH https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
 
 # Create the SQLite database and populate it with initial customer data.
