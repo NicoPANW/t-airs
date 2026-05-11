@@ -170,7 +170,7 @@ terraform apply -var="enable_local_llm=false" -auto-approve
 
 
 ### Step 5: Access the Lab
-Once Terraform finishes, it will print out the Public IP address of your new server. Open your web browser and go to:
+Once Terraform finishes, it will print out a helpful `deployment_summary` which includes the Public IP address of your new server. Open your web browser and go to:
 
 ```bash
 http://<YOUR_SERVER_IP>:8000
