@@ -54,8 +54,8 @@ variable "aws_subnet_cidr" {
   default     = "10.0.1.0/24"
 }
 
-variable "bedrock_model_id" {
-  description = "The AWS Bedrock Model ID to deploy"
-  type        = string
-  default     = "meta.llama3-8b-instruct-v1:0"
+variable "bedrock_model_ids" {
+  description = "A list of AWS Bedrock model IDs to enable in the application."
+  type        = list(string)
+  default     = ["meta.llama3-8b-instruct-v1:0"]
 }
