@@ -39,6 +39,15 @@ from aisecurity.scan.models.content import Content
 import personas
 from custom_tools import PERSONA_TOOLS
 
+# --- APPLICATION VERSION ---
+APP_VERSION = "unknown"
+try:
+    # Read the version from the file at the project root
+    with open(os.path.join(os.path.dirname(__file__), '..', 'VERSION'), 'r') as f:
+        APP_VERSION = f.read().strip()
+except Exception as e:
+    print(f"Warning: Could not read VERSION file. Error: {e}")
+
 # --- CAPTURE CLI ARGUMENTS ---
 parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
@@ -317,7 +326,7 @@ async def update_persona(persona_id: str = Form(...), new_context: str = Form(..
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serves the main index.html page."""
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(request=request, name="index.html", context={"app_version": APP_VERSION})
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
