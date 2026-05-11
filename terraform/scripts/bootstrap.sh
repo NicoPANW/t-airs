@@ -227,19 +227,19 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 EOF
 # Inject AWS model definitions if the target cloud is AWS.
 elif [ "${target_cloud}" == "aws" ]; then
+# Loop through each model ID passed from Terraform and add it to the config.
+for model_id in ${bedrock_model_ids}; do
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
-  # --- EXPLICIT MODELS (For the manual UI dropdown) ---
-  - model_name: ${bedrock_model_id}
+  - model_name: ${model_id}
     litellm_params:
-      model: bedrock/${bedrock_model_id}
+      model: bedrock/${model_id}
       aws_region_name: "${aws_region}"
-
-  # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
   - model_name: auto-router
     litellm_params:
-      model: bedrock/${bedrock_model_id}
+      model: bedrock/${model_id}
       aws_region_name: "${aws_region}"
 EOF
+done
 fi
 
 # Inject local Ollama model definitions if GPU mode is enabled.

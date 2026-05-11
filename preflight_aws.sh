@@ -42,29 +42,38 @@ fi
 cd terraform/aws || { echo "❌ ERROR: terraform/aws directory not found."; exit 1; }
 terraform init > /dev/null
 
-# 1. Ask Terraform for the current value
-echo "🔍 Resolving Bedrock Model ID from Terraform..."
-MODEL_ID=$(echo "var.bedrock_model_id" | terraform console | tr -d '"')
+# 1. Get the list of models from Terraform as a JSON string
+echo "🔍 Resolving Bedrock Model IDs from Terraform..."
+MODEL_IDS_JSON=$(echo 'jsonencode(var.bedrock_model_ids)' | terraform console 2>/dev/null)
 
-if [ -z "$MODEL_ID" ] || [[ "$MODEL_ID" == *"Error"* ]]; then
-    echo "❌ ERROR: Could not resolve 'bedrock_model_id'. Ensure it is declared in variables.tf"
+if [ -z "$MODEL_IDS_JSON" ] || [[ "$MODEL_IDS_JSON" == "null" ]]; then
+    echo "❌ ERROR: Could not resolve 'bedrock_model_ids'. Ensure it is declared in variables.tf and has a default value."
     exit 1
 fi
 
-# 2. Check Bedrock Model Status
-echo "🔍 Checking AWS Bedrock Model ($MODEL_ID) Status..."
-MODEL_STATUS=$(aws bedrock get-foundation-model \
-    --model-id "$MODEL_ID" \
-    --region "$TF_VAR_aws_region" \
-    --query 'modelDetails.modelLifecycle.status' \
-    --output text 2>/dev/null)
+# 2. Check Bedrock Model Status for each model
+ACTIVE_MODELS=0
+# Use sed to clean the JSON array into a space-separated list for the loop
+MODEL_IDS_CLEAN=$(echo "$MODEL_IDS_JSON" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | sed 's/,/ /g')
 
-if [ "$MODEL_STATUS" == "ACTIVE" ]; then
-    echo "✅ AWS Bedrock is ACTIVE and ready."
-else
-    # Use $TF_VAR_aws_region here for the error message
-    echo "❌ ERROR: Model $MODEL_ID is not available or ACTIVE in $TF_VAR_aws_region."
-    echo "Check if you have requested access in the Bedrock Console."
+for MODEL_ID in $MODEL_IDS_CLEAN; do
+    echo "🔍 Checking AWS Bedrock Model ($MODEL_ID) Status..."
+    MODEL_STATUS=$(aws bedrock get-foundation-model \
+        --model-id "$MODEL_ID" \
+        --region "$TF_VAR_aws_region" \
+        --query 'modelDetails.modelLifecycle.status' \
+        --output text 2>/dev/null)
+
+    if [ "$MODEL_STATUS" == "ACTIVE" ]; then
+        echo "✅ Model $MODEL_ID is ACTIVE."
+        ACTIVE_MODELS=$((ACTIVE_MODELS + 1))
+    else
+        echo "⚠️  WARNING: Model '$MODEL_ID' is not ACTIVE in region '$TF_VAR_aws_region'. It will be skipped during deployment."
+    fi
+done
+
+if [ "$ACTIVE_MODELS" -eq 0 ]; then
+    echo "❌ ERROR: None of the specified Bedrock models are active in region '$TF_VAR_aws_region'. Deployment cannot continue."
     exit 1
 fi
 
@@ -74,4 +83,4 @@ else
     echo "✅ Dynamic AIRS IPs detected: $TF_VAR_prisma_airs_ips"
 fi
 
-echo "✅ AWS Pre-flight passed! Ready to deploy."
+echo "✅ AWS Pre-flight passed! Found $ACTIVE_MODELS active models. Ready to deploy."

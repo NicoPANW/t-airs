@@ -47,7 +47,8 @@ locals {
     env              = local.env
     target_cloud     = "aws" 
     aws_region       = var.aws_region
-    bedrock_model_id = var.bedrock_model_id
+    # Pass the list of models as a space-separated string for easy parsing in bash.
+    bedrock_model_ids = join(" ", var.bedrock_model_ids)
   })
 }
 
