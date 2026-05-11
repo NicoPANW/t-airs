@@ -44,7 +44,7 @@ terraform init > /dev/null
 
 # 1. Get the list of models from Terraform as a JSON string
 echo "🔍 Resolving Bedrock Model IDs from Terraform..."
-MODEL_IDS_JSON=$(echo 'jsonencode(var.bedrock_model_ids)' | terraform console 2>/dev/null)
+MODEL_IDS_JSON=$(echo 'jsonencode(var.bedrock_model_ids)' | terraform console 2>/dev/null | grep '\[.*\]' || echo "")
 
 if [ -z "$MODEL_IDS_JSON" ] || [[ "$MODEL_IDS_JSON" == "null" ]]; then
     echo "❌ ERROR: Could not resolve 'bedrock_model_ids'. Ensure it is declared in variables.tf and has a default value."
