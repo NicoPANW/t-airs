@@ -133,7 +133,7 @@ export TF_VAR_aws_region="us-east-1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
 # Define a list of Bedrock models to enable. The pre-flight check will verify them.
-export TF_VAR_bedrock_model_ids='["meta.llama3-8b-instruct-v1:0", "anthropic.claude-sonnet-4-5-20250929-v1:0"]'
+export TF_VAR_bedrock_model_ids='["meta.llama3-8b-instruct-v1:0", "mistral.ministral-3-8b-instruct"]'
 # If AIRS model scaning, add IP listed as per AIRS workflow in the UI and update below accordingly
 export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
 
