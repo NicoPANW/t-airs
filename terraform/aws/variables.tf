@@ -57,5 +57,5 @@ variable "aws_subnet_cidr" {
 variable "bedrock_model_ids" {
   description = "A list of AWS Bedrock model IDs to enable in the application."
   type        = list(string)
-  default     = ["meta.llama3-8b-instruct-v1:0"]
+  default     = ["meta.llama3-8b-instruct-v1:0", "mistral.ministral-3-8b-instruct"]
 }
