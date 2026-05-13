@@ -619,9 +619,9 @@ async def chat(
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
                     
-                    # 1. Strictly instantiate the Metadata object with all required fields
+                    # 1. Strictly instantiate the Metadata object with the exact SDK fields
                     mcp_metadata = ToolEventMetadata(
-                        name=tool_name,
+                        tool_invoked=tool_name, # ✅ The exact keyword we've been looking for!
                         ecosystem="mcp",
                         method="tools/call",
                         server_name="mcp-server-sqlite"
