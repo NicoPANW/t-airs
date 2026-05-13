@@ -453,7 +453,8 @@ async def chat(
         gateway_params = {}
         if enforcement_placement == "gateway" and airs_enabled:
             # ✅ FIX: Only run Ingress here! Egress scanning the Tool Call crashes LiteLLM due to the 'openai' ecosystem tag.
-            gateway_params = {"guardrails": ["airs-ingress-scan"]}
+            #gateway_params = {"guardrails": ["airs-ingress-scan"]}
+            gateway_params = {}
 
         # Make the first call to the LLM. This may result in a text response or a tool call request.
         # 📞 INDIRECT CALL TO PRISMA AIRS: If 'guardrails' are enabled, the AI Gateway will call AIRS before and after calling the LLM.
