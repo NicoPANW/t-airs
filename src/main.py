@@ -339,51 +339,6 @@ async def index(request: Request):
         "app_version": APP_VERSION
     })
 
-@app.get("/debug-mcp-airs")
-async def debug_mcp_airs():
-    # 1. Update this URL to match your specific Prisma Cloud region/tenant
-    # Common endpoints: https://api.prismacloud.io, https://api2.prismacloud.io, etc.
-    url = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/sync/request"
-    
-    headers = {
-        "x-pan-api-key": AIRS_KEY,
-        "Content-Type": "application/json"
-    }
-
-    # 2. We will use the exact payload that should trigger the 'Tool' category
-    payload = {
-        "ai_profile": {"profile_name": AIRS_PROFILE_NAME},
-        "contents": [{
-            "tool_calls": [{
-                "id": "call_debug_mcp",
-                "type": "function",
-                "function": {
-                    "name": "freeze_account",
-                    "arguments": json.dumps({"reason": "ATTACK: drop all tables"})
-                }
-            }]
-        }],
-        "metadata": {
-            "app_user": "rest_tester",
-            "ecosystem": "mcp",
-            "method": "tools/call"
-        }
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
-        
-        # 🕵️ LOG TO TERMINAL: Check your sudo journalctl -u t-airs.service logs!
-        print(f"DEBUG AIRS HTTP STATUS: {response.status_code}")
-        print(f"DEBUG AIRS RAW BODY: {response.text}")
-
-        # Safety check: if body is empty, don't try to parse JSON
-        if not response.text:
-            return {"error": f"Empty response from AIRS API. Status code: {response.status_code}"}
-            
-        return response.json()
-    except Exception as e:
-        return {"error": str(e)}
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
@@ -551,49 +506,51 @@ async def chat(
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
 
+                # --- 🛡️ SHIELD 1: SCAN TOOL REQUEST (Ingress/Arguments) ---
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning MCP Tool Payload via Prisma AIRS...")
+                    print(f"🔍 Scanning MCP Tool Arguments via Prisma AIRS...")
                     try:
-                        # Scan the raw JSON tool arguments for malicious injections before executing
                         tool_scan_response = Scanner().sync_scan(
                             ai_profile=ai_profile_obj,
-                            # ✅ FIX: Drop the Content() class wrapper and pass a raw dictionary!
-                            content={
-                                "tool_calls": [{
-                                    "id": tool_call.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": tool_name, 
-                                        "arguments": json.dumps(tool_args)
-                                    }
-                                }]
-                            },
-                            metadata={
-                                "app_user": end_user, 
-                                "ai_model": model_id, 
-                                "ecosystem": "mcp", 
-                                "method": "tools/call"
-                            }
+                            content={"tool_calls": [{"id": tool_call.id, "type": "function", "function": {"name": tool_name, "arguments": json.dumps(tool_args)}}]},
+                            metadata={"app_user": end_user, "ai_model": model_id, "ecosystem": "mcp", "method": "tools/call"}
                         )
-                        tool_res_data = tool_scan_response.to_dict()
-                        tool_data = tool_res_data[0] if isinstance(tool_res_data, list) and len(tool_res_data) > 0 else tool_res_data
-
-                        # If AIRS catches a malicious payload inside the tool arguments, abort!
+                        tool_data = tool_scan_response.to_dict()
                         if str(tool_data.get("action", "pass")).lower() == "block":
-                            block_txt = f"🛡️ App-Level AIRS Blocked Tool [{tool_name}]: Malicious payload detected."
-                            print(f"🛑 AIRS APP BLOCK: TOOL | Category: {tool_data.get('category', 'Policy')}")
-                            return {
-                                "bot": block_txt, 
-                                "output": block_txt, 
-                                "logs": {
-                                    "security_scan": f"TOOL BLOCK ({tool_name})", 
-                                    "raw_response": json.dumps(tool_data, indent=2), 
-                                    "trace": architecture_trace,
-                                    "intercepted_text": json.dumps(tool_args)
-                                }
-                            }
-                    except Exception as scan_err:
-                        print(f"⚠️ Tool Scan Warning: {scan_err}")
+                            return self._handle_block(tool_name, tool_data, tool_args, architecture_trace)
+                    except Exception as e:
+                        print(f"⚠️ Request Scan Warning: {e}")
+
+                # --- 🔌 EXECUTE TOOL ---
+                if tool_name in action_tools:
+                    # (Your existing logic for transfer_funds, freeze_account, etc.)
+                    # ... 
+                    tool_output = "..." 
+                else:
+                    mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
+                    tool_output = mcp_result.content[0].text
+
+                # --- 🛡️ SHIELD 2: SCAN TOOL RESULT (Indirect Injection / Egress) ---
+                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    print(f"🔍 Scanning Data returned by {tool_name} for Indirect Injections...")
+                    try:
+                        # We scan the tool_output as a 'response' to catch Trojan Horse instructions
+                        res_scan = Scanner().sync_scan(
+                            ai_profile=ai_profile_obj,
+                            content=Content(response=tool_output), 
+                            metadata={"app_user": end_user, "ecosystem": "mcp", "method": "tools/response", "tool_name": tool_name}
+                        )
+                        res_data = res_scan.to_dict()
+                        if str(res_data.get("action", "pass")).lower() == "block":
+                            block_msg = f"🛡️ AIRS Blocked Tool Output: The database returned unsafe content for {tool_name}."
+                            print(f"🛑 AIRS BLOCK: TOOL RESULT | Tool: {tool_name}")
+                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "raw_response": json.dumps(res_data, indent=2), "trace": architecture_trace}}
+                    except Exception as e:
+                        print(f"⚠️ Result Scan Warning: {e}")
+
+                # Proceed if clean
+                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
+                architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
                 # --- A) Handle Custom Action Tools (that perform writes/updates) ---
                 action_tools = [
