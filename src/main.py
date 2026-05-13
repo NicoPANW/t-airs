@@ -485,7 +485,19 @@ async def chat(
 
         # If the model requests to use one or more tools...
         if response_msg.tool_calls:
-            messages.append(response_msg.model_dump(exclude_none=True))
+            # 🌟 Safely construct the assistant message to prevent Bedrock parsing crashes
+            assistant_msg = {
+                "role": "assistant",
+                "content": response_msg.content or "", # Force string
+                "tool_calls": [
+                    {
+                        "id": t.id, 
+                        "type": "function", 
+                        "function": {"name": t.function.name, "arguments": t.function.arguments}
+                    } for t in response_msg.tool_calls
+                ]
+            }
+            messages.append(assistant_msg)
 
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
@@ -741,10 +753,10 @@ async def chat(
             category_match = re.search(r"'category':\s*'([^']+)'", error_str)
             category = category_match.group(1).capitalize() if category_match else "Security"
 
-            if "http_400_error" in error_str or "scan_failed" in error_str:
-                # Gracefully handle cases where the gateway scan fails, often due to an empty
-                # response from the LLM which the scanner rejects.
-                clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
+            if category == "Http_400_error" or category == "Guardrail_scan_error":
+                category = "Sensitive Data / Policy" 
+
+            clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} violation."
             else:
                 clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
 
