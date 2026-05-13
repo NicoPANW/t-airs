@@ -640,7 +640,7 @@ async def chat(
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
                     tool_scan_response = Scanner().sync_scan(
                         ai_profile=ai_profile_obj,
-                        content=Content(prompt=json.dumps(mcp_airs_payload)),
+                        content=Content(tool=json.dumps(mcp_airs_payload)), # ✅ Correct field
                         metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
                     )
 
