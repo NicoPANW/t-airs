@@ -618,43 +618,22 @@ async def chat(
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
                     
-                    # 1. Construct the exact MCP JSON array that the AIRS backend recognizes
-                    mcp_airs_payload = [
-                        {
-                            "Info": {
-                                "McpServer": "mcp-server-sqlite",
-                                "ToolName": tool_name,
-                                "EcoSystem": "mcp",
-                                "Method": "tools/call",
-                                "ToolDirection": 0
-                            },
-                            "Data": json.dumps(tool_args)
-                        },
-                        {
-                            "Info": {
-                                "McpServer": "mcp-server-sqlite",
-                                "ToolName": tool_name,
-                                "EcoSystem": "mcp",
-                                "Method": "tools/call",
-                                "ToolDirection": 1
-                            },
-                            "Data": json.dumps({"result": tool_output})
-                        }
-                    ]
-
-                    # 2. Pass the ENTIRE MCP array as a single string into the input field
+                    # 1. Instantiate the ToolEvent. AIRS will automatically synthesize 
+                    # the beautiful MCP array for the UI based on these three fields!
                     mcp_event_obj = ToolEvent(
-                        input=json.dumps(mcp_airs_payload)
+                        metadata={"tool_name": tool_name}, # ✅ REQUIRED: Gives the backend the context it needs
+                        input=json.dumps(tool_args),
+                        output=json.dumps({"result": tool_output})
                     )
                     
-                    # 3. Pass the object to the 'tool_event' parameter
+                    # 2. Pass the object to the 'tool_event' parameter
                     tool_scan_response = Scanner().sync_scan(
                         ai_profile=ai_profile_obj,
                         content=Content(tool_event=mcp_event_obj),
-                        metadata={"app_user": end_user, "ai_model": model_id, "tool_name": tool_name}
+                        metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
                     )
 
-                    # 4. Check if AIRS detected exfiltration or malicious data in the database return
+                    # 3. Check if AIRS detected exfiltration or malicious data in the database return
                     tool_res_data = tool_scan_response.to_dict()
                     tool_data = tool_res_data[0] if isinstance(tool_res_data, list) and len(tool_res_data) > 0 else tool_res_data
 
