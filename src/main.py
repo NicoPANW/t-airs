@@ -483,79 +483,216 @@ async def chat(
         response_msg = response.choices[0].message
 
         # If the model requests to use one or more tools...
-       if response_msg.tool_calls:
-            # ✅ Defined at top of tool block to prevent scope errors
-            action_tools = ["transfer_funds", "freeze_account", "issue_replacement_card", "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details", "issue_store_refund", "apply_admin_discount", "update_billing_zip"]
-            
+        if response_msg.tool_calls:
             messages.append(response_msg)
 
             for tool_call in response_msg.tool_calls:
-                tool_name, tool_args = tool_call.function.name, json.loads(tool_call.function.arguments)
+                tool_name = tool_call.function.name
+                tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
 
-                # 🛡️ SHIELD 1: SCAN TOOL REQUEST (Direction 0)
-                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning MCP Tool Arguments...")
-                    try:
-                        # Map JSON args to 'prompt' as per SDK requirement
-                        tool_req_scan = Scanner().sync_scan(
-                            ai_profile=ai_profile_obj,
-                            content=Content(prompt=json.dumps(tool_args)),
-                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 0}
-                        )
-                        t_data = tool_req_scan.to_dict()
-                        if str(t_data.get("action", "pass")).lower() == "block":
-                            block_msg = f"🛡️ AIRS Blocked Tool Request: {tool_name}"
-                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL REQUEST BLOCK", "raw_response": json.dumps(t_data, indent=2), "trace": architecture_trace}}
-                    except Exception as e: print(f"⚠️ Req Scan Error: {e}")
+                # --- A) Handle Custom Action Tools (that perform writes/updates) ---
+                action_tools = [
+                    "transfer_funds", "freeze_account", "issue_replacement_card",
+                    "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
+                    "issue_store_refund", "apply_admin_discount", "update_billing_zip"
+                ]
 
-                # --- 🔌 EXECUTE TOOL ---
                 if tool_name in action_tools:
-                    await mcp_session.call_tool("write_query", arguments={"query": "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"})
-                    
-                    details, tool_output = "", ""
-                    if tool_name == "transfer_funds":
-                        src, dst, amt = tool_args.get("source_account"), tool_args.get("dest_account"), tool_args.get("amount")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"})
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"})
-                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} executed."
-                    elif tool_name == "freeze_account":
-                        acc, reason = tool_args.get("account_id"), tool_args.get("reason")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
-                        tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} frozen."
-                    
-                    tool_output += " (Transaction recorded in backend)."
-                else:
-                    mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                    tool_output = mcp_res.content[0].text
 
-                # 🛡️ SHIELD 2: SCAN TOOL RESULT (Direction 1 - Catches Indirect Injection/Exfiltration)
-                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning MCP Tool Result from {tool_name}...")
-                    try:
-                        # Map result to 'response' as per SDK requirement
-                        tool_res_scan = Scanner().sync_scan(
-                            ai_profile=ai_profile_obj,
-                            content=Content(response=tool_output),
-                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 1}
-                        )
-                        r_data = tool_res_scan.to_dict()
-                        if str(r_data.get("action", "pass")).lower() == "block":
-                            block_msg = f"🛡️ AIRS Blocked Malicious Database Content from [{tool_name}]."
-                            print(f"🛑 AIRS BLOCK: TOOL RESULT (Direction 1)")
-                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
-                    except Exception as e: print(f"⚠️ Res Scan Error: {e}")
+                    # Ensure a log table exists for these high-privilege actions.
+                    setup_query = "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"
+                    await mcp_session.call_tool("write_query", arguments={"query": setup_query})
+
+                    # === BANKING TOOLS ===
+                    if tool_name == "transfer_funds":
+                        src = tool_args.get("source_account")
+                        dst = tool_args.get("dest_account")
+                        amt = tool_args.get("amount")
+
+                        deduct_query = f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": deduct_query})
+
+                        add_query = f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": add_query})
+
+                        details = f"Transferred ${amt} from {src} to {dst}"
+                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed and settled."
+
+                    elif tool_name == "freeze_account":
+                        acc = tool_args.get("account_id")
+                        reason = tool_args.get("reason")
+
+                        freeze_query = f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": freeze_query})
+
+                        details = f"Froze account {acc}. Reason: {reason}"
+                        tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} has been frozen."
+
+                    elif tool_name == "issue_replacement_card":
+                        acc = tool_args.get("account_id")
+
+                        card_query = f"UPDATE users SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": card_query})
+
+                        details = f"Canceled and replaced card for account {acc}"
+                        tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
+
+                    # === TRAVEL TOOLS ===
+                    elif tool_name == "upgrade_flight_seat":
+                        tkt = tool_args.get("ticket_number")
+                        cabin = tool_args.get("new_class")
+
+                        upgrade_query = f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": upgrade_query})
+
+                        details = f"Upgraded ticket {tkt} to {cabin} class"
+                        tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} successfully upgraded to {cabin}."
+
+                    elif tool_name == "cancel_flight_booking":
+                        tkt = tool_args.get("ticket_number")
+                        refund = tool_args.get("refund_to_card")
+
+                        cancel_query = f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": cancel_query})
+
+                        details = f"Canceled ticket {tkt}. Refund to card: {refund}"
+                        tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked."
+
+                    elif tool_name == "update_passport_details":
+                        tkt = tool_args.get("ticket_number")
+                        new_pass = tool_args.get("new_passport_id")
+
+                        pass_query = f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": pass_query})
+
+                        details = f"Updated passport to {new_pass} for ticket {tkt}"
+                        tool_output = f"🛂 PASSPORT UPDATED: New document saved to manifest."
+
+                    # === E-SHOP TOOLS ===
+                    elif tool_name == "issue_store_refund":
+                        order = tool_args.get("order_id")
+                        amt = tool_args.get("amount")
+
+                        refund_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": refund_query})
+
+                        details = f"Refunded ${amt} for order {order}"
+                        tool_output = f"✅ REFUND PROCESSED: ${amt} credited back to payment method for order {order}."
+
+                    elif tool_name == "apply_admin_discount":
+                        order = tool_args.get("order_id")
+                        disc = tool_args.get("discount_percentage")
+
+                        disc_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": disc_query})
+
+                        details = f"Applied {disc}% SYSTEM_ADMIN discount to order {order}"
+                        tool_output = f"💸 DISCOUNT APPLIED: {disc}% off order {order}."
+
+                    elif tool_name == "update_billing_zip":
+                        order = tool_args.get("order_id")
+                        new_zip = tool_args.get("new_zip_code")
+
+                        zip_query = f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"
+                        await mcp_session.call_tool("write_query", arguments={"query": zip_query})
+
+                        details = f"Changed billing zip to {new_zip} for order {order}"
+                        tool_output = f"📦 ADDRESS UPDATED: Billing zip changed to {new_zip}."
+
+                    # Log the execution of the high-privilege action to the database.
+                    insert_query = f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', '{details}');"
+                    await mcp_session.call_tool("write_query", arguments={"query": insert_query})
+
+                    tool_output += " (Transaction permanently recorded in backend database)."
+
+                if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    # 1. Construct the exact MCP JSON array that the AIRS UI recognizes
+                    mcp_airs_payload = [
+                        {
+                            "Info": {
+                                "McpServer": "mcp-server-sqlite",
+                                "ToolName": tool_name,
+                                "EcoSystem": "mcp",
+                                "Method": "tools/call",
+                                "ToolDirection": 0
+                            },
+                            "Data": json.dumps(tool_args)
+                        },
+                        {
+                            "Info": {
+                                "McpServer": "mcp-server-sqlite",
+                                "ToolName": tool_name,
+                                "EcoSystem": "mcp",
+                                "Method": "tools/call",
+                                "ToolDirection": 1
+                            },
+                            "Data": json.dumps({"result": tool_output})
+                        }
+                    ]
+
+                    # 2. Stringify the array and pass it to the 'prompt' parameter
+                    print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
+                    tool_scan_response = Scanner().sync_scan(
+                        ai_profile=ai_profile_obj,
+                        content=Content(prompt=json.dumps(mcp_airs_payload)),
+                        metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
+                    )
+
+                    # 3. Check if AIRS detected exfiltration or malicious data in the database return
+                    tool_res_data = tool_scan_response.to_dict()
+                    tool_data = tool_res_data[0] if isinstance(tool_res_data, list) and len(tool_res_data) > 0 else tool_res_data
+
+                    if str(tool_data.get("action", "pass")).lower() == "block":
+                        block_txt = f"🛡️ App-Level AIRS Blocked Tool: '{tool_name}' returned a {tool_data.get('category', 'Data Exfiltration')} violation."
+                        print(f"🛑 AIRS APP BLOCK: TOOL ({tool_name}) | Category: {tool_data.get('category', 'Policy')}")
+                        
+                        # Abort the request before the LLM can read the malicious database output
+                        return {
+                            "bot": block_txt,
+                            "output": block_txt,
+                            "logs": {
+                                "security_scan": f"TOOL BLOCK ({tool_name})",
+                                "raw_response": json.dumps(tool_data, indent=2),
+                                "trace": architecture_trace
+                            }
+                        }
+                    else:
+                        # Append the successful tool scan to the raw logs so your UI can display it
+                        if isinstance(ingress_data, dict):
+                            ingress_data[f"tool_scan_{tool_name}"] = tool_data
+                # =====================================================================
 
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
-                architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
+                
+                # Record the tool execution details for the UI trace.
+                architecture_trace["mcp_execution"].append({
+                    "tool": tool_name,
+                    "arguments": tool_args,
+                    "database_result": tool_output
+                })
 
-            # --- SUMMARIZATION ---
-            execution_phase = "Tool Summarization"
-            gateway_params_egress = {"guardrails": ["airs-egress-scan"]} if enforcement_placement == "gateway" and airs_enabled else {}
-            final_res = await llm_client.chat.completions.create(model=model_id, messages=messages, temperature=0.7, user=end_user, extra_body=gateway_params_egress)
-            bot_response = final_res.choices[0].message.content or ""
+            # 🌟 STATE TRACKER: Secondary Inference Phase (after tools return)
+            # Make a second call to the LLM, providing the tool results, to get a final summary.
+            execution_phase = "Tool Summarization Inference"
+
+            gateway_params_egress = {}
+            if enforcement_placement == "gateway" and airs_enabled:
+                gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
+
+            final_response = await llm_client.chat.completions.create(
+                model=model_id,
+                messages=messages,
+                temperature=0.7,
+                user=end_user,
+                extra_body=gateway_params_egress
+            )
+            bot_response = final_response.choices[0].message.content or ""
         else:
             bot_response = response_msg.content or ""
+
+        if bot_response.strip() == "":
+            bot_response = "⚠️ [System: The LLM executed the prompt and tools, but returned an empty text string.]"
 
         architecture_trace["llm_generation"] = bot_response
 
