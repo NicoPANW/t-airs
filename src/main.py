@@ -637,10 +637,14 @@ async def chat(
                     ]
 
                     # 2. Stringify the array and pass it to the 'prompt' parameter
+                    mcp_content = Content()
+                    mcp_content.tool = json.dumps(mcp_airs_payload)
+
+                    # 3. Send the scan
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
                     tool_scan_response = Scanner().sync_scan(
                         ai_profile=ai_profile_obj,
-                        content=Content(tools=json.dumps(mcp_airs_payload)), # ✅ Correct field
+                        content=mcp_content,
                         metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
                     )
 
