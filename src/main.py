@@ -621,7 +621,7 @@ async def chat(
                     
                     # 1. Strictly instantiate the Metadata object with all required fields
                     mcp_metadata = ToolEventMetadata(
-                        tool_name=tool_name,
+                        name=tool_name,
                         ecosystem="mcp",
                         method="tools/call",
                         server_name="mcp-server-sqlite"
