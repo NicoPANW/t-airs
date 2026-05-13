@@ -750,15 +750,15 @@ async def chat(
                 direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
 
             # Extract the violation category from the error string for a user-friendly message.
+            # Extract the violation category from the error string for a user-friendly message.
             category_match = re.search(r"'category':\s*'([^']+)'", error_str)
             category = category_match.group(1).capitalize() if category_match else "Security"
 
+            # 🌟 Clean up LiteLLM's generic blocking category
             if category == "Http_400_error" or category == "Guardrail_scan_error":
                 category = "Sensitive Data / Policy" 
 
             clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} violation."
-            else:
-                clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
 
             # Parse the nested error string from LiteLLM to build a clean JSON log for the UI.
             sidebar_log = {"raw_error": error_str}
