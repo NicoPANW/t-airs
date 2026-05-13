@@ -267,7 +267,6 @@ async def lifespan(app: FastAPI):
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-            # 📞 CALL TO PRISMA AIRS: Healthcheck scan to verify connectivity on startup.
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
@@ -339,7 +338,6 @@ async def index(request: Request):
         "app_version": APP_VERSION
     })
 
-
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     """Handles browser requests for the favicon."""
@@ -403,7 +401,6 @@ async def chat(
         execution_phase = "Initial Inference"
 
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-            # 📞 CALL TO PRISMA AIRS: App-level ingress scan of the user's prompt.
             scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
@@ -451,21 +448,21 @@ async def chat(
         print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
         # If enforcement is at the gateway, add the 'guardrails' parameter to the request.
 
-        gateway_params = {}
+        gateway_params_ingress = {}
+        gateway_params_egress = {}
+
         if enforcement_placement == "gateway" and airs_enabled:
-            # ✅ FIX: Only run Ingress here! Egress scanning the Tool Call crashes LiteLLM due to the 'openai' ecosystem tag.
-            #gateway_params = {"guardrails": ["airs-ingress-scan"]}
-            gateway_params = {}
+            gateway_params_ingress = {"guardrails": ["airs-ingress-scan"]}
+            gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
 
         # Make the first call to the LLM. This may result in a text response or a tool call request.
-        # 📞 INDIRECT CALL TO PRISMA AIRS: If 'guardrails' are enabled, the AI Gateway will call AIRS before and after calling the LLM.
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
             messages=messages,
             tools=active_tools if active_tools else None,
             temperature=0.7,
             user=end_user,
-            extra_body=gateway_params
+            extra_body=gateway_params_ingress
         )
 
         response = raw_response.parse()
@@ -487,82 +484,12 @@ async def chat(
 
         # If the model requests to use one or more tools...
         if response_msg.tool_calls:
-            # 1. Define action_tools at the top of the block so it's always available
-            action_tools = [
-                "transfer_funds", "freeze_account", "issue_replacement_card",
-                "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
-                "issue_store_refund", "apply_admin_discount", "update_billing_zip"
-            ]
-
-            # 🌟 Construct the assistant message safely
-            assistant_msg = {
-                "role": "assistant",
-                "content": response_msg.content or "",
-                "tool_calls": [
-                    {
-                        "id": t.id, 
-                        "type": "function", 
-                        "function": {"name": t.function.name, "arguments": t.function.arguments}
-                    } for t in response_msg.tool_calls
-                ]
-            }
-            messages.append(assistant_msg)
+            messages.append(response_msg)
 
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
-
-                # --- 🛡️ SHIELD 1: SCAN TOOL REQUEST ---
-                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning MCP Tool Arguments via Prisma AIRS...")
-                    try:
-                        # Reverting to 'prompt=' to satisfy your specific SDK version
-                        tool_scan_response = Scanner().sync_scan(
-                            ai_profile=ai_profile_obj,
-                            content=Content(prompt=json.dumps(tool_args)),
-                            metadata={
-                                "app_user": end_user, 
-                                "ai_model": model_id, 
-                                "ecosystem": "mcp", 
-                                "method": "tools/call",
-                                "tool_name": tool_name
-                            }
-                        )
-                        tool_data = tool_scan_response.to_dict()
-                        if str(tool_data.get("action", "pass")).lower() == "block":
-                            block_txt = f"🛡️ AIRS Blocked Tool [{tool_name}]: Malicious arguments."
-                            return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "TOOL REQUEST BLOCK", "raw_response": json.dumps(tool_data, indent=2), "trace": architecture_trace}}
-                    except Exception as e:
-                        print(f"⚠️ Request Scan Warning: {e}")
-
-                # --- 🔌 EXECUTE TOOL ---
-                if tool_name in action_tools:
-                    # (YOUR EXISTING IF/ELIF LOGIC FOR transfer_funds, etc.)
-                    # Ensure you keep the existing code here that sets tool_output!
-                    tool_output = "Action executed." 
-                else:
-                    # Handle read-only MCP tools
-                    mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                    tool_output = mcp_result.content[0].text
-
-                # --- 🛡️ SHIELD 2: SCAN TOOL RESULT ---
-                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning Data returned by {tool_name}...")
-                    try:
-                        res_scan = Scanner().sync_scan(
-                            ai_profile=ai_profile_obj,
-                            content=Content(response=tool_output), 
-                            metadata={"app_user": end_user, "ecosystem": "mcp", "method": "tools/response", "tool_name": tool_name}
-                        )
-                        if str(res_scan.to_dict().get("action", "pass")).lower() == "block":
-                            block_msg = f"🛡️ AIRS Blocked Tool Output: Unsafe content returned by {tool_name}."
-                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "trace": architecture_trace}}
-                    except Exception as e:
-                        print(f"⚠️ Result Scan Warning: {e}")
-
-                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
-                architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
                 # --- A) Handle Custom Action Tools (that perform writes/updates) ---
                 action_tools = [
@@ -697,19 +624,16 @@ async def chat(
             # Make a second call to the LLM, providing the tool results, to get a final summary.
             execution_phase = "Tool Summarization Inference"
 
-            gateway_params_turn_2 = {}
+            gateway_params_egress = {}
             if enforcement_placement == "gateway" and airs_enabled:
-                # This parameter instructs the LiteLLM AI Gateway to perform the egress scan.
-                gateway_params_turn_2 = {"guardrails": ["airs-egress-scan"]}
+                gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
 
-            # 📞 INDIRECT CALL TO PRISMA AIRS: If 'guardrails' are enabled, the AI Gateway will call AIRS to scan the LLM's final response.
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
-                tools=active_tools if active_tools else None,
                 temperature=0.7,
                 user=end_user,
-                extra_body=gateway_params_turn_2
+                extra_body=gateway_params_egress
             )
             bot_response = final_response.choices[0].message.content or ""
         else:
@@ -723,7 +647,6 @@ async def chat(
         # --- 5. EGRESS SCAN (App-Level) ---
         # If enforcement is set to 'app', scan the LLM's final response before sending it to the user.
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
-            # 📞 CALL TO PRISMA AIRS: App-level egress scan of the LLM's final response.
             out_scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),
@@ -810,15 +733,15 @@ async def chat(
                 direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
 
             # Extract the violation category from the error string for a user-friendly message.
-            # Extract the violation category from the error string for a user-friendly message.
             category_match = re.search(r"'category':\s*'([^']+)'", error_str)
             category = category_match.group(1).capitalize() if category_match else "Security"
 
-            # 🌟 Clean up LiteLLM's generic blocking category
-            if category == "Http_400_error" or category == "Guardrail_scan_error":
-                category = "Sensitive Data / Policy" 
-
-            clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} violation."
+            if "http_400_error" in error_str or "scan_failed" in error_str:
+                # Gracefully handle cases where the gateway scan fails, often due to an empty
+                # response from the LLM which the scanner rejects.
+                clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
+            else:
+                clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
 
             # Parse the nested error string from LiteLLM to build a clean JSON log for the UI.
             sidebar_log = {"raw_error": error_str}
