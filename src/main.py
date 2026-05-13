@@ -481,7 +481,7 @@ async def chat(
 
         # If the model requests to use one or more tools...
         if response_msg.tool_calls:
-            messages.append(response_msg)
+            messages.append(response_msg.model_dump(exclude_none=True))
 
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
@@ -621,16 +621,17 @@ async def chat(
             # Make a second call to the LLM, providing the tool results, to get a final summary.
             execution_phase = "Tool Summarization Inference"
 
-            gateway_params_egress = {}
+            gateway_params_turn_2 = {}
             if enforcement_placement == "gateway" and airs_enabled:
-                gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
+                gateway_params_turn_2 = {"guardrails": ["airs-egress-scan"]}
 
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
+                tools=active_tools if active_tools else None,
                 temperature=0.7,
                 user=end_user,
-                extra_body=gateway_params
+                extra_body=gateway_params_turn_2  # 👈 Make sure this uses the new variable!
             )
             bot_response = final_response.choices[0].message.content or ""
         else:
