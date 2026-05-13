@@ -343,7 +343,7 @@ async def index(request: Request):
 async def debug_mcp_airs():
     # 1. Update this URL to match your specific Prisma Cloud region/tenant
     # Common endpoints: https://api.prismacloud.io, https://api2.prismacloud.io, etc.
-    url = "https://api.prismacloud.io/ai-security/v1/scan/sync"
+    url = "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/sync/request"
     
     headers = {
         "x-pan-api-key": AIRS_KEY,
