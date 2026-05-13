@@ -34,6 +34,7 @@ importlib.reload(rag_data)  # Force a fresh read of the file on every boot to pi
 # Prisma AIRS Imports (Enterprise LLM Security Scanning)
 import aisecurity
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
+from aisecurity.generated_openapi_client import ToolEvent
 from aisecurity.scan.inline.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
@@ -611,37 +612,23 @@ async def chat(
                     mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_result.content[0].text
 
+               # =====================================================================
+                # 🚀 NEW: SCAN MCP TOOL EXECUTION WITH AIRS
+                # =====================================================================
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    # 1. Construct the exact MCP JSON array that the AIRS UI recognizes
-                    mcp_airs_payload = [
-                        {
-                            "Info": {
-                                "McpServer": "mcp-server-sqlite",
-                                "ToolName": tool_name,
-                                "EcoSystem": "mcp",
-                                "Method": "tools/call",
-                                "ToolDirection": 0
-                            },
-                            "Data": json.dumps(tool_args)
-                        },
-                        {
-                            "Info": {
-                                "McpServer": "mcp-server-sqlite",
-                                "ToolName": tool_name,
-                                "EcoSystem": "mcp",
-                                "Method": "tools/call",
-                                "ToolDirection": 1
-                            },
-                            "Data": json.dumps({"result": tool_output})
-                        }
-                    ]
-
-                    # 2. Stringify the array and pass it to the 'tool_event' parameter
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
+                    
+                    # 1. Instantiate the ToolEvent object strictly using its Pydantic fields
+                    mcp_event_obj = ToolEvent(
+                        input=json.dumps(tool_args),
+                        output=json.dumps({"result": tool_output})
+                    )
+                    
+                    # 2. Pass the object to the 'tool_event' parameter
                     tool_scan_response = Scanner().sync_scan(
                         ai_profile=ai_profile_obj,
-                        content=Content(tool_event=json.dumps(mcp_airs_payload)), # ✅ The exact parameter the SDK wants
-                        metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
+                        content=Content(tool_event=mcp_event_obj),
+                        metadata={"app_user": end_user, "ai_model": model_id, "tool_name": tool_name}
                     )
 
                     # 3. Check if AIRS detected exfiltration or malicious data in the database return
@@ -666,7 +653,7 @@ async def chat(
                         # Append the successful tool scan to the raw logs so your UI can display it
                         if isinstance(ingress_data, dict):
                             ingress_data[f"tool_scan_{tool_name}"] = tool_data
-                # =====================================================================
+
 
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
 
