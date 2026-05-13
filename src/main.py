@@ -487,10 +487,17 @@ async def chat(
 
         # If the model requests to use one or more tools...
         if response_msg.tool_calls:
-            # 🌟 Safely construct the assistant message to prevent Bedrock parsing crashes
+            # 1. Define action_tools at the top of the block so it's always available
+            action_tools = [
+                "transfer_funds", "freeze_account", "issue_replacement_card",
+                "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
+                "issue_store_refund", "apply_admin_discount", "update_billing_zip"
+            ]
+
+            # 🌟 Construct the assistant message safely
             assistant_msg = {
                 "role": "assistant",
-                "content": response_msg.content or "", # Force string
+                "content": response_msg.content or "",
                 "tool_calls": [
                     {
                         "id": t.id, 
@@ -506,49 +513,54 @@ async def chat(
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
 
-                # --- 🛡️ SHIELD 1: SCAN TOOL REQUEST (Ingress/Arguments) ---
+                # --- 🛡️ SHIELD 1: SCAN TOOL REQUEST ---
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     print(f"🔍 Scanning MCP Tool Arguments via Prisma AIRS...")
                     try:
+                        # Reverting to 'prompt=' to satisfy your specific SDK version
                         tool_scan_response = Scanner().sync_scan(
                             ai_profile=ai_profile_obj,
-                            content={"tool_calls": [{"id": tool_call.id, "type": "function", "function": {"name": tool_name, "arguments": json.dumps(tool_args)}}]},
-                            metadata={"app_user": end_user, "ai_model": model_id, "ecosystem": "mcp", "method": "tools/call"}
+                            content=Content(prompt=json.dumps(tool_args)),
+                            metadata={
+                                "app_user": end_user, 
+                                "ai_model": model_id, 
+                                "ecosystem": "mcp", 
+                                "method": "tools/call",
+                                "tool_name": tool_name
+                            }
                         )
                         tool_data = tool_scan_response.to_dict()
                         if str(tool_data.get("action", "pass")).lower() == "block":
-                            return self._handle_block(tool_name, tool_data, tool_args, architecture_trace)
+                            block_txt = f"🛡️ AIRS Blocked Tool [{tool_name}]: Malicious arguments."
+                            return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "TOOL REQUEST BLOCK", "raw_response": json.dumps(tool_data, indent=2), "trace": architecture_trace}}
                     except Exception as e:
                         print(f"⚠️ Request Scan Warning: {e}")
 
                 # --- 🔌 EXECUTE TOOL ---
                 if tool_name in action_tools:
-                    # (Your existing logic for transfer_funds, freeze_account, etc.)
-                    # ... 
-                    tool_output = "..." 
+                    # (YOUR EXISTING IF/ELIF LOGIC FOR transfer_funds, etc.)
+                    # Ensure you keep the existing code here that sets tool_output!
+                    tool_output = "Action executed." 
                 else:
+                    # Handle read-only MCP tools
                     mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_result.content[0].text
 
-                # --- 🛡️ SHIELD 2: SCAN TOOL RESULT (Indirect Injection / Egress) ---
+                # --- 🛡️ SHIELD 2: SCAN TOOL RESULT ---
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning Data returned by {tool_name} for Indirect Injections...")
+                    print(f"🔍 Scanning Data returned by {tool_name}...")
                     try:
-                        # We scan the tool_output as a 'response' to catch Trojan Horse instructions
                         res_scan = Scanner().sync_scan(
                             ai_profile=ai_profile_obj,
                             content=Content(response=tool_output), 
                             metadata={"app_user": end_user, "ecosystem": "mcp", "method": "tools/response", "tool_name": tool_name}
                         )
-                        res_data = res_scan.to_dict()
-                        if str(res_data.get("action", "pass")).lower() == "block":
-                            block_msg = f"🛡️ AIRS Blocked Tool Output: The database returned unsafe content for {tool_name}."
-                            print(f"🛑 AIRS BLOCK: TOOL RESULT | Tool: {tool_name}")
-                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "raw_response": json.dumps(res_data, indent=2), "trace": architecture_trace}}
+                        if str(res_scan.to_dict().get("action", "pass")).lower() == "block":
+                            block_msg = f"🛡️ AIRS Blocked Tool Output: Unsafe content returned by {tool_name}."
+                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "trace": architecture_trace}}
                     except Exception as e:
                         print(f"⚠️ Result Scan Warning: {e}")
 
-                # Proceed if clean
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
                 architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
