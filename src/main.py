@@ -34,7 +34,7 @@ importlib.reload(rag_data)  # Force a fresh read of the file on every boot to pi
 # Prisma AIRS Imports (Enterprise LLM Security Scanning)
 import aisecurity
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
-from aisecurity.generated_openapi_client import ToolEvent
+from aisecurity.generated_openapi_client.models.tool_event import ToolEvent
 from aisecurity.scan.inline.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
