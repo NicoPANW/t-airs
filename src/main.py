@@ -448,12 +448,9 @@ async def chat(
         print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
         # If enforcement is at the gateway, add the 'guardrails' parameter to the request.
 
-        gateway_params_ingress = {}
-        gateway_params_egress = {}
-
+        gateway_params = {}
         if enforcement_placement == "gateway" and airs_enabled:
-            gateway_params_ingress = {"guardrails": ["airs-ingress-scan"]}
-            gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
+            gateway_params = {"guardrails": ["airs-ingress-scan", "airs-egress-scan"]}
 
         # Make the first call to the LLM. This may result in a text response or a tool call request.
         raw_response = await llm_client.chat.completions.with_raw_response.create(
@@ -462,7 +459,7 @@ async def chat(
             tools=active_tools if active_tools else None,
             temperature=0.7,
             user=end_user,
-            extra_body=gateway_params_ingress
+            extra_body=gateway_params
         )
 
         response = raw_response.parse()
@@ -633,7 +630,7 @@ async def chat(
                 messages=messages,
                 temperature=0.7,
                 user=end_user,
-                extra_body=gateway_params_egress
+                extra_body=gateway_params
             )
             bot_response = final_response.choices[0].message.content or ""
         else:
