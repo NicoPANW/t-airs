@@ -267,6 +267,7 @@ async def lifespan(app: FastAPI):
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
+            # 📞 CALL TO PRISMA AIRS: Healthcheck scan to verify connectivity on startup.
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
@@ -401,6 +402,7 @@ async def chat(
         execution_phase = "Initial Inference"
 
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+            # 📞 CALL TO PRISMA AIRS: App-level ingress scan of the user's prompt.
             scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
@@ -450,9 +452,11 @@ async def chat(
 
         gateway_params = {}
         if enforcement_placement == "gateway" and airs_enabled:
+            # This parameter instructs the LiteLLM AI Gateway to perform the AIRS scan.
             gateway_params = {"guardrails": ["airs-ingress-scan", "airs-egress-scan"]}
 
         # Make the first call to the LLM. This may result in a text response or a tool call request.
+        # 📞 INDIRECT CALL TO PRISMA AIRS: If 'guardrails' are enabled, the AI Gateway will call AIRS before and after calling the LLM.
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
             messages=messages,
@@ -623,15 +627,17 @@ async def chat(
 
             gateway_params_turn_2 = {}
             if enforcement_placement == "gateway" and airs_enabled:
+                # This parameter instructs the LiteLLM AI Gateway to perform the egress scan.
                 gateway_params_turn_2 = {"guardrails": ["airs-egress-scan"]}
 
+            # 📞 INDIRECT CALL TO PRISMA AIRS: If 'guardrails' are enabled, the AI Gateway will call AIRS to scan the LLM's final response.
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
                 tools=active_tools if active_tools else None,
                 temperature=0.7,
                 user=end_user,
-                extra_body=gateway_params_turn_2  # 👈 Make sure this uses the new variable!
+                extra_body=gateway_params_turn_2
             )
             bot_response = final_response.choices[0].message.content or ""
         else:
@@ -645,6 +651,7 @@ async def chat(
         # --- 5. EGRESS SCAN (App-Level) ---
         # If enforcement is set to 'app', scan the LLM's final response before sending it to the user.
         if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
+            # 📞 CALL TO PRISMA AIRS: App-level egress scan of the LLM's final response.
             out_scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),
