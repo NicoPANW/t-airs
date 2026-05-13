@@ -618,10 +618,9 @@ async def chat(
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
                     
-                    # 1. Instantiate the ToolEvent object strictly using its Pydantic fields
+                    # 1. Pass the ENTIRE MCP array as a single string into the input field
                     mcp_event_obj = ToolEvent(
-                        input=json.dumps(tool_args),
-                        output=json.dumps({"result": tool_output})
+                        input=json.dumps(mcp_airs_payload)
                     )
                     
                     # 2. Pass the object to the 'tool_event' parameter
