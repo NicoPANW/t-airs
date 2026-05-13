@@ -611,7 +611,7 @@ async def chat(
                     mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_result.content[0].text
 
-                if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     # 1. Construct the exact MCP JSON array that the AIRS UI recognizes
                     mcp_airs_payload = [
                         {
