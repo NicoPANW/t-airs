@@ -606,6 +606,11 @@ async def chat(
 
                     tool_output += " (Transaction permanently recorded in backend database)."
 
+                else:
+                    # --- B) Handle standard MCP Read-Only Tools ---
+                    mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
+                    tool_output = mcp_result.content[0].text
+
                 if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     # 1. Construct the exact MCP JSON array that the AIRS UI recognizes
                     mcp_airs_payload = [
@@ -664,7 +669,7 @@ async def chat(
                 # =====================================================================
 
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
-                
+
                 # Record the tool execution details for the UI trace.
                 architecture_trace["mcp_execution"].append({
                     "tool": tool_name,
