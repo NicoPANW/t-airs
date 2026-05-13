@@ -505,6 +505,41 @@ async def chat(
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
 
+                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    print(f"🔍 Scanning MCP Tool Payload via Prisma AIRS...")
+                    try:
+                        # Scan the raw JSON tool arguments for malicious injections before executing
+                        tool_scan_response = Scanner().sync_scan(
+                            ai_profile=ai_profile_obj,
+                            content=Content(prompt=json.dumps(tool_args)),
+                            metadata={
+                                "app_user": end_user, 
+                                "ai_model": model_id, 
+                                "ecosystem": "mcp", 
+                                "method": "tools/call",
+                                "tool_name": tool_name
+                            }
+                        )
+                        tool_res_data = tool_scan_response.to_dict()
+                        tool_data = tool_res_data[0] if isinstance(tool_res_data, list) and len(tool_res_data) > 0 else tool_res_data
+
+                        # If AIRS catches a malicious payload inside the tool arguments, abort!
+                        if str(tool_data.get("action", "pass")).lower() == "block":
+                            block_txt = f"🛡️ App-Level AIRS Blocked Tool [{tool_name}]: Malicious payload detected."
+                            print(f"🛑 AIRS APP BLOCK: TOOL | Category: {tool_data.get('category', 'Policy')}")
+                            return {
+                                "bot": block_txt, 
+                                "output": block_txt, 
+                                "logs": {
+                                    "security_scan": f"TOOL BLOCK ({tool_name})", 
+                                    "raw_response": json.dumps(tool_data, indent=2), 
+                                    "trace": architecture_trace,
+                                    "intercepted_text": json.dumps(tool_args)
+                                }
+                            }
+                    except Exception as scan_err:
+                        print(f"⚠️ Tool Scan Warning: {scan_err}")
+
                 # --- A) Handle Custom Action Tools (that perform writes/updates) ---
                 action_tools = [
                     "transfer_funds", "freeze_account", "issue_replacement_card",
