@@ -511,13 +511,22 @@ async def chat(
                         # Scan the raw JSON tool arguments for malicious injections before executing
                         tool_scan_response = Scanner().sync_scan(
                             ai_profile=ai_profile_obj,
-                            content=Content(tool=json.dumps(tool_args)),
+                            # ✅ FIX: Drop the Content() class wrapper and pass a raw dictionary!
+                            content={
+                                "tool_calls": [{
+                                    "id": tool_call.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool_name, 
+                                        "arguments": json.dumps(tool_args)
+                                    }
+                                }]
+                            },
                             metadata={
                                 "app_user": end_user, 
                                 "ai_model": model_id, 
                                 "ecosystem": "mcp", 
-                                "method": "tools/call",
-                                "tool_name": tool_name
+                                "method": "tools/call"
                             }
                         )
                         tool_res_data = tool_scan_response.to_dict()
