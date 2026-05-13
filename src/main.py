@@ -35,6 +35,7 @@ importlib.reload(rag_data)  # Force a fresh read of the file on every boot to pi
 import aisecurity
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
 from aisecurity.generated_openapi_client.models.tool_event import ToolEvent
+from aisecurity.generated_openapi_client.models.tool_event_metadata import ToolEventMetadata
 from aisecurity.scan.inline.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
@@ -618,22 +619,24 @@ async def chat(
                 if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
                     
-                    # 1. Instantiate the ToolEvent. AIRS will automatically synthesize 
-                    # the beautiful MCP array for the UI based on these three fields!
+                    # 1. Strictly instantiate the Metadata object
+                    mcp_metadata = ToolEventMetadata(tool_name=tool_name)
+
+                    # 2. Instantiate the ToolEvent using the strictly typed objects
                     mcp_event_obj = ToolEvent(
-                        metadata={"tool_name": tool_name}, # ✅ REQUIRED: Gives the backend the context it needs
+                        metadata=mcp_metadata,
                         input=json.dumps(tool_args),
                         output=json.dumps({"result": tool_output})
                     )
                     
-                    # 2. Pass the object to the 'tool_event' parameter
+                    # 3. Pass the object to the 'tool_event' parameter
                     tool_scan_response = Scanner().sync_scan(
                         ai_profile=ai_profile_obj,
                         content=Content(tool_event=mcp_event_obj),
                         metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
                     )
 
-                    # 3. Check if AIRS detected exfiltration or malicious data in the database return
+                    # 4. Check if AIRS detected exfiltration or malicious data in the database return
                     tool_res_data = tool_scan_response.to_dict()
                     tool_data = tool_res_data[0] if isinstance(tool_res_data, list) and len(tool_res_data) > 0 else tool_res_data
 
@@ -656,7 +659,6 @@ async def chat(
                         if isinstance(ingress_data, dict):
                             ingress_data[f"tool_scan_{tool_name}"] = tool_data
                 # =====================================================================
-
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
 
                 # Record the tool execution details for the UI trace.
