@@ -52,21 +52,6 @@
             </div>
             
             <div class="sidebar-section">
-                
-                <div class="mb-4 flex items-center justify-between bg-slate-800/50 p-2 rounded-lg border border-slate-700">
-                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Placement</span>
-                    <div class="flex gap-1 bg-slate-900 p-1 rounded-md shadow-inner">
-                        <label class="cursor-pointer" title="Scans only Ingress/Egress locally">
-                            <input type="radio" name="enforcement" value="prompt_only" class="peer sr-only">
-                            <div class="px-2 py-1 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm">PROMPT-ONLY</div>
-                        </label>
-                        <label class="cursor-pointer" title="Scans Prompt, RAG, and MCP Tools">
-                            <input type="radio" name="enforcement" value="gateway" class="peer sr-only" checked>
-                            <div class="px-2 py-1 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm">AI GATEWAY</div>
-                        </label>
-                    </div>
-                </div>
-
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
                         <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-blue-400"></i>
@@ -83,6 +68,20 @@
                 <div class="flex flex-col gap-1 overflow-hidden">
                     <span id="airs-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
                     <span id="airs-profile-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter">NO_PROFILE</span>
+                </div>
+
+                <div class="mt-4 flex flex-col gap-2 bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center mb-0.5">Placement</span>
+                    <div class="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-md shadow-inner">
+                        <label class="cursor-pointer text-center" title="Scans only Ingress/Egress locally">
+                            <input type="radio" name="enforcement" value="prompt_only" class="peer sr-only">
+                            <div class="px-1 py-1.5 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm truncate">PROMPT-ONLY</div>
+                        </label>
+                        <label class="cursor-pointer text-center" title="Scans Prompt, RAG, and MCP Tools">
+                            <input type="radio" name="enforcement" value="gateway" class="peer sr-only" checked>
+                            <div class="px-1 py-1.5 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm truncate">AI GATEWAY</div>
+                        </label>
+                    </div>
                 </div>
             </div>
 
