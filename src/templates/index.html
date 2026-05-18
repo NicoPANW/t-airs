@@ -51,26 +51,9 @@
                 </div>
             </div>
             
-            <div class="sidebar-section">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-blue-400"></i>
-                        <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">AIRS Protection</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="airs-toggle" class="sr-only peer" checked>
-                        <div class="w-8 h-4 bg-slate-600 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4 shadow-sm"></div>
-                    </label>
-                </div>
-                <div id="airs-status-light" class="w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
-                    <div id="status-bar" class="w-0 h-full bg-slate-500 transition-all duration-700"></div>
-                </div>
-                <div class="flex flex-col gap-1 overflow-hidden">
-                    <span id="airs-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
-                    <span id="airs-profile-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter">NO_PROFILE</span>
-                </div>
-
-                <div class="mt-4 flex flex-col gap-2 bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
+            <div class="sidebar-section flex flex-col gap-3">
+                
+                <div class="flex flex-col gap-2 bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
                     <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center mb-0.5">Placement</span>
                     <div class="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-md shadow-inner">
                         <label class="cursor-pointer text-center" title="Scans only Ingress/Egress locally">
@@ -83,6 +66,29 @@
                         </label>
                     </div>
                 </div>
+
+                <div class="flex flex-col bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-blue-400"></i>
+                            <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">AIRS Protection</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="airs-toggle" class="sr-only peer" checked>
+                            <div class="w-8 h-4 bg-slate-600 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4 shadow-sm"></div>
+                        </label>
+                    </div>
+                    
+                    <div id="airs-status-light" class="w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
+                        <div id="status-bar" class="w-0 h-full bg-slate-500 transition-all duration-700"></div>
+                    </div>
+                    
+                    <div class="flex flex-col gap-0.5 overflow-hidden">
+                        <span id="airs-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
+                        <span id="airs-profile-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter">NO_PROFILE</span>
+                    </div>
+                </div>
+
             </div>
 
             <div class="sidebar-section">
@@ -392,7 +398,7 @@
                     } else if (statusText.includes("EGRESS BLOCK")) {
                         borderColor = "border-l-orange-500";
                         badgeColor = "bg-orange-900/50 text-orange-400";
-                    } else if (statusText.includes("Passed")) {
+                    } else if (statusText.includes("Passed") || statusText.includes("Passed App")) {
                         borderColor = "border-l-green-500";
                         badgeColor = "bg-green-900/50 text-green-400";
                     }
@@ -400,7 +406,7 @@
                     let traceHtml = "";
                     if (data.logs.trace) {
                         
-                        // 🌟 1. RAG Pipeline (Updated to handle Rejected Data)
+                        // 🌟 1. RAG Pipeline
                         if (data.logs.trace.rag_pipeline) {
                             const chunks = data.logs.trace.rag_pipeline.chunks_injected || [];
                             const rejectedChunks = data.logs.trace.rag_pipeline.chunks_rejected || [];
