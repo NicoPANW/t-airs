@@ -415,8 +415,9 @@ async def chat(
 
             # If AIRS returns a 'block' action, abort the request immediately.
             if str(ingress_data.get("action", "pass")).lower() == "block":
-                block_txt = f"🛡️ App-Level AIRS Blocked Input: {ingress_data.get('category', 'Policy')} violation."
-                print(f"🛑 AIRS APP BLOCK: INGRESS | Category: {ingress_data.get('category', 'Policy')}")
+                category = str(ingress_data.get("category", "Security")).capitalize()
+                block_txt = f"🛡️ Blocked by Prisma AIRS [User ➔ LLM]: {category} policy violation."
+                print(f"🛑 AIRS BLOCK: INGRESS | Category: {category}")
                 print(f"🏁 REQUEST ABORTED | Security Status: Blocked by App SDK")
                 print(f"{'='*40}\n")
                 return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK (User ➔ LLM)", "raw_response": json.dumps(ingress_data, indent=2), "trace": architecture_trace}}
@@ -651,8 +652,9 @@ async def chat(
                     tool_data = tool_res_data[0] if isinstance(tool_res_data, list) and len(tool_res_data) > 0 else tool_res_data
 
                     if str(tool_data.get("action", "pass")).lower() == "block":
-                        block_txt = f"🛡️ App-Level AIRS Blocked Tool: '{tool_name}' returned a {tool_data.get('category', 'Data Exfiltration')} violation."
-                        print(f"🛑 AIRS APP BLOCK: TOOL ({tool_name}) | Category: {tool_data.get('category', 'Policy')}")
+                        category = str(tool_data.get("category", "Security")).capitalize()
+                        block_txt = f"🛡️ Blocked by Prisma AIRS [MCP Tool ➔ LLM]: '{tool_name}' returned a {category} policy violation."
+                        print(f"🛑 AIRS BLOCK: TOOL ({tool_name}) | Category: {category}")
                         
                         # Abort the request before the LLM can read the malicious database output
                         return {
@@ -719,8 +721,9 @@ async def chat(
 
             # If AIRS blocks the output, abort and show the block message.
             if str(out_data.get("action", "pass")).lower() == "block":
-                block_txt = f"🛡️ App-Level AIRS Blocked Output: The LLM generated a {out_data.get('category', 'Policy')} violation."
-                print(f"🛑 AIRS APP BLOCK: EGRESS | Category: {out_data.get('category', 'Policy')}")
+                category = str(out_data.get("category", "Security")).capitalize()
+                block_txt = f"🛡️ Blocked by Prisma AIRS [LLM ➔ User]: {category} policy violation."
+                print(f"🛑 AIRS BLOCK: EGRESS | Category: {category}")
                 print(f"🏁 REQUEST ABORTED | Security Status: Blocked by App SDK")
                 print(f"{'='*40}\n")
                 return {
