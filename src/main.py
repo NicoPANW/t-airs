@@ -269,6 +269,7 @@ async def lifespan(app: FastAPI):
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
+            # 📞 CALL TO PRISMA AIRS: Healthcheck scan to verify connectivity on startup.
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
@@ -399,10 +400,11 @@ async def chat(
 
     try:
         # --- 1. INGRESS SCAN (App-Level) ---
-        # If enforcement is set to 'app', scan the user's prompt before it reaches the LLM.
+        # If enforcement is set to 'prompt_only', scan the user's prompt before it reaches the LLM.
         execution_phase = "Initial Inference"
 
-        if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+        if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+            # 📞 CALL TO PRISMA AIRS: App-level ingress scan of the user's prompt ONLY.
             scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
@@ -454,10 +456,12 @@ async def chat(
         gateway_params_egress = {}
 
         if enforcement_placement == "gateway" and airs_enabled:
+            # This parameter instructs the LiteLLM AI Gateway to perform the ingress scan.
             gateway_params_ingress = {"guardrails": ["airs-ingress-scan"]}
             gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
 
         # Make the first call to the LLM. This may result in a text response or a tool call request.
+        # 📞 INDIRECT CALL TO PRISMA AIRS: If 'guardrails' are enabled, the AI Gateway will call AIRS to scan the user's prompt (ingress).
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
             messages=messages,
@@ -613,15 +617,16 @@ async def chat(
                     mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_result.content[0].text
 
-               # =====================================================================
-                # 🚀 NEW: SCAN MCP TOOL EXECUTION WITH AIRS
                 # =====================================================================
-                if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                # 🚀 NEW: SCAN MCP TOOL EXECUTION WITH AIRS (GATEWAY ONLY)
+                # =====================================================================
+                # This scan will ONLY fire if the user wants the deep "Gateway" holistic scan.
+                if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
                     
                     # 1. Strictly instantiate the Metadata object with the exact SDK fields
                     mcp_metadata = ToolEventMetadata(
-                        tool_invoked=tool_name, # ✅ The exact keyword we've been looking for!
+                        tool_invoked=tool_name,
                         ecosystem="mcp",
                         method="tools/call",
                         server_name="mcp-server-sqlite"
@@ -664,6 +669,7 @@ async def chat(
                         if isinstance(ingress_data, dict):
                             ingress_data[f"tool_scan_{tool_name}"] = tool_data
                 # =====================================================================
+                
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
 
                 # Record the tool execution details for the UI trace.
@@ -679,8 +685,10 @@ async def chat(
 
             gateway_params_egress = {}
             if enforcement_placement == "gateway" and airs_enabled:
+                # This parameter instructs the LiteLLM AI Gateway to perform the egress scan.
                 gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
 
+            # 📞 INDIRECT CALL TO PRISMA AIRS: If 'guardrails' are enabled, the AI Gateway will call AIRS to scan the LLM's final response (egress).
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
@@ -698,8 +706,9 @@ async def chat(
         architecture_trace["llm_generation"] = bot_response
 
         # --- 5. EGRESS SCAN (App-Level) ---
-        # If enforcement is set to 'app', scan the LLM's final response before sending it to the user.
-        if enforcement_placement == "app" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
+        # If enforcement is set to 'prompt_only', scan the LLM's final response before sending it to the user.
+        if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
+            # 📞 CALL TO PRISMA AIRS: App-level egress scan of the LLM's final response ONLY.
             out_scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),

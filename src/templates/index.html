@@ -73,11 +73,11 @@
                 <div class="mt-3 flex items-center justify-between bg-slate-800/50 p-2 rounded-lg border border-slate-700">
                     <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Placement</span>
                     <div class="flex gap-1 bg-slate-900 p-1 rounded-md shadow-inner">
-                        <label class="cursor-pointer">
-                            <input type="radio" name="enforcement" value="app" class="peer sr-only">
-                            <div class="px-2 py-1 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm">APP</div>
+                        <label class="cursor-pointer" title="Scans only Ingress/Egress locally">
+                            <input type="radio" name="enforcement" value="prompt_only" class="peer sr-only">
+                            <div class="px-2 py-1 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm">PROMPT-ONLY</div>
                         </label>
-                        <label class="cursor-pointer">
+                        <label class="cursor-pointer" title="Scans Prompt, RAG, and MCP Tools">
                             <input type="radio" name="enforcement" value="gateway" class="peer sr-only" checked>
                             <div class="px-2 py-1 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm">AI GATEWAY</div>
                         </label>
