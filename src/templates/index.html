@@ -7,11 +7,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        /* * Custom scrollbar styling to keep the UI looking sleek and modern.
+         * Specific scrollbars are targeted for the chat, the system prompt text area,
+         * and the left configuration sidebar.
+         */
         .chat-container::-webkit-scrollbar { width: 6px; }
         .chat-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
+        /* * .log-hidden is used to smoothly collapse the right-side Observability Trace panel 
+         * when the "Inspector Logs" button is toggled.
+         */
         .log-hidden { width: 0 !important; opacity: 0; pointer-events: none; border-left: none !important; }
         #log-panel { transition: all 0.3s ease; }
+        
+        /* Highlight local LLM options in the dropdown differently than cloud models */
         #model-select option.local-option { background-color: #1e293b; color: #60a5fa; font-weight: bold; }
+        
         #persona-context-display::-webkit-scrollbar { width: 4px; }
         #persona-context-display::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
         .sidebar-scroll::-webkit-scrollbar { width: 4px; }
@@ -19,6 +30,7 @@
         .sidebar-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
 
+        /* Reusable card styling for the left sidebar configuration blocks */
         .sidebar-section {
             background-color: rgba(30, 41, 59, 0.4);
             border: 1px solid rgba(51, 65, 85, 0.5);
@@ -200,13 +212,19 @@
     </aside>
 
     <script>
-        lucide.createIcons();
+        lucide.createIcons(); // Initialize all data-lucide icons
+        
+        // Generate a random session ID on boot to isolate this conversation's history
         let sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+        
         const chatForm = document.getElementById('chat-form');
         const chatBox = document.getElementById('chat-box');
         const logContainer = document.getElementById('log-container');
 
-        // Fetch System Prompt into Editable Textarea
+        /**
+         * Fetch the predefined system prompt for the selected persona (Banking/Travel/EShop)
+         * and populate the editable textarea in the left sidebar.
+         */
         async function updatePersonaDisplay(personaId) {
             const display = document.getElementById('persona-context-display');
             try {
@@ -217,7 +235,9 @@
             } catch (e) { display.value = "Error loading context."; }
         }
 
-        // Save System Prompt Logic
+        /**
+         * Handles saving changes made to the system prompt in the UI back to the server.
+         */
         document.getElementById('save-persona-btn').addEventListener('click', async () => {
             const btn = document.getElementById('save-persona-btn');
             const newContext = document.getElementById('persona-context-display').value;
@@ -241,13 +261,17 @@
                 btn.classList.replace("bg-orange-500", "bg-red-500");
             }
             
+            // Revert button state after 2 seconds
             setTimeout(() => {
                 btn.innerText = "SAVE";
                 btn.className = "text-[9px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded hover:bg-orange-500/40 transition font-bold tracking-widest cursor-pointer";
             }, 2000);
         });
 
-        // Fetch AI Models and populate the dropdown
+        /**
+         * Queries the Python backend to fetch the list of AI models discovered 
+         * on the LiteLLM Gateway and populates the dropdown list.
+         */
         async function fetchModels() {
             try {
                 const res = await fetch('/models');
@@ -257,13 +281,16 @@
                 const submitBtn = chatForm.querySelector('button[type="submit"]');
 
                 if (data.models && data.models.length > 0) {
+                    // Filter out the internal 'auto-router' alias from the raw list
                     const cleanModels = data.models.filter(m => m !== 'auto-router');
 
+                    // Differentiate local models (e.g., Ollama) from cloud models visually
                     select.innerHTML = cleanModels.map(m => {
                         const isLocal = m.startsWith('local-');
                         return `<option value="${m}" class="${isLocal ? 'local-option' : ''}">${isLocal ? '🏠 ' + m + ' (Local)' : '☁️ ' + m}</option>`;
                     }).join('');
                     
+                    // Enable chat input if models are found
                     if (cleanModels.length > 0) {
                         select.value = cleanModels[0];
                         if (!document.getElementById('auto-route-toggle').checked) {
@@ -274,6 +301,7 @@
                         msgInput.placeholder = "Enter attack vector or prompt...";
                     }
                 } else {
+                    // Disable chat input if no models are available
                     select.innerHTML = '<option value="">❌ No Cloud LLMs Detected</option>';
                     document.getElementById('engine-tag').innerText = "OFFLINE";
                     msgInput.disabled = true;
@@ -284,7 +312,11 @@
             }
         }
 
-        // Check AIRS Status
+        /**
+         * [🔍 AIRS HEALTH CHECK INITIALIZATION]
+         * Queries the Python backend to see if the Prisma AIRS SDK successfully 
+         * authenticated and loaded the Security Profile during server boot.
+         */
         async function checkAirsHealth() {
             try {
                 const res = await fetch('/health-airs');
@@ -292,6 +324,7 @@
                 const bar = document.getElementById('status-bar');
                 const statusText = document.getElementById('airs-status-text');
 
+                // Visual updates based on SDK connection state
                 if (data.status === "connected") {
                     bar.className = "w-full h-full bg-green-500 shadow-[0_0_8px_#22c55e]";
                     statusText.innerText = "CONNECTED Prisma AIRS profile";
@@ -306,7 +339,9 @@
             } catch (e) {}
         }
 
-        // Top Header Radio Buttons Change Logic
+        // --- Event Listeners for UI interaction ---
+        
+        // Update Persona textarea when user clicks different radio tabs
         document.querySelectorAll('input[name="persona"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 const val = e.target.value;
@@ -314,13 +349,15 @@
             });
         });
 
-        // Model Dropdown Change Logic
+        // Update the tiny engine badge when a new model is selected
         document.getElementById('model-select').addEventListener('change', (e) => {
             document.getElementById('engine-tag').innerText = e.target.value;
         });
 
-        // UI Toggles
+        // Toggle the right-hand Observability panel visibility
         document.getElementById('toggle-logs').addEventListener('click', () => document.getElementById('log-panel').classList.toggle('log-hidden'));
+        
+        // Generate a new Session ID and clear the screen
         document.getElementById('reset-session').addEventListener('click', () => {
             if(confirm("Start a fresh session? This clears chat and generates a new session ID.")) {
                 sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
@@ -329,6 +366,9 @@
             }
         });
 
+        /**
+         * Helper function to build and inject the HTML for a user or bot message bubble.
+         */
         function appendMessage(role, text) {
             const isBot = role === 'bot';
             const html = `<div class="flex gap-3 ${isBot ? '' : 'flex-row-reverse ml-auto'} max-w-[85%] animate-in fade-in slide-in-from-bottom-2">
@@ -344,9 +384,13 @@
             lucide.createIcons();
         }
 
-        // Chat Submit
+        // =====================================================================
+        // CORE CHAT SUBMISSION LOGIC
+        // =====================================================================
         chatForm.onsubmit = async (e) => {
             e.preventDefault();
+            
+            // Determine which model to send based on manual/auto UI state
             const isAuto = document.getElementById('auto-route-toggle').checked;
             const modelId = isAuto ? "auto-router" : document.getElementById('model-select').value;
             
@@ -355,39 +399,63 @@
                 return; 
             }
 
+            // Gather all configuration variables from the left sidebar UI
             const historyToggle = document.getElementById('history-toggle');
             const historyEnabled = historyToggle ? historyToggle.checked : true;
-
             const msgInput = document.getElementById('msg');
             const message = msgInput.value;
             const persona = document.querySelector('input[name="persona"]:checked').value;
-            const airsEnabled = document.getElementById('airs-toggle').checked;
-            const enforcementPlacement = document.querySelector('input[name="enforcement"]:checked').value;
             const endUser = document.getElementById('end-user-input').value || "user1";
 
+            // [🔍 AIRS SCANNER INVOCATION TRIGGER]
+            // We capture these two variables to tell the Python backend exactly HOW to scan.
+            // airsEnabled: Master on/off switch for security.
+            // enforcementPlacement: 'prompt_only' (fast local check) OR 'gateway' (deep proxy check).
+            const airsEnabled = document.getElementById('airs-toggle').checked;
+            const enforcementPlacement = document.querySelector('input[name="enforcement"]:checked').value;
+
+            // Display user message immediately
             appendMessage('user', message);
             msgInput.value = '';
 
+            // Render a loading indicator
             const loadId = 'l-' + Date.now();
             chatBox.insertAdjacentHTML('beforeend', `<div id="${loadId}" class="text-[10px] text-slate-400 ml-11 italic flex items-center gap-2"><div class="w-1 h-1 bg-slate-400 rounded-full animate-ping"></div>Processing Request...</div>`);
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
+                // Post all configurations and the message to the Python backend
                 const res = await fetch('/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: new URLSearchParams({
-                        'message': message, 'persona': persona, 'session_id': sessionId,
-                        'airs_enabled': airsEnabled, 'model_id': modelId, 'history_enabled': historyEnabled,
-                        'enforcement_placement': enforcementPlacement, 'end_user': endUser
+                        'message': message, 
+                        'persona': persona, 
+                        'session_id': sessionId,
+                        'airs_enabled': airsEnabled, 
+                        'model_id': modelId, 
+                        'history_enabled': historyEnabled,
+                        'enforcement_placement': enforcementPlacement, 
+                        'end_user': endUser
                     })
                 });
+                
                 const data = await res.json();
+                
+                // Remove loading indicator
                 if (document.getElementById(loadId)) document.getElementById(loadId).remove();
 
                 if (data.bot) {
+                    // Display the final text response from the LLM
                     appendMessage('bot', data.bot);
                     
+                    // =========================================================
+                    // OBSERVABILITY TRACE RENDERING
+                    // =========================================================
+                    // Parses the rich `architecture_trace` object returned by the backend
+                    // to visualize RAG grounding, Tool Execution, and Security Blocks.
+
+                    // Determine border/badge colors based on security scan outcome
                     const statusText = data.logs.security_scan || "";
                     let borderColor = "border-l-slate-500";
                     let badgeColor = "bg-slate-900/50 text-slate-400";
@@ -406,7 +474,7 @@
                     let traceHtml = "";
                     if (data.logs.trace) {
                         
-                        // 🌟 1. RAG Pipeline
+                        // 🌟 1. Render RAG Pipeline Data
                         if (data.logs.trace.rag_pipeline) {
                             const chunks = data.logs.trace.rag_pipeline.chunks_injected || [];
                             const rejectedChunks = data.logs.trace.rag_pipeline.chunks_rejected || [];
@@ -428,6 +496,7 @@
                                     </div>`;
                             }
 
+                            // Show chunks that ChromaDB rejected due to high distance (irrelevance)
                             let rejectedHtml = "";
                             if (rejectedChunks.length > 0) {
                                 let rejectedList = rejectedChunks.map(c => `[Distance: ${c.distance}] ${c.text}`).join('\n\n');
@@ -455,7 +524,7 @@
                                 </div>`;
                         }
 
-                        // 2. AI Gateway
+                        // 2. Render AI Gateway routing decision
                         if (data.logs.trace.ai_gateway && data.logs.trace.ai_gateway.routed_to) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
@@ -464,7 +533,7 @@
                                 </div>`;
                         }
 
-                        // 3. MCP
+                        // 3. Render MCP Tool Executions (e.g. database query inputs/outputs)
                         if (data.logs.trace.mcp_execution && data.logs.trace.mcp_execution.length > 0) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
@@ -473,7 +542,7 @@
                                 </div>`;
                         }
                         
-                        // 4. LLM Raw Text Output
+                        // 4. Render LLM Raw Text Output
                         if (data.logs.trace.llm_generation) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
@@ -482,7 +551,10 @@
                                 </div>`;
                         }
                     }
-                    // --- ASSEMBLE FULL LOG PANEL ---
+
+                    // --- [🔍 AIRS SCAN RESULT RENDERING] ---
+                    // 5. ASSEMBLE FULL LOG PANEL & RENDER SECURITY OUTCOMES
+                    // This block visualizes the JSON generated by Prisma AIRS SDK or Gateway hooks
                     const logHtml = `
                         <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${borderColor} transition-all hover:bg-slate-800/60">
                             <div class="flex justify-between text-[9px] text-blue-400 mb-2 border-b border-slate-700/50 pb-1 font-bold">
@@ -514,6 +586,7 @@
                             </div>
                         </div>`;
                     
+                    // Inject the assembled trace into the Right Sidebar
                     logContainer.insertAdjacentHTML('afterbegin', logHtml);
                 }
             } catch (err) {
@@ -522,12 +595,13 @@
             }
         };
 
-        // Auto-Router Toggle Logic
+        // --- Auto-Router UI State Logic ---
         const autoToggle = document.getElementById('auto-route-toggle');
         const manualContainer = document.getElementById('manual-model-container');
         const autoContainer = document.getElementById('auto-model-container');
         const engineTag = document.getElementById('engine-tag');
 
+        // Swap between manual dropdown and Auto-Router visual state
         autoToggle.addEventListener('change', (e) => {
             if (e.target.checked) {
                 manualContainer.classList.add('hidden');
@@ -541,6 +615,7 @@
             lucide.createIcons();
         });
 
+        // Initialize application state on page load
         window.addEventListener('DOMContentLoaded', () => {
             fetchModels();
             checkAirsHealth();
