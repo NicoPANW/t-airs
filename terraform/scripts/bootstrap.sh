@@ -177,9 +177,9 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       model: vertex_ai/gemini-3.1-pro-preview
       vertex_project: "${gcp_project}"
       vertex_location: "global"
-  - model_name: gemini-3.1-flash-lite-preview
+  - model_name: gemini-3.1-flash-lite
     litellm_params:
-      model: vertex_ai/gemini-3.1-flash-lite-preview
+      model: vertex_ai/gemini-3.1-flash-lite
       vertex_project: "${gcp_project}"
       vertex_location: "global"
   - model_name: gemini-2.5-pro
@@ -206,7 +206,7 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       vertex_location: "global"
   - model_name: auto-router
     litellm_params:
-      model: vertex_ai/gemini-3.1-flash-lite-preview
+      model: vertex_ai/gemini-3.1-flash-lite
       vertex_project: "${gcp_project}"
       vertex_location: "global"
   - model_name: auto-router
