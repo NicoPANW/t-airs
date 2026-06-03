@@ -339,7 +339,7 @@ async def chat(
         gateway_params_ingress = {}
         if enforcement_placement == "gateway" and airs_enabled:
             # LiteLLM scans for malicious MCP tool usage right at the Gateway proxy level
-            gateway_params_ingress = {"guardrails": ["airs-mcp-scan"]}
+            gateway_params_ingress = {"guardrails": ["airs-mcp-scan", "airs-egress-scan"]}
 
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
