@@ -160,7 +160,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
             else:
                 rejected_docs.append({"text": doc, "distance": round(dist, 2)})
         if filtered_docs:
-            formatted_text = "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(filtered_docs)
+            formatted_text = "\n[DATA RETRIEVED VIA RAG]:\n" + "\n".join(filtered_docs)
             return formatted_text, filtered_docs, rejected_docs
     except Exception as e:
         print(f"RAG Retrieval Error: {e}")
