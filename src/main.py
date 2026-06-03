@@ -421,7 +421,7 @@ async def chat(
                         src, dst, amt = tool_args.get("source_account"), tool_args.get("dest_account"), tool_args.get("amount")
                         await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"})
                         await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"})
-                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} executed."
+                        tool_output = f"⚠️ Wire transfer of ${amt} executed."
                     elif tool_name == "freeze_account":
                         acc, reason = tool_args.get("account_id"), tool_args.get("reason")
                         await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
@@ -461,7 +461,21 @@ async def chat(
                 else:
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_res.content[0].text
-                
+                # --- FIXED CODE ---
+                else:
+                    mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
+                    raw_text = mcp_res.content[0].text
+    
+                    try:
+        # If it's a string representation of a Python object, parse it safely
+                        parsed_data = ast.literal_eval(raw_text)
+        # Re-serialize it into standard compliant JSON using double quotes
+                        tool_output = json.dumps(parsed_data)
+                    except Exception:
+        # Fallback if it's already plain text
+                        tool_output = raw_text
+
+
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
                 architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
