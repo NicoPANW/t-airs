@@ -282,9 +282,10 @@ async def chat(
 
     try:
         # =====================================================================
-        # 1. LOCAL INGRESS SCAN (Always runs to protect the System Prompt)
+        # 1. LOCAL INGRESS SCAN 
+        # (Only executes for the user's raw prompt if "prompt_only" is selected)
         # =====================================================================
-        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+        if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
             scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
@@ -305,28 +306,11 @@ async def chat(
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
         # =====================================================================
-        # 2. RAG CONTEXT RETRIEVAL & SCAN
+        # 2. RAG CONTEXT RETRIEVAL
         # =====================================================================
         rag_context, raw_rag_docs, rejected_rag_docs = await asyncio.to_thread(retrieve_rag_context, message, persona)
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         architecture_trace["rag_pipeline"]["chunks_rejected"] = rejected_rag_docs
-
-        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and rag_context:
-            print(f"🔍 Scanning RAG Context via AIRS...")
-            try:
-                rag_scan = Scanner().sync_scan(
-                    ai_profile=ai_profile_obj,
-                    content=Content(prompt=rag_context), 
-                    metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "rag_data"}
-                )
-                r_data = rag_scan.to_dict()
-                if str(r_data.get("action", "pass")).lower() == "block":
-                    category = str(r_data.get("category", "Security")).capitalize()
-                    block_msg = f"🛡️ AIRS Blocked RAG Retrieval: {category} violation (Indirect Injection detected)."
-                    print(f"🛑 AIRS BLOCK: RAG DATA | Category: {category}")
-                    return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "RAG DATA BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
-            except Exception as e: 
-                print(f"⚠️ RAG Scan Error: {e}")
         
         system_instruction = f"{selected_prompt}\n{rag_context}"
 
@@ -400,21 +384,6 @@ async def chat(
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
 
-                # 🛡️ SHIELD 1: SCAN TOOL REQUEST (App-Level Fallback)
-                if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning MCP Tool Arguments via AIRS (App-Level)...")
-                    try:
-                        tool_req_scan = Scanner().sync_scan(
-                            ai_profile=ai_profile_obj,
-                            content=Content(prompt=json.dumps(tool_args)),
-                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 0}
-                        )
-                        t_data = tool_req_scan.to_dict()
-                        if str(t_data.get("action", "pass")).lower() == "block":
-                            block_msg = f"🛡️ AIRS Blocked Tool Request: {tool_name}"
-                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL REQUEST BLOCK", "raw_response": json.dumps(t_data, indent=2), "trace": architecture_trace}}
-                    except Exception as e: print(f"⚠️ Request Scan Error: {e}")
-
                 # --- 🔌 EXECUTE TOOL ---
                 if tool_name in action_tools:
                     await mcp_session.call_tool("write_query", arguments={"query": "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"})
@@ -465,27 +434,9 @@ async def chat(
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_res.content[0].text
 
-                # 🛡️ SHIELD 2: SCAN TOOL RESULT (App-Level Fallback - Database Exfiltration)
-                if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 Scanning MCP Tool Result from {tool_name} (App-Level)...")
-                    try:
-                        tool_res_scan = Scanner().sync_scan(
-                            ai_profile=ai_profile_obj,
-                            content=Content(response=tool_output),
-                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 1}
-                        )
-                        r_data = tool_res_scan.to_dict()
-                        if str(r_data.get("action", "pass")).lower() == "block":
-                            block_msg = f"🛡️ AIRS Blocked Malicious Database Content from [{tool_name}]."
-                            print(f"🛑 AIRS BLOCK: TOOL RESULT (Direction 1)")
-                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
-                    except Exception as e: print(f"⚠️ Result Scan Error: {e}")
-
                 # =====================================================================
-                # 🚀 EXPLICIT MCP TOOL SCAN (To restore 'Tool' Dashboard UI)
+                # 🚀 EXPLICIT MCP TOOL SCAN (To restore 'Tool' Dashboard UI in Gateway Mode)
                 # =====================================================================
-                # Even if the Gateway is protecting us, we use the local SDK to explicitly
-                # format this data as a 'ToolEvent' so Prisma AIRS logs it beautifully.
                 if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
                     print(f"🔍 Logging explicit ToolEvent to AIRS for {tool_name}...")
                     try:
