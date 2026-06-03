@@ -311,6 +311,24 @@ async def chat(
         rag_context, raw_rag_docs, rejected_rag_docs = await asyncio.to_thread(retrieve_rag_context, message, persona)
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         architecture_trace["rag_pipeline"]["chunks_rejected"] = rejected_rag_docs
+
+        if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and raw_rag_docs:
+            print(f"🔍 Scanning RAG Context via AIRS...")
+            raw_rag_text = "\n".join(raw_rag_docs)
+            try:
+                rag_scan = Scanner().sync_scan(
+                    ai_profile=ai_profile_obj,
+                    content=Content(prompt=raw_rag_text), 
+                    metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "rag_data"}
+                )
+                r_data = rag_scan.to_dict()
+                if str(r_data.get("action", "pass")).lower() == "block":
+                    category = str(r_data.get("category", "Security")).capitalize()
+                    block_msg = f"🛡️ AIRS Blocked RAG Retrieval: {category} violation (Indirect Injection detected)."
+                    print(f"🛑 AIRS BLOCK: RAG DATA | Category: {category}")
+                    return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "RAG DATA BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
+            except Exception as e: 
+                print(f"⚠️ RAG Scan Error: {e}")
         
         system_instruction = f"{selected_prompt}\n{rag_context}"
 
@@ -338,7 +356,7 @@ async def chat(
 
         gateway_params_ingress = {}
         if enforcement_placement == "gateway" and airs_enabled:
-            # LiteLLM scans for malicious MCP tool usage right at the Gateway proxy level
+            # LiteLLM scans for malicious MCP tool usage AND egress output at the Gateway proxy level
             gateway_params_ingress = {"guardrails": ["airs-mcp-scan", "airs-egress-scan"]}
 
         raw_response = await llm_client.chat.completions.with_raw_response.create(
@@ -368,21 +386,43 @@ async def chat(
         response_msg = response.choices[0].message
 
         # =====================================================================
-        # 5. MCP TOOL HANDLING
+        # 5. THE MULTI-STEP AGENT LOOP
         # =====================================================================
-        if response_msg.tool_calls:
+        iteration = 0
+        MAX_ITERATIONS = 5
+
+        # By using a while loop, advanced models (like Gemini 3.5) can call a tool, 
+        # read the output, and call ANOTHER tool before finally answering the user.
+        while getattr(response_msg, "tool_calls", None) and iteration < MAX_ITERATIONS:
+            iteration += 1
             action_tools = [
                 "transfer_funds", "freeze_account", "issue_replacement_card",
                 "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
                 "issue_store_refund", "apply_admin_discount", "update_billing_zip"
             ]
             
+            # Append the model's tool request to history so it remembers what it asked
             messages.append(response_msg)
 
             for tool_call in response_msg.tool_calls:
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
-                print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
+                print(f"🛠️  MODEL REQUESTED TOOL [{iteration}/{MAX_ITERATIONS}]: {tool_name}")
+
+                # 🛡️ SHIELD 1: SCAN TOOL REQUEST (App-Level Fallback)
+                if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    print(f"🔍 Scanning MCP Tool Arguments via AIRS (App-Level)...")
+                    try:
+                        tool_req_scan = Scanner().sync_scan(
+                            ai_profile=ai_profile_obj,
+                            content=Content(prompt=json.dumps(tool_args)),
+                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 0}
+                        )
+                        t_data = tool_req_scan.to_dict()
+                        if str(t_data.get("action", "pass")).lower() == "block":
+                            block_msg = f"🛡️ AIRS Blocked Tool Request: {tool_name}"
+                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL REQUEST BLOCK", "raw_response": json.dumps(t_data, indent=2), "trace": architecture_trace}}
+                    except Exception as e: print(f"⚠️ Request Scan Error: {e}")
 
                 # --- 🔌 EXECUTE TOOL ---
                 if tool_name in action_tools:
@@ -434,6 +474,22 @@ async def chat(
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_res.content[0].text
 
+                # 🛡️ SHIELD 2: SCAN TOOL RESULT (App-Level Fallback - Database Exfiltration)
+                if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    print(f"🔍 Scanning MCP Tool Result from {tool_name} (App-Level)...")
+                    try:
+                        tool_res_scan = Scanner().sync_scan(
+                            ai_profile=ai_profile_obj,
+                            content=Content(response=tool_output),
+                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 1}
+                        )
+                        r_data = tool_res_scan.to_dict()
+                        if str(r_data.get("action", "pass")).lower() == "block":
+                            block_msg = f"🛡️ AIRS Blocked Malicious Database Content from [{tool_name}]."
+                            print(f"🛑 AIRS BLOCK: TOOL RESULT (Direction 1)")
+                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
+                    except Exception as e: print(f"⚠️ Result Scan Error: {e}")
+
                 # =====================================================================
                 # 🚀 EXPLICIT MCP TOOL SCAN (To restore 'Tool' Dashboard UI in Gateway Mode)
                 # =====================================================================
@@ -468,32 +524,32 @@ async def chat(
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
                 architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
-            # =====================================================================
-            # 6. GATEWAY TOOL SUMMARIZATION (Egress)
-            # =====================================================================
-            execution_phase = "Tool Summarization Inference"
-            gateway_params_egress = {}
-            if enforcement_placement == "gateway" and airs_enabled:
-                gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
-
-            final_response = await llm_client.chat.completions.create(
+            # Fetch the next step from the LLM (It might return text, or MORE tools!)
+            execution_phase = f"Agent Iteration {iteration}"
+            raw_response = await llm_client.chat.completions.with_raw_response.create(
                 model=model_id,
                 messages=messages,
+                tools=active_tools if active_tools else None,
                 temperature=0.7,
                 user=end_user,
-                extra_body=gateway_params_egress
+                extra_body=gateway_params_ingress
             )
-            bot_response = final_response.choices[0].message.content or ""
-        else:
-            bot_response = response_msg.content or ""
+            response = raw_response.parse()
+            response_msg = response.choices[0].message
+
+        # The loop has broken! We either got a text response, or hit the iteration limit.
+        bot_response = response_msg.content or ""
 
         if bot_response.strip() == "":
-            bot_response = "⚠️ [System: The LLM executed the prompt and tools, but returned an empty text string.]"
+            if iteration >= MAX_ITERATIONS:
+                bot_response = f"⚠️ [System: The LLM reached the maximum limit of {MAX_ITERATIONS} tool executions and was halted.]"
+            else:
+                bot_response = "⚠️ [System: The LLM executed the prompt and tools, but returned an empty text string.]"
 
         architecture_trace["llm_generation"] = bot_response
 
         # =====================================================================
-        # 7. APP-LEVEL EGRESS SCAN
+        # 6. APP-LEVEL EGRESS SCAN
         # =====================================================================
         if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
             out_scan_response = Scanner().sync_scan(
