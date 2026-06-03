@@ -461,6 +461,9 @@ async def chat(
                 else:
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_res.content[0].text
+                
+                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
+                architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
                 # =====================================================================
                 # 🚀 EXPLICIT MCP TOOL SCAN (Only executes if 'gateway' is selected)
@@ -493,8 +496,7 @@ async def chat(
                     except Exception as e:
                         print(f"⚠️ ToolEvent Log Error: {e}")
 
-                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
-                architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
+                
 
             # Fetch the next step from the LLM (It might return text, or MORE tools!)
             execution_phase = f"Agent Iteration {iteration}"
