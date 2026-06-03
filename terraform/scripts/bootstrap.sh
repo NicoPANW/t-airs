@@ -172,11 +172,6 @@ EOF
 if [ "${target_cloud}" == "gcp" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   # --- EXPLICIT MODELS (For the manual UI dropdown) ---
-  - model_name: gemini-3.1-pro-preview
-    litellm_params:
-      model: vertex_ai/gemini-3.1-pro-preview
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
   - model_name: gemini-3.1-flash-lite
     litellm_params:
       model: vertex_ai/gemini-3.1-flash-lite
@@ -204,11 +199,6 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       vertex_location: "global"
 
   # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
-  - model_name: auto-router
-    litellm_params:
-      model: vertex_ai/gemini-3.1-pro-preview
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
   - model_name: auto-router
     litellm_params:
       model: vertex_ai/gemini-3.1-flash-lite
