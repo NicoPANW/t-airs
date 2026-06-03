@@ -467,15 +467,7 @@ async def chat(
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     tool_output = mcp_res.content[0].text
                     
-                    # --- 🛡️ ANTI-FALSE-POSITIVE DATA SANITIZER ---
-                    try:
-                        parsed_data = ast.literal_eval(raw_text)
-                        if isinstance(parsed_data, list):
-                            tool_output = "\n".join([", ".join([f"{k}: {v}" for k, v in row.items()]) for row in parsed_data])
-                        else:
-                            tool_output = str(parsed_data)
-                    except Exception:
-                        tool_output = raw_text
+
 
                 # Log trace *before* security scan so early-blocks are fully observable
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
