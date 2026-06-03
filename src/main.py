@@ -35,6 +35,8 @@ importlib.reload(rag_data)
 # 4. Prisma AIRS Imports (Enterprise LLM Security Scanning)
 import aisecurity
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
+from aisecurity.generated_openapi_client.models.tool_event import ToolEvent
+from aisecurity.generated_openapi_client.models.tool_event_metadata import ToolEventMetadata
 from aisecurity.scan.inline.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
@@ -478,6 +480,39 @@ async def chat(
                             print(f"🛑 AIRS BLOCK: TOOL RESULT (Direction 1)")
                             return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
                     except Exception as e: print(f"⚠️ Result Scan Error: {e}")
+
+                # =====================================================================
+                # 🚀 EXPLICIT MCP TOOL SCAN (To restore 'Tool' Dashboard UI)
+                # =====================================================================
+                # Even if the Gateway is protecting us, we use the local SDK to explicitly
+                # format this data as a 'ToolEvent' so Prisma AIRS logs it beautifully.
+                if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    print(f"🔍 Logging explicit ToolEvent to AIRS for {tool_name}...")
+                    try:
+                        mcp_metadata = ToolEventMetadata(
+                            tool_invoked=tool_name,
+                            ecosystem="mcp",
+                            method="tools/call",
+                            server_name="mcp-server-sqlite"
+                        )
+                        mcp_event_obj = ToolEvent(
+                            metadata=mcp_metadata,
+                            input=json.dumps(tool_args),
+                            output=json.dumps({"result": tool_output})
+                        )
+                        tool_scan_response = Scanner().sync_scan(
+                            ai_profile=ai_profile_obj,
+                            content=Content(tool_event=mcp_event_obj),
+                            metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
+                        )
+                        
+                        tool_data = tool_scan_response.to_dict()
+                        if str(tool_data.get("action", "pass")).lower() == "block":
+                            category = str(tool_data.get("category", "Security")).capitalize()
+                            block_txt = f"🛡️ Blocked by Prisma AIRS [MCP Tool ➔ LLM]: '{tool_name}' returned a {category} violation."
+                            return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": f"TOOL BLOCK ({tool_name})", "raw_response": json.dumps(tool_data, indent=2), "trace": architecture_trace}}
+                    except Exception as e:
+                        print(f"⚠️ ToolEvent Log Error: {e}")
 
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
                 architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})

@@ -101,7 +101,7 @@ echo "💎 Checking for Gemini 3.x capability..."
 G3_FOUND=false
 
 # We loop through the exact preview model IDs currently deployed on the Global endpoint
-for model in "gemini-3.1-pro-preview" "gemini-3.5-flash" "gemini-3.1-flash-lite"; do
+for model in "gemini-3.5-flash" "gemini-3.1-flash-lite"; do
     G3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
       -X POST "https://aiplatform.googleapis.com/v1beta1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/$model:generateContent" \
       -H "Authorization: Bearer $TOKEN" \
@@ -117,7 +117,7 @@ for model in "gemini-3.1-pro-preview" "gemini-3.5-flash" "gemini-3.1-flash-lite"
 done
 
 if [ "$G3_FOUND" = false ]; then
-    echo "⚠️  NOTE: Gemini 3.x Preview not detected on Global API. The lab will gracefully fall back to Gemini 2.5."
+    echo "⚠️  NOTE: Gemini 3.x not detected on Global API. The lab will gracefully fall back to Gemini 2.5."
 fi
 
 if [ -z "$TF_VAR_prisma_airs_ips" ]; then
