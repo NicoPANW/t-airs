@@ -458,25 +458,11 @@ async def chat(
                     await mcp_session.call_tool("write_query", arguments={"query": f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', 'Action executed.');"})
                     tool_output += " (Transaction permanently recorded in backend database)."
 
-
                 else:
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                    raw_text = mcp_res.content[0].text
-                    
-                    # --- 🛡️ ANTI-FALSE-POSITIVE DATA SANITIZER ---
-                    try:
-                        # Parse the SQLite stringified list of dicts
-                        parsed_data = ast.literal_eval(raw_text)
-                        
-                        if isinstance(parsed_data, list):
-                            # Convert [{'balance': 14700.5}] into plain text: "balance: 14700.5"
-                            # This strips ALL brackets and quotes so the scanner sees harmless text!
-                            tool_output = "\n".join([", ".join([f"{k}: {v}" for k, v in row.items()]) for row in parsed_data])
-                        else:
-                            tool_output = str(parsed_data)
-                    except Exception:
-                        # Fallback if it's already plain text
-                        tool_output = raw_text
+                    tool_output = mcp_res.content[0].text
+                # --- FIXED CODE ---
+
 
 
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
