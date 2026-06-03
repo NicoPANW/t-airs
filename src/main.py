@@ -34,10 +34,12 @@ importlib.reload(rag_data)
 
 # 4. Prisma AIRS Imports (Enterprise LLM Security Scanning)
 import aisecurity
+from aisecurity.exceptions import AISecSDKException
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
 from aisecurity.generated_openapi_client.models.tool_event import ToolEvent
 from aisecurity.generated_openapi_client.models.tool_event_metadata import ToolEventMetadata
-from aisecurity.scan.inline.scanner import Scanner
+# ✅ FIX: Using the asynchronous scanner for high-concurrency FastAPI environments
+from aisecurity.scan.asyncio.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
 # Local modules
@@ -71,6 +73,7 @@ GATEWAY_URL = args.gateway_url
 AIRS_CONFIGURED = False
 airs_error_msg = "Not initialized"
 ai_profile_obj = None
+async_scanner = None  # Global async scanner instance
 validated_models = []
 PERSONAS = personas.PERSONAS
 SESSION_HISTORY = {}
@@ -169,7 +172,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
 # --- APP LIFESPAN MANAGEMENT ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools
+    global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools, async_scanner
     print("\n" + "="*50, flush=True)
     print("🚀 T-AIRS STARTUP", flush=True)
     print("="*50, flush=True)
@@ -180,7 +183,9 @@ async def lifespan(app: FastAPI):
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-            Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
+            # Instantiate the global async scanner
+            async_scanner = Scanner()
+            await async_scanner.sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
             print("RESULT: ✅ AIRS SDK ONLINE", flush=True)
@@ -209,7 +214,13 @@ async def lifespan(app: FastAPI):
             })
         print(f"RESULT: ✅ MCP ONLINE. Tools loaded: {[t.name for t in mcp_tools.tools]}")
         print("="*50 + "\n")
-        yield
+        
+        yield  # Application runs here
+
+        # ✅ FIX: Explicit cleanup of aiohttp connection pool on shutdown
+        if async_scanner:
+            print("Shutting down Prisma AIRS connection pool...", flush=True)
+            await async_scanner.close()
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
@@ -283,10 +294,10 @@ async def chat(
     try:
         # =====================================================================
         # 1. LOCAL INGRESS SCAN 
-        # (Universally applied to protect the System Prompt from Gateway drops)
         # =====================================================================
-        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-            scan_response = Scanner().sync_scan(
+        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner:
+            # ✅ FIX: Awaiting async_scanner
+            scan_response = await async_scanner.sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
                 metadata={"app_user": end_user, "ai_model": model_id}
@@ -307,17 +318,17 @@ async def chat(
 
         # =====================================================================
         # 2. RAG CONTEXT RETRIEVAL & SCAN
-        # (Strictly disabled if "prompt_only" is selected)
         # =====================================================================
         rag_context, raw_rag_docs, rejected_rag_docs = await asyncio.to_thread(retrieve_rag_context, message, persona)
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         architecture_trace["rag_pipeline"]["chunks_rejected"] = rejected_rag_docs
 
-        if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and raw_rag_docs:
+        if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and raw_rag_docs and async_scanner:
             print(f"🔍 Scanning RAG Context via AIRS...")
             raw_rag_text = "\n".join(raw_rag_docs)
             try:
-                rag_scan = Scanner().sync_scan(
+                # ✅ FIX: Awaiting async_scanner
+                rag_scan = await async_scanner.sync_scan(
                     ai_profile=ai_profile_obj,
                     content=Content(prompt=raw_rag_text), 
                     metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "rag_data"}
@@ -357,9 +368,6 @@ async def chat(
 
         gateway_params_agent = {}
         if enforcement_placement == "gateway" and airs_enabled:
-            # LiteLLM scans for malicious MCP tool usage right at the Gateway proxy level.
-            # CRITICAL: We DO NOT attach egress scanning here, because LiteLLM crashes 
-            # with an HTTP 400 when attempting to scan the null/0-byte payload of a tool call.
             gateway_params_agent = {"guardrails": ["airs-mcp-scan"]}
 
         raw_response = await llm_client.chat.completions.with_raw_response.create(
@@ -394,8 +402,6 @@ async def chat(
         iteration = 0
         MAX_ITERATIONS = 5
 
-        # By using a while loop, advanced models (like Gemini 3.5) can call a tool, 
-        # read the output, and call ANOTHER tool before finally answering the user.
         while getattr(response_msg, "tool_calls", None) and iteration < MAX_ITERATIONS:
             iteration += 1
             action_tools = [
@@ -404,7 +410,6 @@ async def chat(
                 "issue_store_refund", "apply_admin_discount", "update_billing_zip"
             ]
             
-            # Append the model's tool request to history so it remembers what it asked
             messages.append(response_msg)
 
             for tool_call in response_msg.tool_calls:
@@ -460,18 +465,26 @@ async def chat(
 
                 else:
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                    tool_output = mcp_res.content[0].text
-                # --- FIXED CODE ---
+                    raw_text = mcp_res.content[0].text
+                    
+                    # --- 🛡️ ANTI-FALSE-POSITIVE DATA SANITIZER ---
+                    try:
+                        parsed_data = ast.literal_eval(raw_text)
+                        if isinstance(parsed_data, list):
+                            tool_output = "\n".join([", ".join([f"{k}: {v}" for k, v in row.items()]) for row in parsed_data])
+                        else:
+                            tool_output = str(parsed_data)
+                    except Exception:
+                        tool_output = raw_text
 
-
-
+                # Log trace *before* security scan so early-blocks are fully observable
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
                 architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
                 # =====================================================================
-                # 🚀 EXPLICIT MCP TOOL SCAN (Only executes if 'gateway' is selected)
+                # 🚀 EXPLICIT MCP TOOL SCAN 
                 # =====================================================================
-                if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner:
                     print(f"🔍 Logging explicit ToolEvent to AIRS for {tool_name}...")
                     try:
                         mcp_metadata = ToolEventMetadata(
@@ -485,7 +498,8 @@ async def chat(
                             input=json.dumps(tool_args),
                             output=json.dumps({"result": tool_output})
                         )
-                        tool_scan_response = Scanner().sync_scan(
+                        # ✅ FIX: Awaiting async_scanner
+                        tool_scan_response = await async_scanner.sync_scan(
                             ai_profile=ai_profile_obj,
                             content=Content(tool_event=mcp_event_obj),
                             metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
@@ -499,9 +513,7 @@ async def chat(
                     except Exception as e:
                         print(f"⚠️ ToolEvent Log Error: {e}")
 
-                
-
-            # Fetch the next step from the LLM (It might return text, or MORE tools!)
+            # Fetch the next step from the LLM
             execution_phase = f"Agent Iteration {iteration}"
             raw_response = await llm_client.chat.completions.with_raw_response.create(
                 model=model_id,
@@ -514,7 +526,6 @@ async def chat(
             response = raw_response.parse()
             response_msg = response.choices[0].message
 
-        # The loop has broken! We either got a text response, or hit the iteration limit.
         bot_response = response_msg.content or ""
 
         if bot_response.strip() == "":
@@ -528,9 +539,9 @@ async def chat(
         # =====================================================================
         # 6. APP-LEVEL EGRESS SCAN
         # =====================================================================
-        # Runs unconditionally for both placements to prevent Gateway 0-byte crashes.
-        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
-            out_scan_response = Scanner().sync_scan(
+        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner and "Error:" not in bot_response:
+            # ✅ FIX: Awaiting async_scanner
+            out_scan_response = await async_scanner.sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),
                 metadata={"app_user": end_user, "ai_model": model_id}
@@ -575,6 +586,10 @@ async def chat(
     # =====================================================================
     # EXCEPTION & PROXY GUARDRAIL HANDLING
     # =====================================================================
+    except AISecSDKException as e:
+        # ✅ FIX: Native catch for Prisma AIRS connection and logic faults
+        print(f"⚠️ Prisma AIRS SDK Error: {e}")
+        return {"bot": "⚠️ Secure Connection to Prisma AIRS failed.", "output": "⚠️ Secure Connection to Prisma AIRS failed.", "logs": {"security_scan": "SDK Error", "raw_response": str(e), "trace": architecture_trace}}
     except Exception as e:
         error_str = str(e)
 
