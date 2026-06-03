@@ -458,21 +458,18 @@ async def chat(
                     await mcp_session.call_tool("write_query", arguments={"query": f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', 'Action executed.');"})
                     tool_output += " (Transaction permanently recorded in backend database)."
 
-                else:
-                    mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                    tool_output = mcp_res.content[0].text
-                # --- FIXED CODE ---
+
                 else:
                     mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
                     raw_text = mcp_res.content[0].text
-    
+                    
                     try:
-        # If it's a string representation of a Python object, parse it safely
+                        # If it's a string representation of a Python object, parse it safely
                         parsed_data = ast.literal_eval(raw_text)
-        # Re-serialize it into standard compliant JSON using double quotes
+                        # Re-serialize it into standard compliant JSON using double quotes
                         tool_output = json.dumps(parsed_data)
                     except Exception:
-        # Fallback if it's already plain text
+                        # Fallback if it's already plain text
                         tool_output = raw_text
 
 
