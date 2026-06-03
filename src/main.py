@@ -2,12 +2,6 @@
 T-AIRS: Enterprise AI Application with Prisma AIRS Security, RAG, and MCP
 =========================================================================
 This application serves as a demonstration of a secure, full-stack AI chatbot.
-It integrates:
-1. LiteLLM (Gateway): For routing requests to various AI models.
-2. ChromaDB & SentenceTransformers: For local Retrieval-Augmented Generation (RAG).
-3. Model Context Protocol (MCP): To allow the LLM to query a local SQLite database securely.
-4. Prisma AIRS (AI Runtime Security): To scan user prompts, LLM responses, and database tool
-   interactions for security threats, data loss (DLP), and prompt injections.
 """
 
 import os
@@ -20,35 +14,27 @@ import requests
 import asyncio
 import ast
 from contextlib import asynccontextmanager, AsyncExitStack
-from fastapi import Request
-from fastapi.templating import Jinja2Templates
-
-# FastAPI Imports for web server and UI rendering
 from fastapi import FastAPI, Request, Form, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-# 1. The Universal AI Gateway Client (Routes requests to LiteLLM)
+# 1. The Universal AI Gateway Client
 from openai import AsyncOpenAI
 
-# 2. MCP Imports (Model Context Protocol for direct Database Tool Calling)
-# This allows the AI to securely access a local SQLite database using standard protocol definitions.
+# 2. MCP Imports (Database Tool Calling)
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-# 3. RAG Imports (Retrieval-Augmented Generation for Unstructured Data)
+# 3. RAG Imports 
 import chromadb
 from sentence_transformers import SentenceTransformer
-import rag_data # Contains the knowledge base text for each persona
+import rag_data 
 import importlib
-importlib.reload(rag_data)  # Force a fresh read of the file on every boot to pick up changes without a full restart.
-
+importlib.reload(rag_data)
 
 # 4. Prisma AIRS Imports (Enterprise LLM Security Scanning)
 import aisecurity
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
-from aisecurity.generated_openapi_client.models.tool_event import ToolEvent
-from aisecurity.generated_openapi_client.models.tool_event_metadata import ToolEventMetadata
 from aisecurity.scan.inline.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
@@ -57,13 +43,10 @@ import personas
 from custom_tools import PERSONA_TOOLS
 
 # --- APPLICATION VERSION ---
-# Attempts to read the deployment version from a local VERSION file.
 APP_VERSION = "unknown"
 try:
-    # Use absolute paths to guarantee Systemd finds it during service boot
     base_dir = os.path.dirname(os.path.abspath(__file__))
     version_file = os.path.join(base_dir, '..', 'VERSION')
-    
     with open(version_file, 'r') as f:
         version_content = f.read().strip()
         if version_content:
@@ -72,39 +55,27 @@ except Exception as e:
     print(f"Warning: Could not read VERSION file. Error: {e}")
 
 # --- CAPTURE CLI ARGUMENTS ---
-# Allows passing configurations via the command line when starting the server.
 parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
 args, _ = parser.parse_known_args()
 
-# Global configuration variables populated from CLI
 AIRS_KEY = args.airs_key
 AIRS_PROFILE_NAME = args.airs_profile
-GATEWAY_URL = args.gateway_url # URL for the LiteLLM AI Gateway
+GATEWAY_URL = args.gateway_url 
 
 # --- GLOBAL STATE TRACKERS & CLIENTS ---
-
-# Prisma AIRS state trackers to know if the SDK successfully handshaked on boot
 AIRS_CONFIGURED = False
 airs_error_msg = "Not initialized"
 ai_profile_obj = None
-
-# Application state variables
 validated_models = []
 PERSONAS = personas.PERSONAS
-
-# In-memory session management for conversation history (Stores last 10 messages per user)
 SESSION_HISTORY = {}
 MAX_HISTORY = 10
 
-# Initialize the OpenAI client to communicate with the LiteLLM AI Gateway.
-# Note: The API key is a dummy because authentication is handled by the internal network/gateway.
 llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
 
-# MCP (Model Context Protocol) state and server configuration.
-# Points to the local SQLite database to be used as a tool by the LLM.
 mcp_session = None
 openai_tools = []
 server_params = StdioServerParameters(
@@ -112,7 +83,6 @@ server_params = StdioServerParameters(
     args=["--db-path", "/opt/t-airs/src/customers.db"]
 )
 
-# RAG (Retrieval-Augmented Generation) vector database state
 chroma_client = None
 rag_collections = {}
 embedder = None
@@ -120,48 +90,24 @@ embedder = None
 # --- CORE LOGIC HELPERS ---
 
 def check_gpu_status():
-    """
-    Checks for NVIDIA GPU presence and queries Ollama for loaded models.
-    Provides a detailed status string for the UI to display hardware acceleration state.
-    """
     try:
-        # Check for a physical GPU using nvidia-smi with a timeout.
         gpu_info = subprocess.check_output(
             ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
             text=True, timeout=5
         ).strip()
-
-        # Check for active models loaded in VRAM via Ollama with a timeout.
         try:
             ollama_ps = subprocess.check_output(["ollama", "ps"], text=True, timeout=5).strip().split('\n')
-            # Extract just the model names, skipping the header row.
             loaded_models = [line.split()[0] for line in ollama_ps[1:] if line.strip()]
-
-            if loaded_models:
-                model_str = f"| Models in VRAM: {', '.join(loaded_models)}"
-            else:
-                model_str = "| No models currently active in VRAM"
+            model_str = f"| Models in VRAM: {', '.join(loaded_models)}" if loaded_models else "| No models currently active in VRAM"
         except subprocess.TimeoutExpired:
             model_str = "| Ollama engine is busy/hanging"
         except Exception:
             model_str = "| Ollama engine not responding"
-
         return f"✅ GPU ONLINE: {gpu_info} {model_str}"
-
-    except FileNotFoundError:
-        return "⚠️ NO GPU DETECTED: 'nvidia-smi' not found. Running on CPU."
-    except subprocess.TimeoutExpired:
-        return "⚠️ GPU CHECK FAILED: nvidia-smi timed out."
-    except subprocess.CalledProcessError:
-        return "⚠️ GPU CHECK FAILED: nvidia-smi execution failed."
     except Exception as e:
-        return f"⚠️ SYSTEM CHECK FAILED: {str(e)}"
+        return f"⚠️ NO GPU DETECTED: Running on CPU."
 
 def discover_gateway_models():
-    """
-    Queries the LiteLLM AI Gateway's /models endpoint to dynamically get a list of
-    all available models that can be routed to, populating the UI dropdown.
-    """
     found = []
     try:
         response = requests.get(f"{GATEWAY_URL}/v1/models", timeout=5)
@@ -169,131 +115,74 @@ def discover_gateway_models():
             for m in response.json().get("data", []):
                 found.append(m["id"])
     except Exception as e:
-        print(f"CRITICAL: Could not connect to AI Gateway. Is LiteLLM running? Error: {e}")
+        print(f"CRITICAL: Could not connect to AI Gateway. Error: {e}")
     found.sort()
     return found
 
 def init_rag_pipeline():
-    """
-    Initializes the in-memory RAG system on server boot. This involves:
-    1. Loading the sentence-transformer embedding model.
-    2. Creating a ChromaDB collection for each persona (Banking, Travel, etc.).
-    3. Chunking the knowledge base text from rag_data.py.
-    4. Embedding the chunks and storing them in the vector database.
-    """
     global chroma_client, rag_collections, embedder
     print("📚 Initializing Multi-Persona RAG Pipeline...", flush=True)
     try:
-        # Initialize the ChromaDB client (in-memory).
         chroma_client = chromadb.Client()
-        # Load the specified sentence-transformer model from HuggingFace.
         print("⏳ Downloading BAAI Embedding Model from HuggingFace...", flush=True)
         embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
         print("✅ BAAI Model successfully loaded into memory!", flush=True)
 
-        # Iterate through each persona's knowledge base defined in rag_data.py.
         for persona_name, content in rag_data.RAG_KNOWLEDGE_BASE.items():
-
-            # Use get_or_create_collection to prevent errors on app hot-reloads.
             col = chroma_client.get_or_create_collection(name=f"rag_{persona_name}")
-
-            # Wipe any existing data from previous runs to ensure a clean state.
             existing_data = col.get()
             if existing_data and existing_data["ids"]:
                 col.delete(ids=existing_data["ids"])
-
-            # Split the text into chunks (if > 10 chars), embed them, and add to the collection.
             chunks = [c for c in content.split('\n') if len(c.strip()) > 10]
             if chunks:
                 embeddings = embedder.encode(chunks).tolist()
-                col.add(
-                    embeddings=embeddings,
-                    documents=chunks,
-                    ids=[f"{persona_name}_chunk_{i}" for i in range(len(chunks))]
-                )
+                col.add(embeddings=embeddings, documents=chunks, ids=[f"{persona_name}_chunk_{i}" for i in range(len(chunks))])
             rag_collections[persona_name] = col
-
         print("✅ RAG Ready: Loaded multiple personas into Vector DB.")
     except Exception as e:
         print(f"❌ RAG Initialization Failed: {e}")
 
 def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
-    """
-    Performs a semantic search on the vector database to ground the LLM's knowledge.
-    - Embeds the user's query.
-    - Queries the specific ChromaDB collection for the active persona.
-    - Filters results based on a maximum distance threshold (to ensure relevance).
-    - Returns the formatted context string, and debug lists of injected/rejected docs for the UI.
-    """
     target_collection = rag_collections.get(persona)
     if not target_collection:
         return "", [], []
-
-    filtered_docs = []
-    rejected_docs = []
-
+    filtered_docs, rejected_docs = [], []
     try:
         query_emb = embedder.encode([user_prompt]).tolist()
-        results = target_collection.query(
-            query_embeddings=query_emb,
-            n_results=top_k,
-            include=["documents", "distances"]
-        )
-
+        results = target_collection.query(query_embeddings=query_emb, n_results=top_k, include=["documents", "distances"])
         raw_docs = results.get("documents", [[]])[0]
         distances = results.get("distances", [[]])[0]
-
-        # Define a relevance threshold. Chunks with a distance > 0.50 are ignored.
-        MAX_DISTANCE = 0.50
-
         for doc, dist in zip(raw_docs, distances):
-            if dist <= MAX_DISTANCE:
+            if dist <= 0.50:
                 filtered_docs.append(doc)
             else:
-                # Save rejected documents and their distance for debugging in the UI Inspector.
                 rejected_docs.append({"text": doc, "distance": round(dist, 2)})
-                print(f"🛑 RAG Chunk Rejected: Too far from prompt (Distance: {dist:.2f})")
-
         if filtered_docs:
             formatted_text = "\n[CONFIDENTIAL INTERNAL DATA RETRIEVED VIA RAG]:\n" + "\n".join(filtered_docs)
             return formatted_text, filtered_docs, rejected_docs
-
     except Exception as e:
         print(f"RAG Retrieval Error: {e}")
-
-    # Always return all three items, even if empty, to prevent unpacking errors later.
     return "", filtered_docs, rejected_docs
 
 # --- APP LIFESPAN MANAGEMENT ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manages the application's startup and shutdown events. 
-    Handles connection handshakes to Prisma AIRS, LiteLLM, RAG, and MCP.
-    """
     global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools
     print("\n" + "="*50, flush=True)
     print("🚀 T-AIRS STARTUP", flush=True)
     print("="*50, flush=True)
-    print("Checking Hardware Acceleration...", flush=True)
     print(f"RESULT: {check_gpu_status()}", flush=True)
-    print("-" * 50, flush=True)
 
-    # 1. Initialize Prisma AIRS SDK.
     if AIRS_KEY and AIRS_PROFILE_NAME:
         print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...", flush=True)
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-            
-            # [🔍 AIRS SCANNER INVOCATION: HEALTHCHECK]
-            # Performs a basic synchronous scan just to verify API connectivity and profile validity.
             Scanner().sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
             airs_error_msg = "Connected"
             print("RESULT: ✅ AIRS SDK ONLINE", flush=True)
         except Exception as e:
-            # Parse the AIRS HTTP error gracefully for the UI
             raw_error = str(e)
             match = re.search(r'HTTP response body: (\{.*\})', raw_error)
             airs_error_msg = match.group(1) if match else raw_error
@@ -301,47 +190,31 @@ async def lifespan(app: FastAPI):
     else:
         print("RESULT: ⚠️ AIRS Keys missing. App SDK Disabled.")
 
-    # 2. Discover available models from the AI Gateway.
-    print("Performing Deep Model Discovery via AI Gateway...")
     validated_models = discover_gateway_models()
-    print(f"RESULT: ✅ {len(validated_models)} routing models loaded.")
-
-    # 3. Initialize the RAG pipeline and vector database.
     init_rag_pipeline()
 
-    # 4. Start the MCP (Model Context Protocol) server as a background process.
     async with AsyncExitStack() as stack:
         print("🔌 Booting SQLite MCP Server...")
-        # Establish a client connection to the server's stdio (standard input/output).
         read, write = await stack.enter_async_context(stdio_client(server_params))
         mcp_session = await stack.enter_async_context(ClientSession(read, write))
         await mcp_session.initialize()
 
-        # Extract tools provided by the MCP server and format them to match OpenAI's schema.
         mcp_tools = await mcp_session.list_tools()
         for t in mcp_tools.tools:
             openai_tools.append({
                 "type": "function",
-                "function": {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.inputSchema
-                }
+                "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}
             })
         print(f"RESULT: ✅ MCP ONLINE. Tools loaded: {[t.name for t in mcp_tools.tools]}")
         print("="*50 + "\n")
-
         yield
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
 # --- UI ENDPOINTS ---
-# Standard web endpoints to serve the HTML/CSS/JS frontend and its states.
-
 @app.post("/update-persona")
 async def update_persona(persona_id: str = Form(...), new_context: str = Form(...)):
-    """Allows the user to edit a persona's system prompt live from the UI and saves it to file."""
     if persona_id in PERSONAS:
         PERSONAS[persona_id] = new_context
         try:
@@ -354,7 +227,6 @@ async def update_persona(persona_id: str = Form(...), new_context: str = Form(..
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Serves the main frontend UI page."""
     return templates.TemplateResponse("index.html", {"request": request, "app_version": APP_VERSION})
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -363,24 +235,19 @@ async def favicon():
 
 @app.get("/models")
 async def list_models():
-    """Endpoint for the UI to fetch discovered AI Gateway models."""
     return {"models": validated_models}
 
 @app.get("/health-airs")
 async def health_airs():
-    """Endpoint for the UI to display the Prisma AIRS connection health light."""
     return {"status": "connected" if AIRS_CONFIGURED else "disconnected", "profile": AIRS_PROFILE_NAME, "reason": airs_error_msg}
 
 @app.get("/get-persona-context/{persona_id}")
 async def get_persona_context(persona_id: str):
-    """Endpoint to populate the system prompt editor in the UI."""
     return {"context": PERSONAS.get(persona_id, "Not found.")}
 
 # --- THE CORE AI PIPELINE ---
-
 @app.post("/chat")
 async def chat(
-    # Input parameters provided by the user via the frontend UI
     message: str = Form(...),
     persona: str = Form("banking"),
     session_id: str = Form("default-session"),
@@ -390,11 +257,6 @@ async def chat(
     enforcement_placement: str = Form("gateway"),
     end_user: str = Form("user1")
 ):
-    """
-    Main orchestration endpoint. Handles Ingress Scanning, RAG Retrieval, 
-    LLM Querying, MCP Tool Execution, and Egress Scanning.
-    """
-    # --- Initialization for this request ---
     selected_prompt = PERSONAS.get(persona, PERSONAS["banking"])
     security_status = "Bypassed"
     raw_sec_log = "{}"
@@ -404,7 +266,6 @@ async def chat(
     print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona} | AIRS placement: {enforcement_placement.upper()}")
     print(f"💬 PROMPT: {message}")
 
-    # architecture_trace collects observability data to render the Inspector panel in the UI.
     architecture_trace = {
         "ai_gateway": {"routed_to": model_id},
         "rag_pipeline": {"chunks_injected": [], "chunks_rejected": []},
@@ -415,20 +276,13 @@ async def chat(
         model_id = validated_models[0] if validated_models else None
         architecture_trace["ai_gateway"]["routed_to"] = model_id
 
-    # execution_phase tracks where we are in the pipeline to provide better error formatting later.
-    execution_phase = "Pre-Inference"
+    execution_phase = "Initial Inference"
 
     try:
         # =====================================================================
-        # 1. INGRESS SCAN (App-Level - Optional based on UI Placement setting)
+        # 1. LOCAL INGRESS SCAN (Always runs to protect the System Prompt)
         # =====================================================================
-        execution_phase = "Initial Inference"
-
-        # If 'prompt_only', we scan the RAW user input before doing any RAG or DB lookups.
-        if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-            
-            # [🔍 AIRS SCANNER INVOCATION: LOCAL INGRESS]
-            # Calls the Python SDK to scan the 'message' variable.
+        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
             scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
@@ -437,7 +291,6 @@ async def chat(
             res_data = scan_response.to_dict()
             ingress_data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
 
-            # If AIRS flags this prompt as dangerous (e.g., prompt injection), block and exit immediately.
             if str(ingress_data.get("action", "pass")).lower() == "block":
                 category = str(ingress_data.get("category", "Security")).capitalize()
                 block_txt = f"🛡️ Blocked by Prisma AIRS [User ➔ LLM]: {category} policy violation."
@@ -450,15 +303,29 @@ async def chat(
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
         # =====================================================================
-        # 2. RAG CONTEXT RETRIEVAL
+        # 2. RAG CONTEXT RETRIEVAL & SCAN
         # =====================================================================
-        # Fetch relevant grounding data from the vector database using the user's prompt.
         rag_context, raw_rag_docs, rejected_rag_docs = await asyncio.to_thread(retrieve_rag_context, message, persona)
-
         architecture_trace["rag_pipeline"]["chunks_injected"] = raw_rag_docs
         architecture_trace["rag_pipeline"]["chunks_rejected"] = rejected_rag_docs
+
+        if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and rag_context:
+            print(f"🔍 Scanning RAG Context via AIRS...")
+            try:
+                rag_scan = Scanner().sync_scan(
+                    ai_profile=ai_profile_obj,
+                    content=Content(prompt=rag_context), 
+                    metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "rag_data"}
+                )
+                r_data = rag_scan.to_dict()
+                if str(r_data.get("action", "pass")).lower() == "block":
+                    category = str(r_data.get("category", "Security")).capitalize()
+                    block_msg = f"🛡️ AIRS Blocked RAG Retrieval: {category} violation (Indirect Injection detected)."
+                    print(f"🛑 AIRS BLOCK: RAG DATA | Category: {category}")
+                    return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "RAG DATA BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
+            except Exception as e: 
+                print(f"⚠️ RAG Scan Error: {e}")
         
-        # Combine the Persona System Prompt with the retrieved RAG Context.
         system_instruction = f"{selected_prompt}\n{rag_context}"
 
         # =====================================================================
@@ -472,31 +339,22 @@ async def chat(
         else:
             current_context = [{"role": "user", "content": message}]
 
-        # Create the final list of messages sent to the LLM (System + Chat History)
         messages = [{"role": "system", "content": system_instruction}] + current_context
 
-        # Combine standard MCP Database tools with our custom hardcoded high-privilege Persona tools.
         active_tools = openai_tools.copy() if openai_tools else []
         if persona in PERSONA_TOOLS:
             active_tools.extend(PERSONA_TOOLS[persona])
 
         # =====================================================================
-        # 4. AI GATEWAY INFERENCE & TOOL CALLING
+        # 4. AI GATEWAY INFERENCE
         # =====================================================================
         print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
 
         gateway_params_ingress = {}
-        gateway_params_egress = {}
-
-        # If enforcement is "gateway", we pass special headers/body parameters instructing LiteLLM 
-        # to perform the AIRS scan on its end. This scans the ENTIRE payload (Prompt + RAG + History).
         if enforcement_placement == "gateway" and airs_enabled:
-            gateway_params_ingress = {"guardrails": ["airs-ingress-scan"]}
-            gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
+            # LiteLLM scans for malicious MCP tool usage right at the Gateway proxy level
+            gateway_params_ingress = {"guardrails": ["airs-mcp-scan"]}
 
-        # Request completion from the LLM. 
-        # [🔍 AIRS SCANNER INVOCATION: GATEWAY INGRESS (Indirect)]
-        # If 'gateway_params_ingress' is populated, LiteLLM intercepts this and calls AIRS before returning.
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
             messages=messages,
@@ -508,7 +366,6 @@ async def chat(
 
         response = raw_response.parse()
         
-        # Resolve the actual model name used (important if hitting the Gateway load balancer)
         actual_model = getattr(response, "model", model_id)
         hidden_model = raw_response.headers.get("x-litellm-model-name")
 
@@ -524,8 +381,16 @@ async def chat(
 
         response_msg = response.choices[0].message
 
-        # Check if the LLM decided it needs to execute a tool (e.g., query the DB)
+        # =====================================================================
+        # 5. MCP TOOL HANDLING
+        # =====================================================================
         if response_msg.tool_calls:
+            action_tools = [
+                "transfer_funds", "freeze_account", "issue_replacement_card",
+                "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
+                "issue_store_refund", "apply_admin_discount", "update_billing_zip"
+            ]
+            
             messages.append(response_msg)
 
             for tool_call in response_msg.tool_calls:
@@ -533,209 +398,98 @@ async def chat(
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"🛠️  MODEL REQUESTED TOOL: {tool_name}")
 
-                # --- A) Handle Custom Action Tools (Writes/Updates) ---
-                action_tools = [
-                    "transfer_funds", "freeze_account", "issue_replacement_card",
-                    "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
-                    "issue_store_refund", "apply_admin_discount", "update_billing_zip"
-                ]
+                # 🛡️ SHIELD 1: SCAN TOOL REQUEST (App-Level Fallback)
+                if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    print(f"🔍 Scanning MCP Tool Arguments via AIRS (App-Level)...")
+                    try:
+                        tool_req_scan = Scanner().sync_scan(
+                            ai_profile=ai_profile_obj,
+                            content=Content(prompt=json.dumps(tool_args)),
+                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 0}
+                        )
+                        t_data = tool_req_scan.to_dict()
+                        if str(t_data.get("action", "pass")).lower() == "block":
+                            block_msg = f"🛡️ AIRS Blocked Tool Request: {tool_name}"
+                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL REQUEST BLOCK", "raw_response": json.dumps(t_data, indent=2), "trace": architecture_trace}}
+                    except Exception as e: print(f"⚠️ Request Scan Error: {e}")
 
+                # --- 🔌 EXECUTE TOOL ---
                 if tool_name in action_tools:
-                    # Logic block handling specific destructive/write capabilities (Banking, Travel, E-Shop)
-                    # All custom tools log an audit trail entry into the 'unauthorized_actions_log' table via MCP.
-
-                    setup_query = "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"
-                    await mcp_session.call_tool("write_query", arguments={"query": setup_query})
-
-                    # === BANKING TOOLS ===
+                    await mcp_session.call_tool("write_query", arguments={"query": "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"})
+                    
+                    details, tool_output = "", ""
                     if tool_name == "transfer_funds":
-                        src = tool_args.get("source_account")
-                        dst = tool_args.get("dest_account")
-                        amt = tool_args.get("amount")
-
-                        deduct_query = f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": deduct_query})
-
-                        add_query = f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": add_query})
-
-                        details = f"Transferred ${amt} from {src} to {dst}"
-                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} successfully executed and settled."
-
+                        src, dst, amt = tool_args.get("source_account"), tool_args.get("dest_account"), tool_args.get("amount")
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"})
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"})
+                        tool_output = f"⚠️ SYSTEM ALERT: Wire transfer of ${amt} executed."
                     elif tool_name == "freeze_account":
-                        acc = tool_args.get("account_id")
-                        reason = tool_args.get("reason")
-
-                        freeze_query = f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": freeze_query})
-
-                        details = f"Froze account {acc}. Reason: {reason}"
-                        tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} has been frozen."
-
+                        acc, reason = tool_args.get("account_id"), tool_args.get("reason")
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
+                        tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} frozen."
                     elif tool_name == "issue_replacement_card":
                         acc = tool_args.get("account_id")
-
-                        card_query = f"UPDATE users SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": card_query})
-
-                        details = f"Canceled and replaced card for account {acc}"
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"})
                         tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
-
-                    # === TRAVEL TOOLS ===
                     elif tool_name == "upgrade_flight_seat":
-                        tkt = tool_args.get("ticket_number")
-                        cabin = tool_args.get("new_class")
-
-                        upgrade_query = f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": upgrade_query})
-
-                        details = f"Upgraded ticket {tkt} to {cabin} class"
-                        tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} successfully upgraded to {cabin}."
-
+                        tkt, cabin = tool_args.get("ticket_number"), tool_args.get("new_class")
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"})
+                        tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} upgraded to {cabin}."
                     elif tool_name == "cancel_flight_booking":
                         tkt = tool_args.get("ticket_number")
-                        refund = tool_args.get("refund_to_card")
-
-                        cancel_query = f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": cancel_query})
-
-                        details = f"Canceled ticket {tkt}. Refund to card: {refund}"
+                        await mcp_session.call_tool("write_query", arguments={"query": f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"})
                         tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked."
-
                     elif tool_name == "update_passport_details":
-                        tkt = tool_args.get("ticket_number")
-                        new_pass = tool_args.get("new_passport_id")
-
-                        pass_query = f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": pass_query})
-
-                        details = f"Updated passport to {new_pass} for ticket {tkt}"
+                        tkt, new_pass = tool_args.get("ticket_number"), tool_args.get("new_passport_id")
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"})
                         tool_output = f"🛂 PASSPORT UPDATED: New document saved to manifest."
-
-                    # === E-SHOP TOOLS ===
                     elif tool_name == "issue_store_refund":
-                        order = tool_args.get("order_id")
-                        amt = tool_args.get("amount")
-
-                        refund_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": refund_query})
-
-                        details = f"Refunded ${amt} for order {order}"
+                        order, amt = tool_args.get("order_id"), tool_args.get("amount")
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"})
                         tool_output = f"✅ REFUND PROCESSED: ${amt} credited back to payment method for order {order}."
-
                     elif tool_name == "apply_admin_discount":
-                        order = tool_args.get("order_id")
-                        disc = tool_args.get("discount_percentage")
-
-                        disc_query = f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": disc_query})
-
-                        details = f"Applied {disc}% SYSTEM_ADMIN discount to order {order}"
+                        order, disc = tool_args.get("order_id"), tool_args.get("discount_percentage")
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"})
                         tool_output = f"💸 DISCOUNT APPLIED: {disc}% off order {order}."
-
                     elif tool_name == "update_billing_zip":
-                        order = tool_args.get("order_id")
-                        new_zip = tool_args.get("new_zip_code")
-
-                        zip_query = f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"
-                        await mcp_session.call_tool("write_query", arguments={"query": zip_query})
-
-                        details = f"Changed billing zip to {new_zip} for order {order}"
+                        order, new_zip = tool_args.get("order_id"), tool_args.get("new_zip_code")
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"})
                         tool_output = f"📦 ADDRESS UPDATED: Billing zip changed to {new_zip}."
-
-                    # Log the high-privilege action to the database.
-                    insert_query = f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', '{details}');"
-                    await mcp_session.call_tool("write_query", arguments={"query": insert_query})
-
+                    
+                    await mcp_session.call_tool("write_query", arguments={"query": f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', 'Action executed.');"})
                     tool_output += " (Transaction permanently recorded in backend database)."
 
                 else:
-                    # --- B) Handle standard MCP Read-Only Tools ---
-                    # Execute the SQLite query against the database using the Model Context Protocol session.
-                    mcp_result = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                    tool_output = mcp_result.content[0].text
+                    mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
+                    tool_output = mcp_res.content[0].text
 
-                # =====================================================================
-                # 🚀 NEW: SCAN MCP TOOL EXECUTION WITH AIRS (GATEWAY ONLY)
-                # =====================================================================
-                # NUANCE: Why do we only run this when placement == "gateway"?
-                # Because if the user wants the deep "Gateway" holistic scan, the LiteLLM proxy
-                # is entirely blind to these local Python tool executions. By calling the AIRS
-                # SDK locally *here*, we ensure Data Exfiltration (DLP) is blocked natively 
-                # before the LLM can read the sensitive database record and summarize it.
-                if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
-                    print(f"🔍 SCANNING MCP TOOL EXECUTION VIA AIRS: {tool_name}")
-                    
-                    # 1. Instantiate the Metadata object using strict SDK definitions
-                    # Pydantic maps 'tool_invoked' to the OpenAPI 'ToolName' JSON alias.
-                    mcp_metadata = ToolEventMetadata(
-                        tool_invoked=tool_name,
-                        ecosystem="mcp",
-                        method="tools/call",
-                        server_name="mcp-server-sqlite"
-                    )
+                # 🛡️ SHIELD 2: SCAN TOOL RESULT (App-Level Fallback - Database Exfiltration)
+                if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj:
+                    print(f"🔍 Scanning MCP Tool Result from {tool_name} (App-Level)...")
+                    try:
+                        tool_res_scan = Scanner().sync_scan(
+                            ai_profile=ai_profile_obj,
+                            content=Content(response=tool_output),
+                            metadata={"app_user": end_user, "EcoSystem": "mcp", "Method": "tools/call", "ToolName": tool_name, "ToolDirection": 1}
+                        )
+                        r_data = tool_res_scan.to_dict()
+                        if str(r_data.get("action", "pass")).lower() == "block":
+                            block_msg = f"🛡️ AIRS Blocked Malicious Database Content from [{tool_name}]."
+                            print(f"🛑 AIRS BLOCK: TOOL RESULT (Direction 1)")
+                            return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "TOOL RESULT BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
+                    except Exception as e: print(f"⚠️ Result Scan Error: {e}")
 
-                    # 2. Wrap the Tool's inputs and outputs into the strict ToolEvent Schema
-                    mcp_event_obj = ToolEvent(
-                        metadata=mcp_metadata,
-                        input=json.dumps(tool_args),
-                        output=json.dumps({"result": tool_output})
-                    )
-                    
-                    # [🔍 AIRS SCANNER INVOCATION: TOOL EVENT / MCP]
-                    # Submits the specialized `tool_event` Content to Prisma AIRS.
-                    tool_scan_response = Scanner().sync_scan(
-                        ai_profile=ai_profile_obj,
-                        content=Content(tool_event=mcp_event_obj),
-                        metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
-                    )
-
-                    tool_res_data = tool_scan_response.to_dict()
-                    tool_data = tool_res_data[0] if isinstance(tool_res_data, list) and len(tool_res_data) > 0 else tool_res_data
-
-                    # If Prisma AIRS spots sensitive data (e.g. SSNs) leaving the database, block the chain.
-                    if str(tool_data.get("action", "pass")).lower() == "block":
-                        category = str(tool_data.get("category", "Security")).capitalize()
-                        block_txt = f"🛡️ Blocked by Prisma AIRS [MCP Tool ➔ LLM]: '{tool_name}' returned a {category} policy violation."
-                        print(f"🛑 AIRS BLOCK: TOOL ({tool_name}) | Category: {category}")
-                        
-                        # Abort the request BEFORE the LLM reads the database output.
-                        return {
-                            "bot": block_txt,
-                            "output": block_txt,
-                            "logs": {
-                                "security_scan": f"TOOL BLOCK ({tool_name})",
-                                "raw_response": json.dumps(tool_data, indent=2),
-                                "trace": architecture_trace
-                            }
-                        }
-                    else:
-                        # If passed, append the scan logs so the UI Inspector can render them.
-                        if isinstance(ingress_data, dict):
-                            ingress_data[f"tool_scan_{tool_name}"] = tool_data
-                # =====================================================================
-                
-                # Append the safe tool output to the message history so the LLM can read it.
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
+                architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
 
-                # Record execution details for the UI Observability Trace
-                architecture_trace["mcp_execution"].append({
-                    "tool": tool_name,
-                    "arguments": tool_args,
-                    "database_result": tool_output
-                })
-
-            # 🌟 STATE TRACKER: Secondary Inference Phase
-            # We are sending the database results back to the LLM so it can generate a final summary.
+            # =====================================================================
+            # 6. GATEWAY TOOL SUMMARIZATION (Egress)
+            # =====================================================================
             execution_phase = "Tool Summarization Inference"
-
             gateway_params_egress = {}
             if enforcement_placement == "gateway" and airs_enabled:
-                # Ask LiteLLM to perform the Egress scan on the final summarized output.
                 gateway_params_egress = {"guardrails": ["airs-egress-scan"]}
 
-            # [🔍 AIRS SCANNER INVOCATION: GATEWAY EGRESS (Indirect)]
-            # If 'gateway_params_egress' is present, LiteLLM will run AIRS on the output before returning.
             final_response = await llm_client.chat.completions.create(
                 model=model_id,
                 messages=messages,
@@ -745,7 +499,6 @@ async def chat(
             )
             bot_response = final_response.choices[0].message.content or ""
         else:
-            # If the LLM didn't invoke any tools, its initial generation is the final response.
             bot_response = response_msg.content or ""
 
         if bot_response.strip() == "":
@@ -754,14 +507,9 @@ async def chat(
         architecture_trace["llm_generation"] = bot_response
 
         # =====================================================================
-        # 5. EGRESS SCAN (App-Level - Optional based on UI Placement setting)
+        # 7. APP-LEVEL EGRESS SCAN
         # =====================================================================
-        # If enforcement is 'prompt_only', the App takes responsibility for scanning the final text 
-        # before the user sees it.
         if enforcement_placement == "prompt_only" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and "Error:" not in bot_response:
-            
-            # [🔍 AIRS SCANNER INVOCATION: LOCAL EGRESS]
-            # Calls the Python SDK to scan the raw LLM output text.
             out_scan_response = Scanner().sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),
@@ -770,7 +518,6 @@ async def chat(
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
 
-            # If AIRS catches a violation (e.g. leaking PII not blocked by tool scan, or generating toxicity).
             if str(out_data.get("action", "pass")).lower() == "block":
                 category = str(out_data.get("category", "Security")).capitalize()
                 block_txt = f"🛡️ Blocked by Prisma AIRS [LLM ➔ User]: {category} policy violation."
@@ -791,10 +538,9 @@ async def chat(
             security_status = "Passed App Input & Output"
             raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
 
-        # --- 6. PERSIST HISTORY ---
+        # --- PERSIST HISTORY ---
         if history_enabled:
             SESSION_HISTORY[session_id].append({"role": "assistant", "content": bot_response})
-            # Prune memory to prevent context limit errors and high token costs.
             if len(SESSION_HISTORY[session_id]) > 10:
                 SESSION_HISTORY[session_id] = SESSION_HISTORY[session_id][-10:]
 
@@ -804,7 +550,6 @@ async def chat(
         print(f"🏁 REQUEST COMPLETE | Security Status: {security_status}")
         print(f"{'='*40}\n")
         
-        # Finally, return the safe response and observability data to the frontend UI.
         return {"bot": bot_response, "output": bot_response, "logs": {"security_scan": security_status, "raw_response": raw_sec_log, "trace": architecture_trace}}
 
     # =====================================================================
@@ -814,58 +559,35 @@ async def chat(
         error_str = str(e)
 
         if "429" in error_str or "rate limit" in error_str.lower() or "too many requests" in error_str.lower():
-            # Specifically handle 429 Rate Limit errors from upstream models to prevent crashes.
             print(f"🚦 RATE LIMIT HIT: {error_str}")
             print("⏳ Passing HTTP 429 back to Prisma AIRS scanner to trigger backoff...")
             print(f"🏁 REQUEST ABORTED | Security Status: Rate Limited")
             print(f"{'='*40}\n")
+            return JSONResponse(status_code=429, content={"error": {"message": "Rate limit reached", "type": "rate_limit_error", "code": 429}})
 
-            return JSONResponse(
-                status_code=429,
-                content={
-                  "error": {
-                    "message": "Rate limit reached for model",
-                    "type": "rate_limit_error",
-                    "code": 429
-                  }
-                }
-            )
-
-        # If an error occurred, roll back the last user message from memory history
-        # to prevent a "poisoned" prompt from breaking all future inputs.
         if history_enabled and session_id in SESSION_HISTORY:
             if len(SESSION_HISTORY[session_id]) > 0 and SESSION_HISTORY[session_id][-1]["content"] == message:
                 SESSION_HISTORY[session_id].pop()
 
-        # [🔍 AIRS PROXY CATCH BLOCK]
-        # This catches errors thrown by the LiteLLM Gateway when IT enforces an AIRS policy block.
-        # The AI Gateway kills the request with an HTTP 400. We intercept it to format it nicely for the UI.
         if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
-
             scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
             log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
 
-            # Determine where in the pipeline the Gateway blocked the payload based on our tracker.
             if execution_phase == "Initial Inference":
                 direction = "User ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ MCP Tool (or User)"
             else:
                 direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
 
-            # Extract the violation category from the stringified LiteLLM error.
             category_match = re.search(r"'category':\s*'([^']+)'", error_str)
             category = category_match.group(1).capitalize() if category_match else "Security"
 
             if "http_400_error" in error_str or "scan_failed" in error_str:
-                # Gateway failsafe: Sometimes the LLM fails to output valid text during a tool execution,
-                # which causes the proxy egress scan to fail on an empty 0-byte payload.
                 clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
             else:
-                # Standard unified block message
                 clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
 
             sidebar_log = {"raw_error": error_str}
             try:
-                # Safely parse the nested LiteLLM error dictionary to render the raw JSON in the UI.
                 start_idx = error_str.find("{")
                 if start_idx != -1:
                     inner_str = error_str[start_idx:]
@@ -887,7 +609,6 @@ async def chat(
                 }
             }
 
-        # Generic fallback for non-security backend errors
         return {
             "bot": f"Error: {error_str}",
             "output": f"Error: {error_str}",

@@ -296,6 +296,14 @@ guardrails:
       default_on: false
       api_key: os.environ/AIRS_API_KEY
       profile_name: os.environ/AIRS_PROFILE
+  
+  - guardrail_name: "airs-mcp-scan"
+    litellm_params:
+      guardrail: panw_prisma_airs
+      mode: "pre_mcp_call"
+      default_on: false
+      api_key: os.environ/AIRS_API_KEY
+      profile_name: os.environ/AIRS_PROFILE
 EOF
 
 
