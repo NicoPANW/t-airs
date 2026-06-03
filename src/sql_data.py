@@ -43,11 +43,11 @@ def seed_database():
     lasts = ['smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'milland', 'davis', 'rodriguez', 'martinez', 'hernandez', 'lopez', 'gonzalez', 'wilson', 'anderson']
 
     # ==========================================
-    # 1. BANKING PERSONA ('users')
+    # 1. BANKING PERSONA ('bank_accounts')
     # ==========================================
-    print("   -> Seeding 'users' (Banking)...")
-    cursor.execute("DROP TABLE IF EXISTS users")
-    cursor.execute('''CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, balance REAL, notes TEXT, ssn TEXT, cc_number TEXT, tax_id TEXT, national_id TEXT, personal_identity_code TEXT)''')
+    print("   -> Seeding 'bank_accounts' (Banking)...")
+    cursor.execute("DROP TABLE IF EXISTS bank_accounts")
+    cursor.execute('''CREATE TABLE bank_accounts (id INTEGER PRIMARY KEY, name TEXT, balance REAL, notes TEXT, ssn TEXT, cc_number TEXT, tax_id TEXT, national_id TEXT, personal_identity_code TEXT)''')
     
     banking_data = [(10001, 'a_miller', 15000.50, 'VIP member. Handle with care.', '843-92-1049', '4111-1111-1111-1111', '12-3456789', 'NID-94827591', '120485-123U')]
     
@@ -63,7 +63,7 @@ def seed_database():
             f"NID-{random.randint(10000000,99999999)}", 
             f"{random.randint(100000,999999)}-{random.choice(['A','B','C','D'])}{random.randint(100,999)}"
         ))
-    cursor.executemany('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', banking_data)
+    cursor.executemany('INSERT INTO bank_accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', banking_data)
 
     # ==========================================
     # 2. AIRLINE PERSONA ('passenger_manifest')
