@@ -183,7 +183,6 @@ async def lifespan(app: FastAPI):
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-            # CRITICAL ARCHITECTURE NOTE: 
             # We initialize the Prisma AIRS asynchronous scanner here at the application lifespan level.
             # This ensures all concurrent FastAPI requests share a single underlying aiohttp connection pool, 
             # preventing socket exhaustion and massive latency spikes under heavy user load.
@@ -427,16 +426,16 @@ async def chat(
                     details, tool_output = "", ""
                     if tool_name == "transfer_funds":
                         src, dst, amt = tool_args.get("source_account"), tool_args.get("dest_account"), tool_args.get("amount")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance - {amt} WHERE id = '{src}';"})
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET balance = balance + {amt} WHERE id = '{dst}';"})
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance - {amt} WHERE id = '{src}';"})
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance + {amt} WHERE id = '{dst}';"})
                         tool_output = f"⚠️ Wire transfer of ${amt} executed."
                     elif tool_name == "freeze_account":
                         acc, reason = tool_args.get("account_id"), tool_args.get("reason")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
                         tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} frozen."
                     elif tool_name == "issue_replacement_card":
                         acc = tool_args.get("account_id")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE users SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"})
+                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"})
                         tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
                     elif tool_name == "upgrade_flight_seat":
                         tkt, cabin = tool_args.get("ticket_number"), tool_args.get("new_class")
