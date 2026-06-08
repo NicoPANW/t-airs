@@ -183,7 +183,10 @@ async def lifespan(app: FastAPI):
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-            # Instantiate the global async scanner
+            # CRITICAL ARCHITECTURE NOTE: 
+            # We initialize the Prisma AIRS asynchronous scanner here at the application lifespan level.
+            # This ensures all concurrent FastAPI requests share a single underlying aiohttp connection pool, 
+            # preventing socket exhaustion and massive latency spikes under heavy user load.
             async_scanner = Scanner()
             await async_scanner.sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
@@ -240,7 +243,7 @@ async def update_persona(persona_id: str = Form(...), new_context: str = Form(..
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "app_version": APP_VERSION})
+    return templates.TemplateResponse(request=request, name="index.html", context={"app_version": APP_VERSION})
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
