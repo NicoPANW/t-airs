@@ -65,7 +65,8 @@ To keep the application clean and scalable, this repository is a "Monorepo" spli
 
 ## 🔀 Typical user flow
 
-<img width="1713" height="1021" alt="Screenshot 2026-05-18 at 10 37 47" src="https://github.com/user-attachments/assets/70020616-907f-41a5-9add-e6e7c75a2f02" />
+<img width="720" height="390" alt="Screenshot 2026-06-12 at 16 08 30" src="https://github.com/user-attachments/assets/9b25ee6d-0910-494d-8fc3-166cc9e42292" />
+
 
 ---
 
