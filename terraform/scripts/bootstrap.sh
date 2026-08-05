@@ -152,7 +152,7 @@ fi
 # Install all other Python packages required by the application.
 echo "Installing remaining Python requirements..."
 /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
-/opt/t-airs/venv/bin/pip install "litellm[proxy]"
+/opt/t-airs/venv/bin/pip install "litellm[all]"
 
 
 # Pre-download the embedding model for the RAG system from HuggingFace.
