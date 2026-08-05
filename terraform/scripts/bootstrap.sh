@@ -181,6 +181,16 @@ EOF
 # Inject GCP model definitions if the target cloud is GCP.
 if [ "${target_cloud}" == "gcp" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+  - model_name: gemini-3.6-flash
+    litellm_params:
+      model: vertex_ai/gemini-3.6-flash
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: gemini-3.5-flash-lite
+    litellm_params:
+      model: vertex_ai/gemini-3.5-flash-lite
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
   - model_name: gemini-2.5-pro
     litellm_params:
       model: vertex_ai/gemini-2.5-pro
@@ -198,6 +208,16 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       vertex_location: "global"
 
   # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
+  - model_name: auto-router
+    litellm_params:
+      model: vertex_ai/gemini-3.6-flash
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+  - model_name: auto-router
+    litellm_params:
+      model: vertex_ai/gemini-3.5-flash-lite
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
   - model_name: auto-router
     litellm_params:
       model: vertex_ai/gemini-2.5-pro
