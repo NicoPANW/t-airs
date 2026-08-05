@@ -6,6 +6,7 @@ python-multipart==0.0.32
 pan-aisecurity==0.11.0
 openai==2.53.0
 litellm==1.95.0
+litellm[proxy]==1.95.0
 litellm-enterprise==0.1.52
 litellm-proxy-extras==0.4.81
 mcp==1.29.0
