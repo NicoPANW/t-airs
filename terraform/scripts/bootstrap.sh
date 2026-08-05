@@ -152,7 +152,16 @@ fi
 # Install all other Python packages required by the application.
 echo "Installing remaining Python requirements..."
 /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
-/opt/t-airs/venv/bin/pip install "litellm[all]"
+/opt/t-airs/venv/bin/pip install "fastapi"
+/opt/t-airs/venv/bin/pip install "litellm"
+
+# Inject FastAPI 0.115+ compatibility shim for LiteLLM versions expecting 'get_flat_dependant'
+/opt/t-airs/venv/bin/python3 -c "
+import fastapi.dependencies.utils as utils
+if not hasattr(utils, 'get_flat_dependant'):
+    with open(utils.__file__, 'a') as f:
+        f.write('\n\ndef get_flat_dependant(dependant, *, skip_repeats: bool = False):\n    flat = [dependant]\n    for dep in dependant.dependencies:\n        flat.extend(get_flat_dependant(dep, skip_repeats=skip_repeats))\n    return flat\n')
+"
 
 
 # Pre-download the embedding model for the RAG system from HuggingFace.
@@ -172,17 +181,6 @@ EOF
 # Inject GCP model definitions if the target cloud is GCP.
 if [ "${target_cloud}" == "gcp" ]; then
 cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
-  # --- EXPLICIT MODELS (For the manual UI dropdown) ---
-  - model_name: gemini-3.1-flash-lite
-    litellm_params:
-      model: vertex_ai/gemini-3.1-flash-lite
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: gemini-3.5-flash
-    litellm_params:
-      model: vertex_ai/gemini-3.5-flash
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
   - model_name: gemini-2.5-pro
     litellm_params:
       model: vertex_ai/gemini-2.5-pro
@@ -200,16 +198,6 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       vertex_location: "global"
 
   # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
-  - model_name: auto-router
-    litellm_params:
-      model: vertex_ai/gemini-3.1-flash-lite
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: auto-router
-    litellm_params:
-      model: vertex_ai/gemini-3.5-flash
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
   - model_name: auto-router
     litellm_params:
       model: vertex_ai/gemini-2.5-pro
