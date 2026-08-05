@@ -151,7 +151,8 @@ fi
 
 # Install all other Python packages required by the application.
 echo "Installing remaining Python requirements..."
-pip3 install -r /opt/t-airs/src/requirements.txt
+/opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
+/opt/t-airs/venv/bin/pip install "litellm[proxy]"
 
 
 # Pre-download the embedding model for the RAG system from HuggingFace.
@@ -348,7 +349,7 @@ Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
 
 WorkingDirectory=/opt/t-airs/src
 # Before starting the app, wait until the AI Gateway is fully responsive.
-ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000 > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
+ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000/health/readiness > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
 # Launch the main Python application, passing in credentials.
 ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
 Restart=always
