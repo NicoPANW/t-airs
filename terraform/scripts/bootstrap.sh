@@ -152,8 +152,7 @@ fi
 # Install all other Python packages required by the application.
 echo "Installing remaining Python requirements..."
 /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
-# /opt/t-airs/venv/bin/pip install "fastapi"
-# /opt/t-airs/venv/bin/pip install "litellm"
+
 
 # Inject FastAPI 0.115+ compatibility shim for LiteLLM versions expecting 'get_flat_dependant'
 /opt/t-airs/venv/bin/python3 -c "
@@ -346,7 +345,7 @@ fi
 cat <<EOF > /etc/systemd/system/t-airs.service
 [Unit]
 Description=T-AIRS
-After=network.target litellm.service
+After=${TAIRS_AFTER}
 
 [Service]
 # Set environment variables required by HuggingFace libraries to cache models correctly.
@@ -357,9 +356,9 @@ Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
 
 WorkingDirectory=/opt/t-airs/src
 # Before starting the app, wait until the AI Gateway is fully responsive.
-ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000/health/readiness > /dev/null; do echo "Waiting for AI Gateway..."; sleep 2; done'
+ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000/health/readiness > /dev/null; do echo "Waiting for local LiteLLM AI Gateway..."; sleep 2; done'
 # Launch the main Python application, passing in credentials.
-ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000 --gateway-provider portkey
 Restart=always
 User=root
 

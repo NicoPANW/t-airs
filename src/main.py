@@ -20,6 +20,12 @@ from fastapi.templating import Jinja2Templates
 
 # 1. The Universal AI Gateway Client
 from openai import AsyncOpenAI
+try:
+    from portkey_ai import PORTKEY_GATEWAY_URL, createHeaders
+    PORTKEY_AVAILABLE = True
+except ImportError:
+    PORTKEY_AVAILABLE = False
+    PORTKEY_GATEWAY_URL = "https://api.portkey.ai/v1"
 
 # 2. MCP Imports (Database Tool Calling)
 from mcp import ClientSession, StdioServerParameters
@@ -63,11 +69,13 @@ parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
+parser.add_argument("--gateway-provider", help="AI Gateway Provider", choices=["portkey", "litellm"], default="portkey")
 args, _ = parser.parse_known_args()
 
 AIRS_KEY = args.airs_key
 AIRS_PROFILE_NAME = args.airs_profile
-GATEWAY_URL = args.gateway_url 
+GATEWAY_URL = args.gateway_url
+GATEWAY_PROVIDER = args.gateway_provider
 
 # --- GLOBAL STATE TRACKERS & CLIENTS ---
 AIRS_CONFIGURED = False
@@ -79,7 +87,10 @@ PERSONAS = personas.PERSONAS
 SESSION_HISTORY = {}
 MAX_HISTORY = 10
 
-llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
+if GATEWAY_PROVIDER == "portkey":
+    llm_client = AsyncOpenAI(base_url=PORTKEY_GATEWAY_URL, api_key=AIRS_KEY or "sk-t-airs-dummy-key")
+else:
+    llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
 
 mcp_session = None
 openai_tools = []
@@ -366,11 +377,22 @@ async def chat(
         # =====================================================================
         # 4. AI GATEWAY INFERENCE
         # =====================================================================
-        print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
+        print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway ({GATEWAY_PROVIDER.upper()})...")
 
-        gateway_params_agent = {}
-        if enforcement_placement == "gateway" and airs_enabled:
-            gateway_params_agent = {"guardrails": ["airs-mcp-scan"]}
+        extra_headers = {}
+        extra_body = {}
+
+        if GATEWAY_PROVIDER == "portkey" and PORTKEY_AVAILABLE:
+            is_gemini = "gemini" in model_id or "google" in model_id
+            provider_name = "google" if is_gemini else "bedrock"
+            extra_headers = createHeaders(
+                api_key=AIRS_KEY,
+                provider=provider_name,
+                model=model_id
+            )
+        elif GATEWAY_PROVIDER == "litellm":
+            if enforcement_placement == "gateway" and airs_enabled:
+                extra_body = {"guardrails": ["airs-mcp-scan"]}
 
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
@@ -378,18 +400,23 @@ async def chat(
             tools=active_tools if active_tools else None,
             temperature=0.7,
             user=end_user,
-            extra_body=gateway_params_agent
+            extra_headers=extra_headers if extra_headers else None,
+            extra_body=extra_body if extra_body else None
         )
 
         response = raw_response.parse()
         
         actual_model = getattr(response, "model", model_id)
-        hidden_model = raw_response.headers.get("x-litellm-model-name")
 
-        if hidden_model:
-            actual_model = hidden_model
-        elif actual_model == "auto-router":
-            actual_model = "Dynamically Routed (Gateway Load Balancer)"
+        if GATEWAY_PROVIDER == "portkey":
+            portkey_trace_id = raw_response.headers.get("x-portkey-trace-id", "N/A")
+            architecture_trace["ai_gateway"]["portkey_trace_id"] = portkey_trace_id
+        else:
+            hidden_model = raw_response.headers.get("x-litellm-model-name")
+            if hidden_model:
+                actual_model = hidden_model
+            elif actual_model == "auto-router":
+                actual_model = "Dynamically Routed (Gateway Load Balancer)"
 
         if model_id == "auto-router":
             architecture_trace["ai_gateway"]["routed_to"] = f"auto-router ➔ {actual_model}"
@@ -515,7 +542,8 @@ async def chat(
                 tools=active_tools if active_tools else None,
                 temperature=0.7,
                 user=end_user,
-                extra_body=gateway_params_agent
+                extra_headers=extra_headers if extra_headers else None,
+                extra_body=extra_body if extra_body else None
             )
             response = raw_response.parse()
             response_msg = response.choices[0].message
@@ -598,45 +626,60 @@ async def chat(
             if len(SESSION_HISTORY[session_id]) > 0 and SESSION_HISTORY[session_id][-1]["content"] == message:
                 SESSION_HISTORY[session_id].pop()
 
-        if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
-            scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
-            log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
-
-            if execution_phase == "Initial Inference":
-                direction = "User ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ MCP Tool (or User)"
-            else:
-                direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
-
-            category_match = re.search(r"'category':\s*'([^']+)'", error_str)
-            category = category_match.group(1).capitalize() if category_match else "Security"
-
-            if "http_400_error" in error_str or "scan_failed" in error_str:
-                clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
-            else:
-                clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
-
-            sidebar_log = {"raw_error": error_str}
-            try:
-                start_idx = error_str.find("{")
-                if start_idx != -1:
-                    inner_str = error_str[start_idx:]
-                    parsed_dict = ast.literal_eval(inner_str)
-                    sidebar_log = {log_key: parsed_dict.get("error", parsed_dict)}
-            except Exception as parse_error:
-                print(f"Debug: Failed to parse inner LiteLLM error: {parse_error}")
-
-            print(f"🛑 AIRS GATEWAY BLOCK: {scan_type} | Direction: {direction} | Category: {category}")
-            print(f"🏁 REQUEST ABORTED | Security Status: Blocked by Gateway")
-            print(f"{'='*40}\n")
-            return {
-                "bot": clean_msg,
-                "output": clean_msg,
-                "logs": {
-                    "security_scan": f"{scan_type} ({direction})",
-                    "raw_response": json.dumps(sidebar_log, indent=2),
-                    "trace": architecture_trace
+        if GATEWAY_PROVIDER == "portkey":
+            if "portkey" in error_str.lower() or "blocked" in error_str.lower():
+                clean_msg = "🛡️ Blocked by Prisma AIRS (Portkey Gateway) policy violation."
+                print(f"🛑 AIRS GATEWAY BLOCK: Request blocked by Gateway proxy rules.")
+                print(f"{'='*40}\n")
+                return {
+                    "bot": clean_msg,
+                    "output": clean_msg,
+                    "logs": {
+                        "security_scan": "GATEWAY BLOCK",
+                        "raw_response": json.dumps({"error": error_str}, indent=2),
+                        "trace": architecture_trace
+                    }
                 }
-            }
+        else:
+            if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
+                scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
+                log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
+
+                if execution_phase == "Initial Inference":
+                    direction = "User ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ MCP Tool (or User)"
+                else:
+                    direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
+
+                category_match = re.search(r"'category':\s*'([^']+)'", error_str)
+                category = category_match.group(1).capitalize() if category_match else "Security"
+
+                if "http_400_error" in error_str or "scan_failed" in error_str:
+                    clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
+                else:
+                    clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
+
+                sidebar_log = {"raw_error": error_str}
+                try:
+                    start_idx = error_str.find("{")
+                    if start_idx != -1:
+                        inner_str = error_str[start_idx:]
+                        parsed_dict = ast.literal_eval(inner_str)
+                        sidebar_log = {log_key: parsed_dict.get("error", parsed_dict)}
+                except Exception as parse_error:
+                    print(f"Debug: Failed to parse inner LiteLLM error: {parse_error}")
+
+                print(f"🛑 AIRS GATEWAY BLOCK: {scan_type} | Direction: {direction} | Category: {category}")
+                print(f"🏁 REQUEST ABORTED | Security Status: Blocked by Gateway")
+                print(f"{'='*40}\n")
+                return {
+                    "bot": clean_msg,
+                    "output": clean_msg,
+                    "logs": {
+                        "security_scan": f"{scan_type} ({direction})",
+                        "raw_response": json.dumps(sidebar_log, indent=2),
+                        "trace": architecture_trace
+                    }
+                }
 
         return {
             "bot": f"Error: {error_str}",
