@@ -32,7 +32,7 @@ fi
 echo "🔍 Checking GCP Authentication..."
 TOKEN=$(gcloud auth print-access-token 2>/dev/null)
 if [ -z "$TOKEN" ]; then
-    echo "❌ ERROR: Not logged into GCP. Run: gcloud auth application-default login"
+    echo "❌ ERROR: Not logged into GCP. Run: gcloud auth login"
     exit 1
 fi
 
