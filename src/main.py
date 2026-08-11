@@ -109,6 +109,16 @@ embedder = None
 
 
 def discover_gateway_models():
+    if GATEWAY_PROVIDER == "portkey":
+        # Bypass local LiteLLM port checks and return supported SaaS sandbox models
+        models = [
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash-lite",
+            "meta.llama3-8b-instruct-v1:0",
+            "mistral.ministral-3-8b-instruct"
+        ]
+        return sorted(models)
     found = []
     try:
         response = requests.get(f"{GATEWAY_URL}/v1/models", timeout=5)
