@@ -2,7 +2,7 @@
 
 # Capture the Terraform variables passed into the template.
 # These variables control which blocks of this script are executed.
-ENABLE_LOCAL_LLM="${enable_local_llm}"
+GATEWAY_PROVIDER="${gateway_provider}" # e.g., "litellm" or "portkey"
 
 # Set a unique and descriptive hostname for the VM based on its cloud and environment.
 # This makes it easier to identify instances in the cloud console.
@@ -31,84 +31,6 @@ EOF
 systemctl restart unattended-upgrades
 
 
-# ==========================================
-# DYNAMIC LLM BLOCK (GPU & OLLAMA SETUP)
-# This entire block only runs if 'enable_local_llm' is true.
-# ==========================================
-if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
-    
-
-    # First, check if NVIDIA drivers are already loaded.
-    # This is expected on a Deep Learning VM/AMI, so we can skip installation.
-    if lsmod | grep -q nvidia; then
-        echo "✅ NVIDIA drivers are already loaded and active."
-    else
-        echo "⚠️ Nvidia drivers missing (Check your DLAMI/DLVM mapping!)"
-    fi
-
-    # Install and enable the Ollama service if it's not already present.
-    export HOME=/root
-    if ! command -v ollama &> /dev/null; then
-        echo "Ollama not found. Installing..."
-        curl -fsSL https://ollama.com/install.sh | sh
-        systemctl enable --now ollama
-    else
-        echo "✅ Ollama is already installed."
-        systemctl start ollama
-    fi
-
-    # Wait for the Ollama API to become responsive before proceeding.
-    echo "Waiting for Ollama engine to initialize..."
-    until curl -s http://127.0.0.1:11434/api/tags > /dev/null; do 
-        sleep 2
-    done
-
-    # Configure Ollama to keep multiple models loaded in VRAM simultaneously.
-    # This improves performance by avoiding constant loading/unloading.
-    echo "Configuring Ollama to hold multiple models in VRAM..."
-    mkdir -p /etc/systemd/system/ollama.service.d
-    cat <<EOF > /etc/systemd/system/ollama.service.d/override.conf
-[Service]
-# Allow up to 3 models to be loaded into VRAM at the same time
-Environment="OLLAMA_MAX_MODELS=3"
-# Allow multiple requests to be processed concurrently
-Environment="OLLAMA_NUM_PARALLEL=3"
-EOF
-    systemctl daemon-reload
-    systemctl restart ollama
-    sleep 3 # Give it a second to wake back up
-
-    # Pull the required local LLM models from the Ollama registry.
-    echo "Pre-loading LLM models (this may take 10-15 minutes)..."
-    
-    MODELS_TO_PULL="llama3.2:3b ministral-3:3b qwen2.5:1.5b"
-    
-    for model in $MODELS_TO_PULL; do
-        if ! ollama list | grep -q "$model"; then
-            echo "⬇️ Pulling $model..."
-            ollama pull "$model"
-        else
-            echo "✅ $model is already downloaded."
-        fi
-
-        # Verify the model is fully pulled and registered.
-        echo "Verifying $model readiness..."
-        until ollama list | grep -q "$model"; do 
-            sleep 5
-        done
-        # Send a request with 'keep_alive: -1' to lock the model in VRAM indefinitely.
-        echo "🧠 Locking $model into GPU VRAM..."
-        curl -s -X POST http://127.0.0.1:11434/api/generate -d "{\"model\": \"$model\", \"keep_alive\": -1}" > /dev/null
-        echo "🚀 $model is ready to use."
-    done
-
-    echo "✅ All local GPU models are successfully loaded!"
-
-else
-    # This message is shown if local LLMs are disabled.
-    echo "ENABLE_LOCAL_LLM is false. Skipping GPU/Ollama setup."
-fi
-# ==========================================
 
 
 # --- 3. Deploy Application Code, AI Gateway, MCP & RAG ---
@@ -138,16 +60,6 @@ python3 /opt/t-airs/src/sql_data.py
 python3 -m venv venv
 source venv/bin/activate
 
-# Conditionally install the correct PyTorch version.
-# GPU instances need the large CUDA-enabled version, while CPU instances use a lightweight one.
-if [ "$ENABLE_LOCAL_LLM" == "true" ]; then
-    echo "GPU Enabled: Installing massive CUDA 12.4 optimized PyTorch wheels..."
-    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-else
-    echo "API Only Mode: Skipping CUDA wheels (will use lightweight CPU version for RAG)."
-fi
-
-
 
 # Install all other Python packages required by the application.
 echo "Installing remaining Python requirements..."
@@ -169,17 +81,20 @@ echo "Pre-downloading HuggingFace BAAI Embedding Model..."
 python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-base-en-v1.5')"
 echo "✅ BAAI Model successfully cached!"
 
-# --- 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG ---
-# This section creates the LiteLLM configuration file on the fly.
-# The configuration is tailored to the specific cloud provider (GCP/AWS) and whether local LLMs are used.
-echo "Building LiteLLM routing configuration..."
-cat <<EOF > /opt/t-airs/src/litellm_config.yaml
+
+# ==========================================
+# 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG
+# Only build this if LiteLLM is the active gateway
+# ==========================================
+if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
+    echo "Building LiteLLM routing configuration..."
+    cat <<EOF > /opt/t-airs/src/litellm_config.yaml
 model_list:
 EOF
 
-# Inject GCP model definitions if the target cloud is GCP.
-if [ "${target_cloud}" == "gcp" ]; then
-cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+    # Inject GCP model definitions if the target cloud is GCP.
+    if [ "${target_cloud}" == "gcp" ]; then
+    cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: gemini-3.6-flash
     litellm_params:
       model: vertex_ai/gemini-3.6-flash
@@ -233,11 +148,11 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       vertex_project: "${gcp_project}"
       vertex_location: "global"
 EOF
-# Inject AWS model definitions if the target cloud is AWS.
-elif [ "${target_cloud}" == "aws" ]; then
-# Loop through each model ID passed from Terraform and add it to the config.
-for model_id in ${bedrock_model_ids}; do
-cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+    # Inject AWS model definitions if the target cloud is AWS.
+    elif [ "${target_cloud}" == "aws" ]; then
+    # Loop through each model ID passed from Terraform and add it to the config.
+    for model_id in ${bedrock_model_ids}; do
+    cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: $${model_id}
     litellm_params:
       model: bedrock/$${model_id}
@@ -247,30 +162,12 @@ cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
       model: bedrock/$${model_id}
       aws_region_name: "${aws_region}"
 EOF
-done
-fi
+    done
+    fi
 
-# Inject local Ollama model definitions if GPU mode is enabled.
-if [ "${enable_local_llm}" == "true" ]; then
-cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
-  - model_name: local-llama3.2:3b
-    litellm_params:
-      model: ollama/llama3.2:3b
-      api_base: "http://127.0.0.1:11434"
-  - model_name: local-ministral:3b
-    litellm_params:
-      model: ollama/ministral-3:3b
-      api_base: "http://127.0.0.1:11434"
-  - model_name: local-qwen2.5:1.5b
-    litellm_params:
-      model: ollama/qwen2.5:1.5b
-      api_base: "http://127.0.0.1:11434"
-EOF
-fi
 
-# Add the final settings for routing and Prisma AIRS guardrails.
-# The guardrails are defined but set to 'default_on: false' so they can be toggled from the UI.
-cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+    # Add the final settings for routing and Prisma AIRS guardrails.
+    cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 litellm_settings:
   drop_params: true
   modify_params: true
@@ -303,6 +200,7 @@ guardrails:
       api_key: os.environ/AIRS_API_KEY
       profile_name: os.environ/AIRS_PROFILE
 EOF
+fi
 
 
 # --- 4. Create Systemd Services ---
@@ -311,9 +209,13 @@ EOF
 
 echo "Configuring Prisma AIRS Integration Mode: $AIRS_MODE"
 
-# Create the service file for the LiteLLM AI Gateway.
-# This service is responsible for routing requests to the correct LLM.
-cat <<EOF > /etc/systemd/system/litellm.service
+# Determine base dependencies for T-AIRS
+TAIRS_AFTER="network.target"
+
+# Only configure and start LiteLLM if it is the chosen gateway
+if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
+    echo "Configuring LiteLLM Service..."
+    cat <<EOF > /etc/systemd/system/litellm.service
 [Unit]
 Description=LiteLLM AI Gateway
 After=network.target
@@ -321,7 +223,6 @@ After=network.target
 [Service]
 WorkingDirectory=/opt/t-airs/src
 # Inject the AIRS credentials directly into the gateway's environment.
-# This is necessary for the live UI toggle to enable/disable gateway-level scanning.
 Environment="PANW_PRISMA_AIRS_API_KEY=${airs_key}"
 Environment="AIRS_API_KEY=${airs_key}"
 Environment="AIRS_PROFILE=${airs_profile}"
@@ -333,13 +234,12 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-
-# Create the service file for the main T-AIRS application (FastAPI server).
-# Conditionally add 'ollama.service' as a dependency if local LLMs are enabled.
-if [ "${enable_local_llm}" == "true" ]; then
-    TAIRS_AFTER="network.target litellm.service ollama.service"
-else
-    TAIRS_AFTER="network.target litellm.service"
+    systemctl daemon-reload
+    systemctl enable litellm
+    systemctl start litellm
+    
+    # Add litellm to T-AIRS dependencies
+    TAIRS_AFTER="$TAIRS_AFTER litellm.service"
 fi
 
 cat <<EOF > /etc/systemd/system/t-airs.service
@@ -352,13 +252,17 @@ After=${TAIRS_AFTER}
 Environment="HOME=/root"
 Environment="HF_HOME=/root/.cache/huggingface"
 Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
-
+# Inject Portkey credentials from Terraform (ignored if LiteLLM is active)
+Environment="PORTKEY_API_KEY=${portkey_api_key}"
+Environment="PORTKEY_VIRTUAL_KEY=${portkey_virtual_key}"
 
 WorkingDirectory=/opt/t-airs/src
-# Before starting the app, wait until the AI Gateway is fully responsive.
-ExecStartPre=/bin/bash -c 'until curl -s -f http://127.0.0.1:4000/health/readiness > /dev/null; do echo "Waiting for local LiteLLM AI Gateway..."; sleep 2; done'
-# Launch the main Python application, passing in credentials.
-ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000 --gateway-provider portkey
+
+# Before starting the app, wait until the AI Gateway is fully responsive IF using LiteLLM
+ExecStartPre=/bin/bash -c 'if [ "${gateway_provider}" == "litellm" ]; then until curl -s -f http://127.0.0.1:4000/health/readiness > /dev/null; do echo "Waiting for local LiteLLM AI Gateway..."; sleep 2; done; fi'
+
+# Launch the main Python application dynamically configured for the selected provider
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000 --gateway-provider ${gateway_provider}
 Restart=always
 User=root
 
@@ -370,7 +274,5 @@ EOF
 # Reload the systemd daemon to recognize the new service files,
 # then enable and start the services.
 systemctl daemon-reload
-systemctl enable litellm
-systemctl start litellm
 systemctl enable t-airs
 systemctl start t-airs

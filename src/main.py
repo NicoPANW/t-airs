@@ -67,6 +67,8 @@ except Exception as e:
 # --- CAPTURE CLI ARGUMENTS ---
 parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
+parser.add_argument("--portkey-api-key", help="Portkey API Key", default=os.getenv("PORTKEY_API_KEY"))
+parser.add_argument("--portkey-virtual-key", help="Portkey Virtual Key", default=os.getenv("PORTKEY_VIRTUAL_KEY"))
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
 parser.add_argument("--gateway-provider", help="AI Gateway Provider", choices=["portkey", "litellm"], default="portkey")
@@ -88,7 +90,7 @@ SESSION_HISTORY = {}
 MAX_HISTORY = 10
 
 if GATEWAY_PROVIDER == "portkey":
-    llm_client = AsyncOpenAI(base_url=PORTKEY_GATEWAY_URL, api_key=AIRS_KEY or "sk-t-airs-dummy-key")
+    llm_client = AsyncOpenAI(base_url=PORTKEY_GATEWAY_URL, api_key=args.portkey_api_key or "sk-dummy")
 else:
     llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
 
@@ -105,23 +107,6 @@ embedder = None
 
 # --- CORE LOGIC HELPERS ---
 
-def check_gpu_status():
-    try:
-        gpu_info = subprocess.check_output(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            text=True, timeout=5
-        ).strip()
-        try:
-            ollama_ps = subprocess.check_output(["ollama", "ps"], text=True, timeout=5).strip().split('\n')
-            loaded_models = [line.split()[0] for line in ollama_ps[1:] if line.strip()]
-            model_str = f"| Models in VRAM: {', '.join(loaded_models)}" if loaded_models else "| No models currently active in VRAM"
-        except subprocess.TimeoutExpired:
-            model_str = "| Ollama engine is busy/hanging"
-        except Exception:
-            model_str = "| Ollama engine not responding"
-        return f"✅ GPU ONLINE: {gpu_info} {model_str}"
-    except Exception as e:
-        return f"⚠️ NO GPU DETECTED: Running on CPU."
 
 def discover_gateway_models():
     found = []
@@ -187,7 +172,6 @@ async def lifespan(app: FastAPI):
     print("\n" + "="*50, flush=True)
     print("🚀 T-AIRS STARTUP", flush=True)
     print("="*50, flush=True)
-    print(f"RESULT: {check_gpu_status()}", flush=True)
 
     if AIRS_KEY and AIRS_PROFILE_NAME:
         print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...", flush=True)
@@ -384,7 +368,7 @@ async def chat(
 
         if GATEWAY_PROVIDER == "portkey" and PORTKEY_AVAILABLE:
             is_gemini = "gemini" in model_id or "google" in model_id
-            provider_name = "google" if is_gemini else "bedrock"
+            provider_name = "vertex-ai" if is_gemini else "bedrock"
             extra_headers = createHeaders(
                 api_key=AIRS_KEY,
                 provider=provider_name,
