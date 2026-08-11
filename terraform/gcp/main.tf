@@ -46,6 +46,7 @@ locals {
     gcp_region       = var.gcp_region
     env              = local.env
     target_cloud     = "gcp"
+    gateway_provider = var.gateway_provider
     aws_region       = "" # Not used in GCP deployment
     bedrock_model_ids = "" # Not used in GCP deployment
   })

@@ -15,6 +15,12 @@ variable "prisma_airs_ips" {
   ]
 }
 
+variable "gateway_provider" {
+  description = "AI Gateway Provider (portkey or litellm)"
+  type        = string
+  default     = "portkey"
+}
+
 variable "enable_local_llm" {
   description = "If true, deploys an N1 instance with a T4 GPU and installs Ollama/Llama3."
   type        = bool

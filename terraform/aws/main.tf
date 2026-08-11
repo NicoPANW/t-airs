@@ -45,6 +45,7 @@ locals {
     gcp_region       = ""
     env              = local.env
     target_cloud     = "aws" 
+    gateway_provider = var.gateway_provider
     aws_region       = var.aws_region
     # Pass the list of models as a space-separated string for easy parsing in bash.
     bedrock_model_ids = join(" ", var.bedrock_model_ids)
@@ -228,6 +229,12 @@ resource "aws_iam_role_policy" "bedrock_access" {
       }
     ]
   })
+}
+
+variable "gateway_provider" {
+  description = "AI Gateway Provider (portkey or litellm)"
+  type        = string
+  default     = "portkey"
 }
 
 # Creates an instance profile to attach the IAM role to the EC2 instance.
