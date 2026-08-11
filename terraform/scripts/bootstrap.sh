@@ -245,7 +245,7 @@ fi
 cat <<EOF > /etc/systemd/system/t-airs.service
 [Unit]
 Description=T-AIRS
-After=${TAIRS_AFTER}
+After=$${TAIRS_AFTER}
 
 [Service]
 # Set environment variables required by HuggingFace libraries to cache models correctly.

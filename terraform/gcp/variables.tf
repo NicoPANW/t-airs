@@ -64,3 +64,17 @@ variable "gcp_subnet_cidr" {
   type        = string
   default     = "10.10.0.0/24"
 }
+
+variable "portkey_api_key" {
+  description = "Portkey API Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "portkey_virtual_key" {
+  description = "Portkey Virtual Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

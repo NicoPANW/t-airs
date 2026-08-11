@@ -46,12 +46,27 @@ locals {
     env              = local.env
     target_cloud     = "aws" 
     gateway_provider = var.gateway_provider
+    portkey_api_key     = var.portkey_api_key
+    portkey_virtual_key = var.portkey_virtual_key
     aws_region       = var.aws_region
     # Pass the list of models as a space-separated string for easy parsing in bash.
     bedrock_model_ids = join(" ", var.bedrock_model_ids)
   })
 }
 
+variable "portkey_api_key" {
+  description = "Portkey API Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "portkey_virtual_key" {
+  description = "Portkey Virtual Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
 # ==========================================
 # AWS AMI (MACHINE IMAGE) SELECTION
 # ==========================================
