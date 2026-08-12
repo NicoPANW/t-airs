@@ -383,8 +383,7 @@ async def chat(
                 # Utilize a secure saved Integration Slug to bypass block_inline_config restrictions
                 extra_headers = createHeaders(
                     api_key=args.portkey_api_key or AIRS_KEY,
-                    virtual_key=slug_to_use,
-                    model=model_id
+                    virtual_key=slug_to_use
                 )
             else:
                 is_gemini = "gemini" in model_id or "google" in model_id
