@@ -296,6 +296,15 @@ async def chat(
         model_id = validated_models[0] if validated_models else None
         architecture_trace["ai_gateway"]["routed_to"] = model_id
 
+    # Dynamically determine the model ID passed to the client payload
+    llm_model_id = model_id
+    if GATEWAY_PROVIDER == "portkey":
+        if args.portkey_slug:
+            # Satisfy OpenAI SDK validation while letting Portkey define the model on the dashboard
+            llm_model_id = "portkey-default"
+        elif model_id == "auto-router":
+            llm_model_id = "gemini-2.5-flash"
+
     execution_phase = "Initial Inference"
 
     try:
@@ -385,12 +394,12 @@ async def chat(
                     virtual_key=slug_to_use
                 )
             else:
-                is_gemini = "gemini" in model_id or "google" in model_id
+                is_gemini = "gemini" in llm_model_id or "google" in llm_model_id
                 provider_name = "vertex-ai" if is_gemini else "bedrock"
                 extra_headers = createHeaders(
                     api_key=args.portkey_api_key,
                     provider=provider_name,
-                    model=model_id
+                    model=llm_model_id
                 )
         elif GATEWAY_PROVIDER == "litellm":
             if enforcement_placement == "gateway" and airs_enabled:
@@ -410,7 +419,7 @@ async def chat(
         print(f"   - Extra Body Parameter: {extra_body if extra_body else 'None'}")
 
         raw_response = await llm_client.chat.completions.with_raw_response.create(
-            model=model_id,
+            model=llm_model_id,
             messages=messages,
             tools=active_tools if active_tools else None,
             temperature=0.7,
@@ -421,7 +430,7 @@ async def chat(
 
         response = raw_response.parse()
         
-        actual_model = getattr(response, "model", model_id)
+        actual_model = getattr(response, "model", llm_model_id)
 
         if GATEWAY_PROVIDER == "portkey":
             portkey_trace_id = raw_response.headers.get("x-portkey-trace-id", "N/A")
@@ -556,7 +565,7 @@ async def chat(
 
             execution_phase = f"Agent Iteration {iteration}"
             raw_response = await llm_client.chat.completions.with_raw_response.create(
-                model=model_id,
+                model=llm_model_id,
                 messages=messages,
                 tools=active_tools if active_tools else None,
                 temperature=0.7,
