@@ -298,12 +298,8 @@ async def chat(
 
     # Dynamically determine the model ID passed to the client payload
     llm_model_id = model_id
-    if GATEWAY_PROVIDER == "portkey":
-        if args.portkey_slug:
-            # Satisfy OpenAI SDK validation while letting Portkey define the model on the dashboard
-            llm_model_id = "portkey-default"
-        elif model_id == "auto-router":
-            llm_model_id = "gemini-2.5-flash"
+    if GATEWAY_PROVIDER == "portkey" and model_id == "auto-router":
+        llm_model_id = "gemini-2.5-flash"
 
     execution_phase = "Initial Inference"
 
