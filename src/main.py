@@ -25,7 +25,7 @@ try:
     PORTKEY_AVAILABLE = True
 except ImportError:
     PORTKEY_AVAILABLE = False
-    PORTKEY_GATEWAY_URL = "https://api.portkey.ai/v1"
+    PORTKEY_GATEWAY_URL = "https://aigw.portkey.ai/v1"
 
 # 2. MCP Imports (Database Tool Calling)
 from mcp import ClientSession, StdioServerParameters
