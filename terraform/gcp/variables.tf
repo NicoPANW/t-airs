@@ -72,6 +72,12 @@ variable "portkey_api_key" {
   sensitive   = true
 }
 
+variable "portkey_slug" {
+  description = "Portkey Slug (Saved Integration Virtual Key, e.g. @slug-name)"
+  type        = string
+  default     = ""
+}
+
 variable "portkey_virtual_key" {
   description = "Portkey Virtual Key"
   type        = string

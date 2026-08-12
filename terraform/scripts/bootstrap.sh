@@ -255,6 +255,7 @@ Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
 # Inject Portkey credentials from Terraform (ignored if LiteLLM is active)
 Environment="PORTKEY_API_KEY=${portkey_api_key}"
 Environment="PORTKEY_VIRTUAL_KEY=${portkey_virtual_key}"
+Environment="PORTKEY_SLUG=${portkey_slug}"
 
 WorkingDirectory=/opt/t-airs/src
 
@@ -262,7 +263,7 @@ WorkingDirectory=/opt/t-airs/src
 ExecStartPre=/bin/bash -c 'if [ "${gateway_provider}" == "litellm" ]; then until curl -s -f http://127.0.0.1:4000/health/readiness > /dev/null; do echo "Waiting for local LiteLLM AI Gateway..."; sleep 2; done; fi'
 
 # Launch the main Python application dynamically configured for the selected provider
-ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000 --gateway-provider ${gateway_provider}
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000 --gateway-provider ${gateway_provider} --portkey-slug "${portkey_slug}"
 Restart=always
 User=root
 

@@ -48,10 +48,17 @@ locals {
     gateway_provider = var.gateway_provider
     portkey_api_key     = var.portkey_api_key
     portkey_virtual_key = var.portkey_virtual_key
+    portkey_slug        = var.portkey_slug
     aws_region       = var.aws_region
     # Pass the list of models as a space-separated string for easy parsing in bash.
     bedrock_model_ids = join(" ", var.bedrock_model_ids)
   })
+}
+
+variable "portkey_slug" {
+  description = "Portkey Slug (Saved Integration Virtual Key, e.g. @slug-name)"
+  type        = string
+  default     = ""
 }
 
 variable "portkey_api_key" {

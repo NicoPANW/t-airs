@@ -69,6 +69,7 @@ parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--portkey-api-key", help="Portkey API Key", default=os.getenv("PORTKEY_API_KEY"))
 parser.add_argument("--portkey-virtual-key", help="Portkey Virtual Key", default=os.getenv("PORTKEY_VIRTUAL_KEY"))
+parser.add_argument("--portkey-slug", help="Portkey Slug (Saved Integration)", default=os.getenv("PORTKEY_SLUG"))
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
 parser.add_argument("--gateway-provider", help="AI Gateway Provider", choices=["portkey", "litellm"], default="portkey")
@@ -377,13 +378,22 @@ async def chat(
         extra_body = {}
 
         if GATEWAY_PROVIDER == "portkey" and PORTKEY_AVAILABLE:
-            is_gemini = "gemini" in model_id or "google" in model_id
-            provider_name = "vertex-ai" if is_gemini else "bedrock"
-            extra_headers = createHeaders(
-                api_key=args.portkey_api_key or AIRS_KEY,
-                provider=provider_name,
-                model=model_id
-            )
+            slug_to_use = args.portkey_slug or args.portkey_virtual_key
+            if slug_to_use:
+                # Utilize a secure saved Integration Slug to bypass block_inline_config restrictions
+                extra_headers = createHeaders(
+                    api_key=args.portkey_api_key or AIRS_KEY,
+                    virtual_key=slug_to_use,
+                    model=model_id
+                )
+            else:
+                is_gemini = "gemini" in model_id or "google" in model_id
+                provider_name = "vertex-ai" if is_gemini else "bedrock"
+                extra_headers = createHeaders(
+                    api_key=args.portkey_api_key or AIRS_KEY,
+                    provider=provider_name,
+                    model=model_id
+                )
         elif GATEWAY_PROVIDER == "litellm":
             if enforcement_placement == "gateway" and airs_enabled:
                 extra_body = {"guardrails": ["airs-mcp-scan"]}
