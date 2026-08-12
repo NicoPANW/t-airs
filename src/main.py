@@ -90,7 +90,7 @@ SESSION_HISTORY = {}
 MAX_HISTORY = 10
 
 if GATEWAY_PROVIDER == "portkey":
-    llm_client = AsyncOpenAI(base_url=PORTKEY_GATEWAY_URL, api_key=args.portkey_api_key or "sk-dummy")
+    llm_client = AsyncOpenAI(base_url=PORTKEY_GATEWAY_URL, api_key=args.portkey_api_key or AIRS_KEY or "sk-dummy")
 else:
     llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
 
@@ -380,13 +380,26 @@ async def chat(
             is_gemini = "gemini" in model_id or "google" in model_id
             provider_name = "vertex-ai" if is_gemini else "bedrock"
             extra_headers = createHeaders(
-                api_key=AIRS_KEY,
+                api_key=args.portkey_api_key or AIRS_KEY,
                 provider=provider_name,
                 model=model_id
             )
         elif GATEWAY_PROVIDER == "litellm":
             if enforcement_placement == "gateway" and airs_enabled:
                 extra_body = {"guardrails": ["airs-mcp-scan"]}
+
+        # --- 🔧 DEBUG REQUEST PRINT ---
+        debug_headers = {}
+        if extra_headers:
+            for k, v in extra_headers.items():
+                if any(secret_word in k.lower() for secret_word in ["key", "auth", "token", "credential"]):
+                    debug_headers[k] = f"{str(v)[:6]}...{str(v)[-4:]}" if len(str(v)) > 10 else "REDACTED"
+                else:
+                    debug_headers[k] = v
+        print(f"🔧 [DEBUG] Gateway Request Details:")
+        print(f"   - Base URL: {llm_client.base_url}")
+        print(f"   - Extra Headers: {debug_headers}")
+        print(f"   - Extra Body Parameter: {extra_body if extra_body else 'None'}")
 
         raw_response = await llm_client.chat.completions.with_raw_response.create(
             model=model_id,
@@ -529,6 +542,10 @@ async def chat(
                         print(f"⚠️ ToolEvent Log Error: {e}")
 
             # Fetch the next step from the LLM
+            print(f"🔧 [DEBUG] Executing Agent Iteration Step {iteration} with same Gateway request config...")
+            if debug_headers:
+                print(f"   - Active Headers: {debug_headers}")
+
             execution_phase = f"Agent Iteration {iteration}"
             raw_response = await llm_client.chat.completions.with_raw_response.create(
                 model=model_id,
