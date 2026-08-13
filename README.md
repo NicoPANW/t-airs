@@ -24,15 +24,13 @@
 
 
 
-* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS API security scanning, the interception can be either at the AI Gateway level (default) or at the App level. In addition, the App can be used to demonstrate AIRS Red-teaming.
+* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS API security scanning, the interception can be either at the AI Gateway level or at the App level. Portkey AI gateway intargation. In addition, the App can be used to demonstrate AIRS Red-teaming.
   
 * **🤖 Agentic AI Framework:** Implements a full Reasoning-Observation-Action loop. The AI isn't just a chatbot; it is an autonomous agent capable of using tools to achieve objectives. Custom-coded actions for Wire Transfers, Flight Upgrades, and Store Refunds that perform real, permanent modifications to the backend database, providing a high-stakes environment for red-teaming.
 
-* **🌐 Modern design:** Powered by a local LiteLLM Gateway, AI interacts directly with a live SQLite database via MCP, vector Database for Retrieval-Augmented Generation for private, unstructured data (like internal company policies) is semantically searched and injected into the AI's context window.
+* **🌐 Modern design:** Powered by Portkey AI SAAS Gateway or via a local LiteLLM Gateway, AI interacts directly with a live SQLite database via MCP, vector Database for Retrieval-Augmented Generation for private, unstructured data (like internal company policies) is semantically searched and injected into the AI's context window.
 
-* **☁️ SAAS models (recommended):** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
-
-* **🏠 Local models (not recommended):** Even though not recommended since they are slower than SAAS models and less accurate, there is an option to deploy local models (llama3.2:3b, ministral-3:3b, qwen2.5:1.5b) on Nvidia T4 GPUs. Based on testing ministral-3:3b works far better than the other two that hallucinate.
+* **☁️ SAAS models:** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
 
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 
@@ -49,7 +47,7 @@
 
 To keep the application clean and scalable, this repository is a "Monorepo" split into two distinct layers:
 
-1. **The Agent & Gateway Layer (`/src`):** This is the "Core Engine" of the lab. It combines a FastAPI backend with a LiteLLM Gateway to create a unified, cloud-agnostic API.
+1. **The Agent & Gateway Layer (`/src`):** This is the "Core Engine" of the lab. It combines a FastAPI backend with a Portkey or LiteLLM Gateway to create a unified, cloud-agnostic API.
 
    * **Interactive Frontend:**  Provides a real-time interface, featuring live persona switching and a Visual Metadata Trace panel for inspecting Prisma AIRS and Model decision logic.
 
@@ -77,9 +75,8 @@ Before you begin, you need to meet a few requirements:
 2. **Terraform:** Download the engine that builds the cloud infrastructure.
 3. **Cloud Authentication:** You must be logged into your target cloud provider via your computer's terminal:
    * **For AWS:** Install the AWS CLI and run `aws configure`. 
-   * **For GCP:** Install the Google Cloud SDK and run `gcloud auth application-default login`.
+   * **For GCP:** Install the Google Cloud SDK and run `gcloud auth login`.
 4. **Bedrock (AWS Only):** You must enable Bedrock in AWS console beforehand (accept EULA) for the desired target region (it is per region basis)
-5. **Flavors**: Do NOT scale down flavors otherwise it will not work, in paricular for the RAG BAAI Model to load in RAM.
 
 
 ### 🤖 AI Runtime (API) specific prerequisites
@@ -104,6 +101,9 @@ Below shows to define the Prisma AIRS profile and API key.
 **6. Copy and save the API key, click done**
 <img width="1849" height="842" alt="Screenshot 2026-04-01 at 16 12 26" src="https://github.com/user-attachments/assets/554479ae-28c0-404d-b1fd-d4f2450d7b18" />
 
+### 🤖 Portkey AI gateway specific prerequisites
+TBC
+
 ---
 
 ## 🚀 Quick Start Deployment Guide
@@ -125,6 +125,8 @@ export TF_VAR_gcp_project_id="your-gcp-project-id"
 export TF_VAR_gcp_region="us-central1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
+export TF_VAR_portkey_api_key="your_prisma_airs_portkey_api_key_here"
+export TF_VAR_portkey_slug="your_prisma_airs_portkey_slug_here"
 # If AIRS model scaning, add IP listed as per AIRS workflow in the UI and update below accordingly
 export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
 
@@ -132,6 +134,8 @@ export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.11
 export TF_VAR_aws_region="us-east-1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
+export TF_VAR_portkey_api_key="your_prisma_airs_portkey_api_key_here"
+export TF_VAR_portkey_slug="your_prisma_airs_portkey_slug_here"
 # Define a list of Bedrock models to enable. The pre-flight check will verify them.
 export TF_VAR_bedrock_model_ids='["meta.llama3-8b-instruct-v1:0", "mistral.ministral-3-8b-instruct"]'
 # If AIRS model scaning, add IP listed as per AIRS workflow in the UI and update below accordingly
@@ -157,20 +161,20 @@ Navigate to the terraform folder, initialize the plugins, and launch the lab!
 ```bash
 cd terraform/gcp
 terraform init
-terraform apply -var="enable_local_llm=false" -auto-approve
+terraform apply -var="gateway_provider=portkey" -auto-approve
 ```
 
 #### If deploying to AWS:
 ```bash
 cd terraform/aws
 terraform init
-terraform apply -var="enable_local_llm=false" -auto-approve
+terraform apply -var="gateway_provider=portkey" -auto-approve
 ```
 
 > [!NOTE]
-> It takes about 10 minutes after terraform is completed.  
+> It takes about 5 minutes after terraform is completed.  
 > If multiple version of airs_profile exist, it will use the latest one.  
-> If you want to use local LLM with GPU, use this command instead `terraform apply -var="enable_local_llm=true" -auto-approve`, it will use a bigger instance with an Nvidia T4 GPU, pull 3 local AI models and load them in GPU.
+> If you want to use local LiteLLM AI gateway, use this command instead `terraform apply -var="gateway_provider=litellm" -auto-approve`.
 
 
 ### Step 5: Access the Lab
@@ -256,13 +260,13 @@ Destroy the lab with one command:
 #### If deployed to GCP:
 ```bash
 cd terraform/gcp
-terraform destroy -var="enable_local_llm=false" -auto-approve
+terraform destroy -auto-approve
 ```
 
 #### If deployed to AWS:
 ```bash
 cd terraform/aws
-terraform destroy -var="enable_local_llm=false" -auto-approve
+terraform destroy -auto-approve
 ```
 
 ---
@@ -289,8 +293,7 @@ Once logged in, you can check your live app logs, reset the service, or check yo
 
 ```bash
 sudo journalctl -u t-airs.service -n 75 -f
-sudo systemctl restart t-airs
-ollama list && ollama ps  && nvidia-smi #if local-llm, checking Nvidi T4 is ready
+sudo systemctl restart t-airs#if local-llm, checking Nvidi T4 is ready
 sudo journalctl -u litellm.service -n 50 --no-pager
 sudo /opt/t-airs/venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; print('⏳ Attempting foreground download...'); SentenceTransformer('BAAI/bge-small-en-v1.5'); print('✅ Download complete.')" #it may happen after several deployements huggingface download does not work, so app is stuck. To prove this, you can run this command. A workaround is to use another CSP region, it will come with new IPs and bypass HF rate limiters
 ```
