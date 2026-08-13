@@ -22,7 +22,7 @@ fi
 if [ -n "$TF_VAR_portkey_api_key" ]; then
     echo "📡 Verifying Portkey API Connectivity..."
     PORTKEY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-      -X GET "https://aigw.portkey.ai/v1/models" \
+      -X GET "https://api.portkey.ai/v1/models" \
       -H "x-portkey-api-key: $TF_VAR_portkey_api_key")
     
     if [ "$PORTKEY_STATUS" -eq 200 ]; then
