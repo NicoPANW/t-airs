@@ -37,7 +37,7 @@
 
 * **🔎 Visual Metadata Trace:** A built-in inspector panel shows you the exact raw JSON decision logic from the RAG, the AI Gateway and Prisma AIRS on every single interaction.
 
-* **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change.
+* **☁️ Multi-Cloud Ready:** Deploy seamlessly to AWS or GCP with a single variable change. 
 
 * **🧱 Automated Firewalls:** Dynamically builds strict network security groups/firewall rules to allow inbound access to the web UI and SSH, while securely permitting Prisma AIRS IP addresses for red-teaming.
 
