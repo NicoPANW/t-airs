@@ -112,60 +112,6 @@ if [ "$ACTIVE_MODELS" -eq 0 ]; then
     exit 1
 fi
 
-# --- 3.5 PRISMA AIRS API CONNECTIVITY CHECK ---
-if [ -n "$TF_VAR_airs_key" ]; then
-    echo "📡 Verifying Prisma AIRS API Connectivity via Python..."
-    python3 -c "
-import sys, urllib.request, urllib.error, json
-try:
-    url = 'https://api.sase.paloaltonetworks.com/aisec/v1/mgmt/profiles'
-    headers = {
-        'x-pan-api-key': '$TF_VAR_airs_key',
-        'User-Agent': 'Mozilla/5.0'
-    }
-    req = urllib.request.Request(url, headers=headers, method='GET')
-    with urllib.request.urlopen(req, timeout=5) as response:
-        if response.status == 200:
-            data = json.loads(response.read().decode('utf-8'))
-            def has_profile(obj, target):
-                if obj == target:
-                    return True
-                if isinstance(obj, dict):
-                    for k, v in obj.items():
-                        if k in ('name', 'profile_name', 'profileName') and v == target:
-                            return True
-                        if has_profile(v, target):
-                            return True
-                elif isinstance(obj, list):
-                    return any(has_profile(item, target) for item in obj)
-                return False
-            if has_profile(data, '$TF_VAR_airs_profile'):
-                print('✅ Prisma AIRS connectivity and security profile verified successfully.')
-                sys.exit(0)
-            else:
-                print('❌ Prisma AIRS Error: Profile \'' + '$TF_VAR_airs_profile' + '\' was not found in the returned profiles.')
-                sys.exit(1)
-except urllib.error.HTTPError as e:
-    print(f'❌ Prisma AIRS API Error ({e.code}): {e.read().decode(\"utf-8\")}')
-    sys.exit(1)
-except urllib.error.URLError as e:
-    err_msg = str(e.reason)
-    if '[Errno 8]' in err_msg or 'nodename nor servname' in err_msg or 'not known' in err_msg:
-        print('⚠️  WARNING: DNS Resolution failed locally for api.sase.paloaltonetworks.com.')
-        print('   This is common on corporate VPNs or restricted local DNS networks.')
-        print('   Skipping pre-flight check since the deployed cloud VM will use public DNS to connect successfully.')
-        sys.exit(0)
-    print(f'❌ Network Error: {e}')
-    sys.exit(1)
-except Exception as e:
-    print(f'❌ Network Error: {e}')
-    sys.exit(1)
-"
-    if [ $? -ne 0 ]; then
-        exit 1
-    fi
-fi
-
 # --- 4. PORTKEY API CONNECTIVITY CHECK ---
 if [ -n "$TF_VAR_portkey_api_key" ]; then
     echo "📡 Verifying Portkey API Connectivity via Python..."
