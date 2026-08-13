@@ -114,25 +114,25 @@ fi
 
 # --- 3.5 PRISMA AIRS API CONNECTIVITY CHECK ---
 if [ -n "$TF_VAR_airs_key" ]; then
-    echo "📡 Verifying Prisma AIRS API Connectivity via SDK..."
+    echo "📡 Verifying Prisma AIRS API Connectivity via Python..."
     python3 -c "
-import sys
+import sys, urllib.request, urllib.error
 try:
-    import aisecurity
-    from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
-    from aisecurity.scan.sync.scanner import Scanner
-    from aisecurity.scan.models.content import Content
-    
-    aisecurity.init(api_key='$TF_VAR_airs_key')
-    profile = AiProfile(profile_name='$TF_VAR_airs_profile')
-    scanner = Scanner()
-    scanner.sync_scan(ai_profile=profile, content=Content(prompt='healthcheck'))
-    print('✅ Prisma AIRS connectivity and security profile verified successfully.')
-except ImportError:
-    print('⚠️  aisecurity SDK is not installed locally. Please run: pip install pan-aisecurity')
+    url = 'https://api.aisecurity.paloaltonetworks.com/v1/profiles/' + '$TF_VAR_airs_profile'
+    headers = {
+        'x-pan-api-key': '$TF_VAR_airs_key',
+        'User-Agent': 'Mozilla/5.0'
+    }
+    req = urllib.request.Request(url, headers=headers, method='GET')
+    with urllib.request.urlopen(req, timeout=5) as response:
+        if response.status == 200:
+            print('✅ Prisma AIRS connectivity and security profile verified successfully.')
+            sys.exit(0)
+except urllib.error.HTTPError as e:
+    print(f'❌ Prisma AIRS API Error ({e.code}): {e.read().decode(\"utf-8\")}')
     sys.exit(1)
 except Exception as e:
-    print(f'❌ Prisma AIRS Connectivity Check Failed: {e}')
+    print(f'❌ Network Error: {e}')
     sys.exit(1)
 "
     if [ $? -ne 0 ]; then
