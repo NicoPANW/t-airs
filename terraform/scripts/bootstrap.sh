@@ -257,7 +257,6 @@ Environment="HF_HOME=/root/.cache/huggingface"
 Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
 # Inject Portkey credentials from Terraform (ignored if LiteLLM is active)
 Environment="PORTKEY_API_KEY=${portkey_api_key}"
-Environment="PORTKEY_VIRTUAL_KEY=${portkey_virtual_key}"
 Environment="PORTKEY_SLUG=${portkey_slug}"
 
 WorkingDirectory=/opt/t-airs/src
