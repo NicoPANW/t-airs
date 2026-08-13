@@ -261,7 +261,24 @@ async def list_models():
 
 @app.get("/health-airs")
 async def health_airs():
-    return {"status": "connected" if AIRS_CONFIGURED else "disconnected", "profile": AIRS_PROFILE_NAME, "reason": airs_error_msg}
+    gateway_status = "connected"
+    if GATEWAY_PROVIDER == "litellm":
+        try:
+            response = requests.get(f"{GATEWAY_URL}/v1/models", timeout=2)
+            if response.status_code != 200:
+                gateway_status = "disconnected"
+        except Exception:
+            gateway_status = "disconnected"
+    else:
+        if not validated_models:
+            gateway_status = "disconnected"
+    return {
+        "status": "connected" if AIRS_CONFIGURED else "disconnected",
+        "profile": AIRS_PROFILE_NAME,
+        "reason": airs_error_msg,
+        "gateway_provider": GATEWAY_PROVIDER,
+        "gateway_status": gateway_status
+    }
 
 @app.get("/get-persona-context/{persona_id}")
 async def get_persona_context(persona_id: str):
