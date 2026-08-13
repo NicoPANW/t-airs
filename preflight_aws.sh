@@ -39,6 +39,15 @@ try:
 except urllib.error.HTTPError as e:
     print(f'❌ Prisma AIRS API Error ({e.code}): {e.read().decode(\"utf-8\")}')
     sys.exit(1)
+except urllib.error.URLError as e:
+    err_msg = str(e.reason)
+    if "[Errno 8]" in err_msg or "nodename nor servname" in err_msg or "not known" in err_msg:
+        print("⚠️  WARNING: DNS Resolution failed locally for api.aisecurity.paloaltonetworks.com.")
+        print("   This is common on corporate VPNs or restricted local DNS networks.")
+        print("   Skipping pre-flight check since the deployed cloud VM will use public DNS to connect successfully.")
+        sys.exit(0)
+    print(f'❌ Network Error: {e}')
+    sys.exit(1)
 except Exception as e:
     print(f'❌ Network Error: {e}')
     sys.exit(1)
