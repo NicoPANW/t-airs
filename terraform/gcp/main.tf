@@ -48,7 +48,6 @@ locals {
     target_cloud     = "gcp"
     gateway_provider = var.gateway_provider
     portkey_api_key     = var.portkey_api_key
-    portkey_virtual_key = var.portkey_virtual_key
     portkey_slug        = var.portkey_slug
     aws_region       = "" # Not used in GCP deployment
     bedrock_model_ids = "" # Not used in GCP deployment
