@@ -18,35 +18,6 @@ if [ -z "$TF_VAR_airs_profile" ]; then
     exit 1
 fi
 
-# --- 1.5 PORTKEY API CONNECTIVITY CHECK ---
-if [ -n "$TF_VAR_portkey_api_key" ]; then
-    echo "📡 Verifying Portkey API Connectivity via Python..."
-    python3 -c "
-import sys, urllib.request, urllib.error
-try:
-    headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key', 'User-Agent': 'Mozilla/5.0'}
-    if '$TF_VAR_portkey_slug':
-        headers['x-portkey-virtual-key'] = '$TF_VAR_portkey_slug'
-    req = urllib.request.Request(
-        'https://aigw.portkey.ai/v1/models',
-        headers=headers
-    )
-    with urllib.request.urlopen(req, timeout=5) as response:
-        if response.status == 200:
-            print('✅ Portkey connectivity and API key verified successfully.')
-            sys.exit(0)
-except urllib.error.HTTPError as e:
-    print(f'❌ Portkey API Error ({e.code}): {e.read().decode(\"utf-8\")}')
-    sys.exit(1)
-except Exception as e:
-    print(f'❌ Network Error: {e}')
-    sys.exit(1)
-"
-    if [ $? -ne 0 ]; then
-        exit 1
-    fi
-fi
-
 # --- 2. GCP ENV CHECKS ---
 if [ -z "$TF_VAR_gcp_project_id" ] || [ -z "$TF_VAR_gcp_region" ]; then
     echo "❌ ERROR: Missing GCP environment variables (Project ID or Region)."
@@ -103,12 +74,6 @@ echo "✅ Region ($TF_VAR_gcp_region) and Target Zone ($TARGET_ZONE) verified."
 # --- 3. GLOBAL VERTEX AI CONNECTIVITY & CAPABILITY CHECK ---
 echo "📡 Verifying Global Vertex AI Connectivity..."
 
-TOKEN=$(gcloud auth print-access-token 2>/dev/null)
-if [ -z "$TOKEN" ]; then
-    echo "❌ ERROR: Could not retrieve GCP auth token."
-    exit 1
-fi
-
 # Define the precise list of Gemini models to verify
 GEMINI_MODELS=(
     "gemini-2.5-flash"
@@ -143,6 +108,35 @@ done
 if [ "$ACTIVE_MODELS" -eq 0 ]; then
     echo "❌ ERROR: None of the required Gemini models are active in project '$TF_VAR_gcp_project_id'. Deployment cannot continue."
     exit 1
+fi
+
+# --- 4. PORTKEY API CONNECTIVITY CHECK ---
+if [ -n "$TF_VAR_portkey_api_key" ]; then
+    echo "📡 Verifying Portkey API Connectivity via Python..."
+    python3 -c "
+import sys, urllib.request, urllib.error
+try:
+    headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key', 'User-Agent': 'Mozilla/5.0'}
+    if '$TF_VAR_portkey_slug':
+        headers['x-portkey-virtual-key'] = '$TF_VAR_portkey_slug'
+    req = urllib.request.Request(
+        'https://aigw.portkey.ai/v1/models',
+        headers=headers
+    )
+    with urllib.request.urlopen(req, timeout=5) as response:
+        if response.status == 200:
+            print('✅ Portkey connectivity and API key verified successfully.')
+            sys.exit(0)
+except urllib.error.HTTPError as e:
+    print(f'❌ Portkey API Error ({e.code}): {e.read().decode(\"utf-8\")}')
+    sys.exit(1)
+except Exception as e:
+    print(f'❌ Network Error: {e}')
+    sys.exit(1)
+"
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
 fi
 
 if [ -z "$TF_VAR_prisma_airs_ips" ]; then
