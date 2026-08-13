@@ -144,7 +144,7 @@ export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.11
 ```
 
 ### Step 3: Run the Preflight Check
-Run our built-in safety script to make sure your terminal is configured correctly.
+Run our built-in safety script to make sure your terminal and GCP/AWS environments are configured correctly.
 
 ```bash
 # For GCP
