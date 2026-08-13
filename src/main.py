@@ -436,15 +436,19 @@ async def chat(
         print(f"   - Extra Headers: {debug_headers}")
         print(f"   - Extra Body Parameter: {extra_body if extra_body else 'None'}")
 
-        raw_response = await llm_client.chat.completions.with_raw_response.create(
-            model=llm_model_id,
-            messages=messages,
-            tools=active_tools if active_tools else None,
-            temperature=0.7,
-            user=end_user,
-            extra_headers=extra_headers if extra_headers else None,
-            extra_body=extra_body if extra_body else None
-        )
+        inference_kwargs = {
+            "model": llm_model_id,
+            "messages": messages,
+            "tools": active_tools if active_tools else None,
+            "user": end_user,
+            "extra_headers": extra_headers if extra_headers else None,
+            "extra_body": extra_body if extra_body else None
+        }
+        # Suppress deprecation warnings by avoiding passing temperature to Gemini 3+ models
+        if not (llm_model_id and ("gemini-3" in llm_model_id or llm_model_id.startswith("gemini-3."))):
+            inference_kwargs["temperature"] = 0.7
+
+        raw_response = await llm_client.chat.completions.with_raw_response.create(**inference_kwargs)
 
         response = raw_response.parse()
         
@@ -582,15 +586,19 @@ async def chat(
                 print(f"   - Active Headers: {debug_headers}")
 
             execution_phase = f"Agent Iteration {iteration}"
-            raw_response = await llm_client.chat.completions.with_raw_response.create(
-                model=llm_model_id,
-                messages=messages,
-                tools=active_tools if active_tools else None,
-                temperature=0.7,
-                user=end_user,
-                extra_headers=extra_headers if extra_headers else None,
-                extra_body=extra_body if extra_body else None
-            )
+            iteration_kwargs = {
+                "model": llm_model_id,
+                "messages": messages,
+                "tools": active_tools if active_tools else None,
+                "user": end_user,
+                "extra_headers": extra_headers if extra_headers else None,
+                "extra_body": extra_body if extra_body else None
+            }
+            # Suppress deprecation warnings by avoiding passing temperature to Gemini 3+ models
+            if not (llm_model_id and ("gemini-3" in llm_model_id or llm_model_id.startswith("gemini-3."))):
+                iteration_kwargs["temperature"] = 0.7
+
+            raw_response = await llm_client.chat.completions.with_raw_response.create(**iteration_kwargs)
             response = raw_response.parse()
             response_msg = response.choices[0].message
 
