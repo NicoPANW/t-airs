@@ -17,7 +17,8 @@
 
 ## ✨ Capabilities of the App
 
-<img width="1920" height="957" alt="Screenshot 2026-05-18 at 10 10 51" src="https://github.com/user-attachments/assets/5dc89a9a-e118-4df5-87cf-6ef550d0df14" />
+<img width="1512" height="828" alt="Screenshot 2026-08-13 at 15 42 01" src="https://github.com/user-attachments/assets/f7526446-4257-4cd7-aaf5-49d6eb4615c0" />
+
 
 
 
@@ -63,7 +64,7 @@ To keep the application clean and scalable, this repository is a "Monorepo" spli
 
 ## 🔀 Typical user flow
 
-<img width="720" height="390" alt="Screenshot 2026-06-12 at 16 08 30" src="https://github.com/user-attachments/assets/9b25ee6d-0910-494d-8fc3-166cc9e42292" />
+<img width="1512" height="796" alt="Screenshot 2026-08-13 at 15 45 46" src="https://github.com/user-attachments/assets/9e0646cc-0ca3-4645-ba3a-47a5ce142c83" />
 
 
 ---
@@ -300,7 +301,8 @@ sudo journalctl -u litellm.service -n 75 -f
 sudo systemctl restart litellm
 ```
 
-<img width="1661" height="1031" alt="Screenshot 2026-04-10 at 16 24 26" src="https://github.com/user-attachments/assets/04a4865c-3b56-4655-bf88-ee34cd7e2dd6" />
+<img width="1512" height="911" alt="Screenshot 2026-08-13 at 15 42 40" src="https://github.com/user-attachments/assets/8805b258-2ef6-4934-817f-47aaeef83980" />
+
 
 
 
