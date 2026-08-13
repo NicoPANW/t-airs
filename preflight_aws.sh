@@ -26,7 +26,7 @@ if [ -n "$TF_VAR_portkey_api_key" ]; then
     python3 -c "
 import sys, urllib.request, urllib.error
 try:
-    headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key'}
+    headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key', 'User-Agent': 'Mozilla/5.0'}
     if '$TF_VAR_portkey_slug':
         headers['x-portkey-virtual-key'] = '$TF_VAR_portkey_slug'
     req = urllib.request.Request(
