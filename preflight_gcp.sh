@@ -112,6 +112,34 @@ if [ "$ACTIVE_MODELS" -eq 0 ]; then
     exit 1
 fi
 
+# --- 3.5 PRISMA AIRS API CONNECTIVITY CHECK ---
+if [ -n "$TF_VAR_airs_key" ]; then
+    echo "📡 Verifying Prisma AIRS API Connectivity via SDK..."
+    python3 -c "
+import sys
+try:
+    import aisecurity
+    from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
+    from aisecurity.scan.sync.scanner import Scanner
+    from aisecurity.scan.models.content import Content
+    
+    aisecurity.init(api_key='$TF_VAR_airs_key')
+    profile = AiProfile(profile_name='$TF_VAR_airs_profile')
+    scanner = Scanner()
+    scanner.sync_scan(ai_profile=profile, content=Content(prompt='healthcheck'))
+    print('✅ Prisma AIRS connectivity and security profile verified successfully.')
+except ImportError:
+    print('⚠️  aisecurity SDK is not installed locally. Please run: pip install pan-aisecurity')
+    sys.exit(1)
+except Exception as e:
+    print(f'❌ Prisma AIRS Connectivity Check Failed: {e}')
+    sys.exit(1)
+"
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+fi
+
 # --- 4. PORTKEY API CONNECTIVITY CHECK ---
 if [ -n "$TF_VAR_portkey_api_key" ]; then
     echo "📡 Verifying Portkey API Connectivity via Python..."
