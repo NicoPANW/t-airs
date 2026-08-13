@@ -55,25 +55,6 @@ locals {
   })
 }
 
-variable "portkey_slug" {
-  description = "Portkey Slug (Saved Integration Virtual Key, e.g. @slug-name)"
-  type        = string
-  default     = ""
-}
-
-variable "portkey_api_key" {
-  description = "Portkey API Key"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "portkey_virtual_key" {
-  description = "Portkey Virtual Key"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
 # ==========================================
 # AWS AMI (MACHINE IMAGE) SELECTION
 # ==========================================
@@ -251,12 +232,6 @@ resource "aws_iam_role_policy" "bedrock_access" {
       }
     ]
   })
-}
-
-variable "gateway_provider" {
-  description = "AI Gateway Provider (portkey or litellm)"
-  type        = string
-  default     = "portkey"
 }
 
 # Creates an instance profile to attach the IAM role to the EC2 instance.

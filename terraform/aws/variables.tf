@@ -59,3 +59,29 @@ variable "bedrock_model_ids" {
   type        = list(string)
   default     = ["meta.llama3-8b-instruct-v1:0", "mistral.ministral-3-8b-instruct"]
 }
+
+variable "gateway_provider" {
+  description = "AI Gateway Provider (portkey or litellm)"
+  type        = string
+  default     = "portkey"
+}
+
+variable "portkey_api_key" {
+  description = "Portkey API Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "portkey_slug" {
+  description = "Portkey Slug (Saved Integration Virtual Key, e.g. @slug-name)"
+  type        = string
+  default     = ""
+}
+
+variable "portkey_virtual_key" {
+  description = "Portkey Virtual Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
