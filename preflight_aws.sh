@@ -22,16 +22,26 @@ fi
 
 # --- 1.5 PORTKEY API CONNECTIVITY CHECK ---
 if [ -n "$TF_VAR_portkey_api_key" ]; then
-    echo "📡 Verifying Portkey API Connectivity..."
-    PORTKEY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-      -X GET "https://api.portkey.ai/v1/models" \
-      -H "x-portkey-api-key: $TF_VAR_portkey_api_key")
-    
-    if [ "$PORTKEY_STATUS" -eq 200 ]; then
-        echo "✅ Portkey connectivity and API key verified successfully."
-    else
-        echo "❌ ERROR: Portkey connectivity check failed (Status: $PORTKEY_STATUS)."
-        echo "   Please verify that your TF_VAR_portkey_api_key is correct."
+    echo "📡 Verifying Portkey API Connectivity via Python..."
+    python3 -c "
+import sys, urllib.request, urllib.error
+try:
+    req = urllib.request.Request(
+        'https://api.portkey.ai/v1/models',
+        headers={'x-portkey-api-key': '$TF_VAR_portkey_api_key'}
+    )
+    with urllib.request.urlopen(req, timeout=5) as response:
+        if response.status == 200:
+            print('✅ Portkey connectivity and API key verified successfully.')
+            sys.exit(0)
+except urllib.error.HTTPError as e:
+    print(f'❌ Portkey API Error ({e.code}): {e.read().decode(\"utf-8\")}')
+    sys.exit(1)
+except Exception as e:
+    print(f'❌ Network Error: {e}')
+    sys.exit(1)
+"
+    if [ $? -ne 0 ]; then
         exit 1
     fi
 fi
