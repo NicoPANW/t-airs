@@ -2,22 +2,24 @@
 
 echo "🛫 Starting Pre-Flight Checks for AWS..."
 
+FAILED=0
+
 # --- 1. GLOBAL CHECKS ---
 if ! command -v terraform &> /dev/null; then
     echo "❌ ERROR: Terraform is not installed."
-    exit 1
+    FAILED=1
 fi
 
 if [ -z "$TF_VAR_airs_key" ]; then
     echo "❌ ERROR: TF_VAR_airs_key is not set."
     echo "   Run: export TF_VAR_airs_key='your_prisma_key_here'"
-    exit 1
+    FAILED=1
 fi
 
 if [ -z "$TF_VAR_airs_profile" ]; then
     echo "❌ ERROR: TF_VAR_airs_profile is not set."
     echo "   Run: export TF_VAR_airs_profile='strict_red_team_profile'"
-    exit 1
+    FAILED=1
 fi
 
 # --- 1.5 PORTKEY API CONNECTIVITY CHECK ---
@@ -124,4 +126,9 @@ else
     echo "✅ Dynamic AIRS IPs detected: $TF_VAR_prisma_airs_ips"
 fi
 
-echo "✅ AWS Pre-flight passed! Found $ACTIVE_MODELS active models. Ready to deploy."
+if [ "$FAILED" -eq 1 ]; then
+    echo "❌ AWS Pre-flight FAILED! One or more validation checks have failed. Please review the output above."
+    exit 1
+else
+    echo "✅ AWS Pre-flight passed! Found $ACTIVE_MODELS active models. Ready to deploy."
+fi
