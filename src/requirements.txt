@@ -7,10 +7,6 @@ Jinja2
 python-multipart
 pan-aisecurity
 openai
-litellm
-litellm[proxy]
-litellm-enterprise
-litellm-proxy-extras
 mcp
 chromadb
 sentence-transformers

@@ -87,6 +87,9 @@ echo "✅ BAAI Model successfully cached!"
 # Only build this if LiteLLM is the active gateway
 # ==========================================
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
+    echo "Installing LiteLLM packages conditionally..."
+    /opt/t-airs/venv/bin/pip install "litellm" "litellm[proxy]" "litellm-enterprise" "litellm-proxy-extras" "google-auth"
+
     echo "Building LiteLLM routing configuration..."
     cat <<EOF > /opt/t-airs/src/litellm_config.yaml
 model_list:
