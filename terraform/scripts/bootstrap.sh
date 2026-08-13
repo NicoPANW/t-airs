@@ -88,7 +88,7 @@ echo "✅ BAAI Model successfully cached!"
 # ==========================================
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
     echo "Installing LiteLLM packages conditionally..."
-    /opt/t-airs/venv/bin/pip install "litellm" "litellm[proxy]" "litellm-enterprise" "litellm-proxy-extras" "google-auth"
+    /opt/t-airs/venv/bin/pip install "litellm==1.96.2" "litellm[proxy]==1.96.2" "litellm-enterprise==0.1.53" "litellm-proxy-extras==0.4.81" "google-auth==2.56.3"
 
     echo "Building LiteLLM routing configuration..."
     cat <<EOF > /opt/t-airs/src/litellm_config.yaml
