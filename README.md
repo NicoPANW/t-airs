@@ -24,13 +24,13 @@
 
 
 
-* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS API security scanning, the interception can be either at the AI Gateway level or at the App level. Portkey AI gateway intargation. In addition, the App can be used to demonstrate AIRS Red-teaming.
+* **🛡️ Prisma AIRS Integration:** Native integration with Palo Alto Networks Prisma AIRS API security scanning as well as Portkey AI gateway integration. The interception can be either at the AI Gateway level or at the App level. In addition, the App can be used to demonstrate AIRS Red-teaming.
   
 * **🤖 Agentic AI Framework:** Implements a full Reasoning-Observation-Action loop. The AI isn't just a chatbot; it is an autonomous agent capable of using tools to achieve objectives. Custom-coded actions for Wire Transfers, Flight Upgrades, and Store Refunds that perform real, permanent modifications to the backend database, providing a high-stakes environment for red-teaming.
 
 * **🌐 Modern design:** Powered by Portkey AI SAAS Gateway or via a local LiteLLM Gateway, AI interacts directly with a live SQLite database via MCP, vector Database for Retrieval-Augmented Generation for private, unstructured data (like internal company policies) is semantically searched and injected into the AI's context window.
 
-* **☁️ SAAS models:** GCP deployment comes with Gemini (via Vertex AI) and AWS with Llama (via Bedrock).
+* **☁️ SAAS models:** GCP deployment comes with Gemini (via Vertex AI) and AWS via Bedrock.
 
 * **🎭 Dynamic Personas:** Instantly switch the AI's system prompt (e.g., Banking, Travel, E-Shop) and edit the constraints live from the UI to test different attack vectors.
 
@@ -126,6 +126,7 @@ export TF_VAR_gcp_region="us-central1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
 export TF_VAR_portkey_api_key="your_prisma_airs_portkey_api_key_here"
+export TF_VAR_portkey_virtual_key="your_prisma_airs_portkey_virtual_key_here"
 export TF_VAR_portkey_slug="your_prisma_airs_portkey_slug_here"
 # If AIRS model scaning, add IP listed as per AIRS workflow in the UI and update below accordingly
 export TF_VAR_prisma_airs_ips='["35.197.73.227/32", "104.198.97.107/32", "136.117.114.204/32"]'
@@ -135,6 +136,7 @@ export TF_VAR_aws_region="us-east-1"
 export TF_VAR_airs_key="your_prisma_airs_api_key_here"
 export TF_VAR_airs_profile="Your-Profile-Name"
 export TF_VAR_portkey_api_key="your_prisma_airs_portkey_api_key_here"
+export TF_VAR_portkey_virtual_key="your_prisma_airs_portkey_virtual_key_here"
 export TF_VAR_portkey_slug="your_prisma_airs_portkey_slug_here"
 # Define a list of Bedrock models to enable. The pre-flight check will verify them.
 export TF_VAR_bedrock_model_ids='["meta.llama3-8b-instruct-v1:0", "mistral.ministral-3-8b-instruct"]'
