@@ -20,6 +20,22 @@ if [ -z "$TF_VAR_airs_profile" ]; then
     exit 1
 fi
 
+# --- 1.5 PORTKEY API CONNECTIVITY CHECK ---
+if [ -n "$TF_VAR_portkey_api_key" ]; then
+    echo "📡 Verifying Portkey API Connectivity..."
+    PORTKEY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+      -X GET "https://aigw.portkey.ai/v1/models" \
+      -H "x-portkey-api-key: $TF_VAR_portkey_api_key")
+    
+    if [ "$PORTKEY_STATUS" -eq 200 ]; then
+        echo "✅ Portkey connectivity and API key verified successfully."
+    else
+        echo "❌ ERROR: Portkey connectivity check failed (Status: $PORTKEY_STATUS)."
+        echo "   Please verify that your TF_VAR_portkey_api_key is correct."
+        exit 1
+    fi
+fi
+
 # --- 2. AWS CHECKS ---
 if [ -z "$TF_VAR_aws_region" ]; then
     echo "❌ ERROR: Missing AWS environment variables."

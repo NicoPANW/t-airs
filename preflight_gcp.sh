@@ -18,6 +18,22 @@ if [ -z "$TF_VAR_airs_profile" ]; then
     exit 1
 fi
 
+# --- 1.5 PORTKEY API CONNECTIVITY CHECK ---
+if [ -n "$TF_VAR_portkey_api_key" ]; then
+    echo "📡 Verifying Portkey API Connectivity..."
+    PORTKEY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+      -X GET "https://aigw.portkey.ai/v1/models" \
+      -H "x-portkey-api-key: $TF_VAR_portkey_api_key")
+    
+    if [ "$PORTKEY_STATUS" -eq 200 ]; then
+        echo "✅ Portkey connectivity and API key verified successfully."
+    else
+        echo "❌ ERROR: Portkey connectivity check failed (Status: $PORTKEY_STATUS)."
+        echo "   Please verify that your TF_VAR_portkey_api_key is correct."
+        exit 1
+    fi
+fi
+
 # --- 2. GCP ENV CHECKS ---
 if [ -z "$TF_VAR_gcp_project_id" ] || [ -z "$TF_VAR_gcp_region" ]; then
     echo "❌ ERROR: Missing GCP environment variables (Project ID or Region)."
@@ -80,44 +96,40 @@ if [ -z "$TOKEN" ]; then
     exit 1
 fi
 
-# 1. Baseline Check (POST to :generateContent)
-# A 400 Bad Request is a SUCCESS here—it means the model caught the empty payload.
-BASELINE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X POST "https://aiplatform.googleapis.com/v1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/gemini-2.5-flash:generateContent" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{}')
+# Define the precise list of Gemini models to verify
+GEMINI_MODELS=(
+    "gemini-2.5-flash"
+    "gemini-2.5-flash-lite"
+    "gemini-2.5-pro"
+    "gemini-3.1-flash-lite"
+    "gemini-3.5-flash"
+    "gemini-3.5-flash-lite"
+    "gemini-3.6-flash"
+)
 
-if [ "$BASELINE_STATUS" -eq 400 ] || [ "$BASELINE_STATUS" -eq 200 ] || [ "$BASELINE_STATUS" -eq 403 ]; then
-    echo "✅ Global Vertex AI is reachable (Baseline verified)."
-else
-    echo "❌ ERROR: Global Vertex AI Endpoint is not responding (Status: $BASELINE_STATUS)."
-    echo "   Ensure your project has the Vertex AI API enabled and billing attached."
-    exit 1
-fi
+ACTIVE_MODELS=0
 
-# 2. Bleeding-Edge Check for Gemini 3.x Preview (Using v1beta1 API)
-echo "💎 Checking for Gemini 3.x capability..."
-G3_FOUND=false
-
-# We loop through the exact preview model IDs currently deployed on the Global endpoint
-for model in "gemini-3.5-flash" "gemini-3.1-flash-lite"; do
-    G3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+for model in "${GEMINI_MODELS[@]}"; do
+    echo "🔍 Checking Global Vertex AI Model ($model) Status..."
+    
+    # A 400 Bad Request or 200 OK indicates the model is ready and responding
+    MODEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
       -X POST "https://aiplatform.googleapis.com/v1beta1/projects/$TF_VAR_gcp_project_id/locations/global/publishers/google/models/$model:generateContent" \
       -H "Authorization: Bearer $TOKEN" \
       -H "Content-Type: application/json" \
       -d '{}')
 
-    # 400 Bad Request is success (the model exists but rejected our empty JSON)
-    if [ "$G3_STATUS" -eq 400 ] || [ "$G3_STATUS" -eq 200 ]; then
-        echo "✅ SUCCESS: $model access confirmed! Your lab will use the latest models."
-        G3_FOUND=true
-        break # Stop checking once we find one that works
+    if [ "$MODEL_STATUS" -eq 400 ] || [ "$MODEL_STATUS" -eq 200 ]; then
+        echo "✅ Model $model is ACTIVE."
+        ACTIVE_MODELS=$((ACTIVE_MODELS + 1))
+    else
+        echo "⚠️  WARNING: Model '$model' is not active/available (Status: $MODEL_STATUS)."
     fi
 done
 
-if [ "$G3_FOUND" = false ]; then
-    echo "⚠️  NOTE: Gemini 3.x not detected on Global API. The lab will gracefully fall back to Gemini 2.5."
+if [ "$ACTIVE_MODELS" -eq 0 ]; then
+    echo "❌ ERROR: None of the required Gemini models are active in project '$TF_VAR_gcp_project_id'. Deployment cannot continue."
+    exit 1
 fi
 
 if [ -z "$TF_VAR_prisma_airs_ips" ]; then
