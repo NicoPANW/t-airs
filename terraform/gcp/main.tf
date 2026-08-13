@@ -45,8 +45,10 @@ locals {
     gcp_project      = var.gcp_project_id
     gcp_region       = var.gcp_region
     env              = local.env
-    enable_local_llm = var.enable_local_llm
     target_cloud     = "gcp"
+    gateway_provider = var.gateway_provider
+    portkey_api_key     = var.portkey_api_key
+    portkey_slug        = var.portkey_slug
     aws_region       = "" # Not used in GCP deployment
     bedrock_model_ids = "" # Not used in GCP deployment
   })
@@ -62,20 +64,6 @@ data "google_compute_image" "ubuntu_standard_gcp" {
   project = "ubuntu-os-cloud"
 }
 
-# Dynamically finds the latest Deep Learning VM image family name by running a gcloud command.
-# This ensures the deployment always uses the most recent, secure, and feature-rich DLVM image.
-data "external" "latest_dlvm_family" {
-  program = [
-    "bash", "-e", "-c",
-    "FAMILY=$(gcloud compute images list --project=deeplearning-platform-release --format='value(family)' | grep -i 'ubuntu-2204' | grep 'common-cu' | sort -r | head -n 1) && printf '{\"family\": \"%s\"}' \"$FAMILY\""
-  ]
-}
-
-# Fetches the actual image details for the latest Deep Learning VM using the family name found above.
-data "google_compute_image" "ubuntu_dlvm_gcp" {
-  family  = data.external.latest_dlvm_family.result.family
-  project = "deeplearning-platform-release"
-}
 
 # ==========================================
 # GCP NETWORKING
@@ -136,29 +124,12 @@ resource "google_project_iam_member" "vertex_access" {
 resource "google_compute_instance" "t_airs_node" {
   name         = "t-airs-node-${local.env}"
   zone         = "${var.gcp_region}-a"
-  # Conditionally selects a more powerful machine type for GPU workloads.
-  machine_type = var.enable_local_llm ? "n1-standard-4" : "e2-standard-2"
-
-  # Dynamically attaches an NVIDIA T4 GPU only if local LLMs are enabled.
-  dynamic "guest_accelerator" {
-    for_each = var.enable_local_llm ? [1] : []
-    content {
-      type  = "nvidia-tesla-t4"
-      count = 1
-    }
-  }
-
-  # GPU instances require a specific scheduling policy. This is set conditionally.
-  scheduling {
-    on_host_maintenance = var.enable_local_llm ? "TERMINATE" : "MIGRATE"
-  }
+  machine_type = "e2-standard-2"
 
   boot_disk {
-    initialize_params { 
-      # Conditionally selects the boot image (Deep Learning VM or standard Ubuntu).
-      image = var.enable_local_llm ? data.google_compute_image.ubuntu_dlvm_gcp.self_link : data.google_compute_image.ubuntu_standard_gcp.self_link
-      # Conditionally allocates a larger disk for GPU instances to store models.
-      size  = var.enable_local_llm ? 50 : 20 
+    initialize_params {
+      image = data.google_compute_image.ubuntu_standard_gcp.self_link
+      size  = 20
     }
   }
 

@@ -15,6 +15,12 @@ variable "prisma_airs_ips" {
   ]
 }
 
+variable "gateway_provider" {
+  description = "AI Gateway Provider (portkey or litellm)"
+  type        = string
+  default     = "portkey"
+}
+
 variable "enable_local_llm" {
   description = "If true, deploys an N1 instance with a T4 GPU and installs Ollama/Llama3."
   type        = bool
@@ -57,4 +63,17 @@ variable "gcp_subnet_cidr" {
   description = "CIDR block for the GCP Subnet"
   type        = string
   default     = "10.10.0.0/24"
+}
+
+variable "portkey_api_key" {
+  description = "Portkey API Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "portkey_slug" {
+  description = "Portkey Slug (Saved Integration Virtual Key, e.g. @slug-name)"
+  type        = string
+  default     = ""
 }

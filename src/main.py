@@ -20,6 +20,12 @@ from fastapi.templating import Jinja2Templates
 
 # 1. The Universal AI Gateway Client
 from openai import AsyncOpenAI
+try:
+    from portkey_ai import createHeaders
+    PORTKEY_AVAILABLE = True
+except ImportError:
+    PORTKEY_AVAILABLE = False
+PORTKEY_GATEWAY_URL = "https://aigw.portkey.ai/v1"
 
 # 2. MCP Imports (Database Tool Calling)
 from mcp import ClientSession, StdioServerParameters
@@ -62,12 +68,16 @@ except Exception as e:
 parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
+parser.add_argument("--portkey-api-key", help="Portkey API Key", default=os.getenv("PORTKEY_API_KEY"))
+parser.add_argument("--portkey-slug", help="Portkey Slug (Saved Integration)", default=os.getenv("PORTKEY_SLUG"))
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
+parser.add_argument("--gateway-provider", help="AI Gateway Provider", choices=["portkey", "litellm"], default="portkey")
 args, _ = parser.parse_known_args()
 
 AIRS_KEY = args.airs_key
 AIRS_PROFILE_NAME = args.airs_profile
-GATEWAY_URL = args.gateway_url 
+GATEWAY_URL = args.gateway_url
+GATEWAY_PROVIDER = args.gateway_provider
 
 # --- GLOBAL STATE TRACKERS & CLIENTS ---
 AIRS_CONFIGURED = False
@@ -79,7 +89,10 @@ PERSONAS = personas.PERSONAS
 SESSION_HISTORY = {}
 MAX_HISTORY = 10
 
-llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
+if GATEWAY_PROVIDER == "portkey":
+    llm_client = AsyncOpenAI(base_url=PORTKEY_GATEWAY_URL, api_key=args.portkey_api_key)
+else:
+    llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
 
 mcp_session = None
 openai_tools = []
@@ -94,25 +107,20 @@ embedder = None
 
 # --- CORE LOGIC HELPERS ---
 
-def check_gpu_status():
-    try:
-        gpu_info = subprocess.check_output(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            text=True, timeout=5
-        ).strip()
-        try:
-            ollama_ps = subprocess.check_output(["ollama", "ps"], text=True, timeout=5).strip().split('\n')
-            loaded_models = [line.split()[0] for line in ollama_ps[1:] if line.strip()]
-            model_str = f"| Models in VRAM: {', '.join(loaded_models)}" if loaded_models else "| No models currently active in VRAM"
-        except subprocess.TimeoutExpired:
-            model_str = "| Ollama engine is busy/hanging"
-        except Exception:
-            model_str = "| Ollama engine not responding"
-        return f"✅ GPU ONLINE: {gpu_info} {model_str}"
-    except Exception as e:
-        return f"⚠️ NO GPU DETECTED: Running on CPU."
 
 def discover_gateway_models():
+    if GATEWAY_PROVIDER == "portkey":
+        # Bypass local LiteLLM port checks and return supported SaaS sandbox models
+        models = [
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-pro",
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.6-flash"
+        ]
+        return sorted(models)
     found = []
     try:
         response = requests.get(f"{GATEWAY_URL}/v1/models", timeout=5)
@@ -176,7 +184,6 @@ async def lifespan(app: FastAPI):
     print("\n" + "="*50, flush=True)
     print("🚀 T-AIRS STARTUP", flush=True)
     print("="*50, flush=True)
-    print(f"RESULT: {check_gpu_status()}", flush=True)
 
     if AIRS_KEY and AIRS_PROFILE_NAME:
         print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...", flush=True)
@@ -198,6 +205,23 @@ async def lifespan(app: FastAPI):
             print(f"RESULT: ❌ AIRS FAILED - {airs_error_msg}", flush=True)
     else:
         print("RESULT: ⚠️ AIRS Keys missing. App SDK Disabled.")
+
+    if GATEWAY_PROVIDER == "portkey":
+        print("Handshaking with Portkey AI Gateway...", flush=True)
+        try:
+            headers = {
+                "x-portkey-api-key": args.portkey_api_key or "",
+                "User-Agent": "Mozilla/5.0"
+            }
+            if args.portkey_slug:
+                headers["x-portkey-virtual-key"] = args.portkey_slug
+            response = requests.get(f"{PORTKEY_GATEWAY_URL}/models", headers=headers, timeout=5)
+            if response.status_code == 200:
+                print("RESULT: ✅ PORTKEY GATEWAY ONLINE", flush=True)
+            else:
+                print(f"RESULT: ❌ PORTKEY GATEWAY UNHEALTHY - Status Code {response.status_code}", flush=True)
+        except Exception as e:
+            print(f"RESULT: ❌ PORTKEY GATEWAY OFFLINE - Connection Error: {e}", flush=True)
 
     validated_models = discover_gateway_models()
     init_rag_pipeline()
@@ -254,7 +278,24 @@ async def list_models():
 
 @app.get("/health-airs")
 async def health_airs():
-    return {"status": "connected" if AIRS_CONFIGURED else "disconnected", "profile": AIRS_PROFILE_NAME, "reason": airs_error_msg}
+    gateway_status = "connected"
+    if GATEWAY_PROVIDER == "litellm":
+        try:
+            response = requests.get(f"{GATEWAY_URL}/v1/models", timeout=2)
+            if response.status_code != 200:
+                gateway_status = "disconnected"
+        except Exception:
+            gateway_status = "disconnected"
+    else:
+        if not validated_models:
+            gateway_status = "disconnected"
+    return {
+        "status": "connected" if AIRS_CONFIGURED else "disconnected",
+        "profile": AIRS_PROFILE_NAME,
+        "reason": airs_error_msg,
+        "gateway_provider": GATEWAY_PROVIDER,
+        "gateway_status": gateway_status
+    }
 
 @app.get("/get-persona-context/{persona_id}")
 async def get_persona_context(persona_id: str):
@@ -288,8 +329,16 @@ async def chat(
     }
 
     if not model_id or model_id == "none":
-        model_id = validated_models[0] if validated_models else None
+        if "gemini-3.5-flash-lite" in validated_models:
+            model_id = "gemini-3.5-flash-lite"
+        else:
+            model_id = validated_models[0] if validated_models else None
         architecture_trace["ai_gateway"]["routed_to"] = model_id
+
+    # Dynamically determine the model ID passed to the client payload
+    llm_model_id = model_id
+    if GATEWAY_PROVIDER == "portkey" and model_id == "auto-router":
+        llm_model_id = ""
 
     execution_phase = "Initial Inference"
 
@@ -366,30 +415,72 @@ async def chat(
         # =====================================================================
         # 4. AI GATEWAY INFERENCE
         # =====================================================================
-        print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway...")
+        print(f"🚀 ROUTING TO MODEL: {model_id} via AI Gateway ({GATEWAY_PROVIDER.upper()})...")
 
-        gateway_params_agent = {}
-        if enforcement_placement == "gateway" and airs_enabled:
-            gateway_params_agent = {"guardrails": ["airs-mcp-scan"]}
+        extra_headers = {}
+        extra_body = {}
 
-        raw_response = await llm_client.chat.completions.with_raw_response.create(
-            model=model_id,
-            messages=messages,
-            tools=active_tools if active_tools else None,
-            temperature=0.7,
-            user=end_user,
-            extra_body=gateway_params_agent
-        )
+        if GATEWAY_PROVIDER == "portkey" and PORTKEY_AVAILABLE:
+            slug_to_use = args.portkey_slug
+            if slug_to_use:
+                # Utilize a secure saved Integration Slug to bypass block_inline_config restrictions
+                extra_headers = createHeaders(
+                    api_key=args.portkey_api_key,
+                    virtual_key=slug_to_use
+                )
+            else:
+                is_gemini = "gemini" in llm_model_id or "google" in llm_model_id
+                provider_name = "vertex-ai" if is_gemini else "bedrock"
+                extra_headers = createHeaders(
+                    api_key=args.portkey_api_key,
+                    provider=provider_name,
+                    model=llm_model_id
+                )
+        elif GATEWAY_PROVIDER == "litellm":
+            if enforcement_placement == "gateway" and airs_enabled:
+                extra_body = {"guardrails": ["airs-mcp-scan"]}
+
+        # --- 🔧 DEBUG REQUEST PRINT ---
+        debug_headers = {}
+        if extra_headers:
+            for k, v in extra_headers.items():
+                if any(secret_word in k.lower() for secret_word in ["key", "auth", "token", "credential"]):
+                    debug_headers[k] = f"{str(v)[:6]}...{str(v)[-4:]}" if len(str(v)) > 10 else "REDACTED"
+                else:
+                    debug_headers[k] = v
+        print(f"🔧 [DEBUG] Gateway Request Details:")
+        print(f"   - Base URL: {llm_client.base_url}")
+        print(f"   - User: {end_user}")
+        print(f"   - Extra Headers: {debug_headers}")
+        print(f"   - Extra Body Parameter: {extra_body if extra_body else 'None'}")
+
+        inference_kwargs = {
+            "model": llm_model_id,
+            "messages": messages,
+            "tools": active_tools if active_tools else None,
+            "user": end_user,
+            "extra_headers": extra_headers if extra_headers else None,
+            "extra_body": extra_body if extra_body else None
+        }
+        # Suppress deprecation warnings by avoiding passing temperature to Gemini 3+ models
+        if not (llm_model_id and ("gemini-3" in llm_model_id or llm_model_id.startswith("gemini-3."))):
+            inference_kwargs["temperature"] = 0.7
+
+        raw_response = await llm_client.chat.completions.with_raw_response.create(**inference_kwargs)
 
         response = raw_response.parse()
         
-        actual_model = getattr(response, "model", model_id)
-        hidden_model = raw_response.headers.get("x-litellm-model-name")
+        actual_model = getattr(response, "model", llm_model_id)
 
-        if hidden_model:
-            actual_model = hidden_model
-        elif actual_model == "auto-router":
-            actual_model = "Dynamically Routed (Gateway Load Balancer)"
+        if GATEWAY_PROVIDER == "portkey":
+            portkey_trace_id = raw_response.headers.get("x-portkey-trace-id", "N/A")
+            architecture_trace["ai_gateway"]["portkey_trace_id"] = portkey_trace_id
+        else:
+            hidden_model = raw_response.headers.get("x-litellm-model-name")
+            if hidden_model:
+                actual_model = hidden_model
+            elif actual_model == "auto-router":
+                actual_model = "Dynamically Routed (Gateway Load Balancer)"
 
         if model_id == "auto-router":
             architecture_trace["ai_gateway"]["routed_to"] = f"auto-router ➔ {actual_model}"
@@ -508,15 +599,24 @@ async def chat(
                         print(f"⚠️ ToolEvent Log Error: {e}")
 
             # Fetch the next step from the LLM
+            print(f"🔧 [DEBUG] Executing Agent Iteration Step {iteration} with same Gateway request config...")
+            if debug_headers:
+                print(f"   - Active Headers: {debug_headers}")
+
             execution_phase = f"Agent Iteration {iteration}"
-            raw_response = await llm_client.chat.completions.with_raw_response.create(
-                model=model_id,
-                messages=messages,
-                tools=active_tools if active_tools else None,
-                temperature=0.7,
-                user=end_user,
-                extra_body=gateway_params_agent
-            )
+            iteration_kwargs = {
+                "model": llm_model_id,
+                "messages": messages,
+                "tools": active_tools if active_tools else None,
+                "user": end_user,
+                "extra_headers": extra_headers if extra_headers else None,
+                "extra_body": extra_body if extra_body else None
+            }
+            # Suppress deprecation warnings by avoiding passing temperature to Gemini 3+ models
+            if not (llm_model_id and ("gemini-3" in llm_model_id or llm_model_id.startswith("gemini-3."))):
+                iteration_kwargs["temperature"] = 0.7
+
+            raw_response = await llm_client.chat.completions.with_raw_response.create(**iteration_kwargs)
             response = raw_response.parse()
             response_msg = response.choices[0].message
 
@@ -598,45 +698,60 @@ async def chat(
             if len(SESSION_HISTORY[session_id]) > 0 and SESSION_HISTORY[session_id][-1]["content"] == message:
                 SESSION_HISTORY[session_id].pop()
 
-        if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
-            scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
-            log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
-
-            if execution_phase == "Initial Inference":
-                direction = "User ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ MCP Tool (or User)"
-            else:
-                direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
-
-            category_match = re.search(r"'category':\s*'([^']+)'", error_str)
-            category = category_match.group(1).capitalize() if category_match else "Security"
-
-            if "http_400_error" in error_str or "scan_failed" in error_str:
-                clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
-            else:
-                clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
-
-            sidebar_log = {"raw_error": error_str}
-            try:
-                start_idx = error_str.find("{")
-                if start_idx != -1:
-                    inner_str = error_str[start_idx:]
-                    parsed_dict = ast.literal_eval(inner_str)
-                    sidebar_log = {log_key: parsed_dict.get("error", parsed_dict)}
-            except Exception as parse_error:
-                print(f"Debug: Failed to parse inner LiteLLM error: {parse_error}")
-
-            print(f"🛑 AIRS GATEWAY BLOCK: {scan_type} | Direction: {direction} | Category: {category}")
-            print(f"🏁 REQUEST ABORTED | Security Status: Blocked by Gateway")
-            print(f"{'='*40}\n")
-            return {
-                "bot": clean_msg,
-                "output": clean_msg,
-                "logs": {
-                    "security_scan": f"{scan_type} ({direction})",
-                    "raw_response": json.dumps(sidebar_log, indent=2),
-                    "trace": architecture_trace
+        if GATEWAY_PROVIDER == "portkey":
+            if "portkey" in error_str.lower() or "blocked" in error_str.lower():
+                clean_msg = "🛡️ Blocked by Prisma AIRS (Portkey Gateway) policy violation."
+                print(f"🛑 AIRS GATEWAY BLOCK: Request blocked by Gateway proxy rules.")
+                print(f"{'='*40}\n")
+                return {
+                    "bot": clean_msg,
+                    "output": clean_msg,
+                    "logs": {
+                        "security_scan": "GATEWAY BLOCK",
+                        "raw_response": json.dumps({"error": error_str}, indent=2),
+                        "trace": architecture_trace
+                    }
                 }
-            }
+        else:
+            if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
+                scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
+                log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
+
+                if execution_phase == "Initial Inference":
+                    direction = "User ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ MCP Tool (or User)"
+                else:
+                    direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
+
+                category_match = re.search(r"'category':\s*'([^']+)'", error_str)
+                category = category_match.group(1).capitalize() if category_match else "Security"
+
+                if "http_400_error" in error_str or "scan_failed" in error_str:
+                    clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
+                else:
+                    clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
+
+                sidebar_log = {"raw_error": error_str}
+                try:
+                    start_idx = error_str.find("{")
+                    if start_idx != -1:
+                        inner_str = error_str[start_idx:]
+                        parsed_dict = ast.literal_eval(inner_str)
+                        sidebar_log = {log_key: parsed_dict.get("error", parsed_dict)}
+                except Exception as parse_error:
+                    print(f"Debug: Failed to parse inner LiteLLM error: {parse_error}")
+
+                print(f"🛑 AIRS GATEWAY BLOCK: {scan_type} | Direction: {direction} | Category: {category}")
+                print(f"🏁 REQUEST ABORTED | Security Status: Blocked by Gateway")
+                print(f"{'='*40}\n")
+                return {
+                    "bot": clean_msg,
+                    "output": clean_msg,
+                    "logs": {
+                        "security_scan": f"{scan_type} ({direction})",
+                        "raw_response": json.dumps(sidebar_log, indent=2),
+                        "trace": architecture_trace
+                    }
+                }
 
         return {
             "bot": f"Error: {error_str}",

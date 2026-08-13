@@ -43,9 +43,11 @@ locals {
     airs_profile     = var.airs_profile
     gcp_project      = ""
     gcp_region       = ""
-    enable_local_llm = var.enable_local_llm
     env              = local.env
     target_cloud     = "aws" 
+    gateway_provider = var.gateway_provider
+    portkey_api_key     = var.portkey_api_key
+    portkey_slug        = var.portkey_slug
     aws_region       = var.aws_region
     # Pass the list of models as a space-separated string for easy parsing in bash.
     bedrock_model_ids = join(" ", var.bedrock_model_ids)
@@ -66,15 +68,6 @@ data "aws_ami" "ubuntu_standard" {
   }
 }
 
-# Finds the latest AWS Deep Learning AMI with NVIDIA drivers for GPU-enabled instances.
-data "aws_ami" "ubuntu_dlami" {
-  most_recent = true
-  owners      = ["amazon"]
-  filter {
-    name   = "name"
-    values = ["Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"]
-  }
-}
 
 # ==========================================
 # AWS NETWORKING
@@ -185,17 +178,14 @@ resource "aws_security_group" "restricted_airs" {
 # Defines the EC2 instance that will run the application.
 # Note: Do not scale down flavors, otherwise it won't work for laoding BAAI/bge-small-en-v1.5) for RAG
 resource "aws_instance" "t_airs_node" {
-  # Conditionally selects the AMI based on whether a local LLM (GPU) is enabled.
-  ami = var.enable_local_llm ? data.aws_ami.ubuntu_dlami.id : data.aws_ami.ubuntu_standard.id
+  ami = data.aws_ami.ubuntu_standard.id
   
-  # Conditionally selects the instance type: g4dn.xlarge for GPU, t3.large for standard.
-  instance_type        = var.enable_local_llm ? "g4dn.xlarge" : "t3.large"
+  instance_type        = "t3.large"
   key_name             = aws_key_pair.generated_key.key_name
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   
   root_block_device {
-    # Conditionally sets a larger disk size for GPU instances to accommodate models.
-    volume_size           = var.enable_local_llm ? 75 : 20 
+    volume_size           = 20
     volume_type           = "gp3"
     delete_on_termination = true
   }
