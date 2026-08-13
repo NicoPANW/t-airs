@@ -77,10 +77,3 @@ variable "portkey_slug" {
   type        = string
   default     = ""
 }
-
-variable "portkey_virtual_key" {
-  description = "Portkey Virtual Key"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
