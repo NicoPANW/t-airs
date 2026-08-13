@@ -206,6 +206,23 @@ async def lifespan(app: FastAPI):
     else:
         print("RESULT: ⚠️ AIRS Keys missing. App SDK Disabled.")
 
+        if GATEWAY_PROVIDER == "portkey":
+            print("Handshaking with Portkey AI Gateway...", flush=True)
+            try:
+                headers = {
+                    "x-portkey-api-key": args.portkey_api_key or "",
+                    "User-Agent": "Mozilla/5.0"
+                }
+                if args.portkey_slug:
+                    headers["x-portkey-virtual-key"] = args.portkey_slug
+                response = requests.get(f"{PORTKEY_GATEWAY_URL}/models", headers=headers, timeout=5)
+                if response.status_code == 200:
+                    print("RESULT: ✅ PORTKEY GATEWAY ONLINE", flush=True)
+                else:
+                    print(f"RESULT: ❌ PORTKEY GATEWAY UNHEALTHY - Status Code {response.status_code}", flush=True)
+            except Exception as e:
+                print(f"RESULT: ❌ PORTKEY GATEWAY OFFLINE - Connection Error: {e}", flush=True)
+
     validated_models = discover_gateway_models()
     init_rag_pipeline()
 
