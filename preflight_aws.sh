@@ -55,69 +55,78 @@ fi
 if [ -z "$TF_VAR_aws_region" ]; then
     echo "❌ ERROR: Missing AWS environment variables."
     echo "   Run: export TF_VAR_aws_region='us-east-1'"
-    exit 1
+    FAILED=1
 fi
 
 if ! command -v aws &> /dev/null; then
     echo "❌ ERROR: AWS CLI is not installed."
-    exit 1
+    FAILED=1
 fi
 
 echo "🔍 Checking AWS Authentication..."
 if ! aws sts get-caller-identity &> /dev/null; then
     echo "❌ ERROR: Not logged into AWS. Check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
-    exit 1
+    FAILED=1
 fi
 
+if cd terraform/aws 2>/dev/null; then
+    if command -v terraform &> /dev/null; then
+        terraform init > /dev/null
 
-cd terraform/aws || { echo "❌ ERROR: terraform/aws directory not found."; exit 1; }
-terraform init > /dev/null
+        # 1. Get the list of models from Terraform as a JSON string
+        echo "🔍 Resolving Bedrock Model IDs from Terraform..."
+        MODEL_IDS_JSON=$(echo 'jsonencode(var.bedrock_model_ids)' | terraform console 2>/dev/null | grep '\[.*\]' || echo "")
 
-# 1. Get the list of models from Terraform as a JSON string
-echo "🔍 Resolving Bedrock Model IDs from Terraform..."
-MODEL_IDS_JSON=$(echo 'jsonencode(var.bedrock_model_ids)' | terraform console 2>/dev/null | grep '\[.*\]' || echo "")
+        if [ -z "$MODEL_IDS_JSON" ] || [[ "$MODEL_IDS_JSON" == "null" ]]; then
+            echo "❌ ERROR: Could not resolve 'bedrock_model_ids'. Ensure it is declared in variables.tf and has a default value."
+            FAILED=1
+        else
+            # 2. Check Bedrock Model Status for each model
+            ACTIVE_MODELS=0
+            # Use sed to clean the JSON array into a space-separated list for the loop
+            # Use tr to delete brackets and quotes, then sed to replace commas with spaces. This is more robust.
+            MODEL_IDS_CLEAN=$(echo "$MODEL_IDS_JSON" | tr -d '[]"\\' | sed 's/,/ /g')
 
-if [ -z "$MODEL_IDS_JSON" ] || [[ "$MODEL_IDS_JSON" == "null" ]]; then
-    echo "❌ ERROR: Could not resolve 'bedrock_model_ids'. Ensure it is declared in variables.tf and has a default value."
-    exit 1
-fi
+            for MODEL_ID in $MODEL_IDS_CLEAN; do
+                echo "🔍 Checking AWS Bedrock Model ($MODEL_ID) Status..."
+                
+                # 1. First, try to query it as a standard Foundation Model
+                MODEL_STATUS=$(aws bedrock get-foundation-model \
+                    --model-id "$MODEL_ID" \
+                    --region "$TF_VAR_aws_region" \
+                    --query 'modelDetails.modelLifecycle.status' \
+                    --output text 2>/dev/null)
 
-# 2. Check Bedrock Model Status for each model
-ACTIVE_MODELS=0
-# Use sed to clean the JSON array into a space-separated list for the loop
-# Use tr to delete brackets and quotes, then sed to replace commas with spaces. This is more robust.
-MODEL_IDS_CLEAN=$(echo "$MODEL_IDS_JSON" | tr -d '[]"\\' | sed 's/,/ /g')
+                # 2. If it fails or is empty, try querying it as a Cross-Region Inference Profile
+                if [ -z "$MODEL_STATUS" ] || [ "$MODEL_STATUS" == "None" ] || [[ "$MODEL_STATUS" == *"An error occurred"* ]]; then
+                    MODEL_STATUS=$(aws bedrock get-inference-profile \
+                        --inference-profile-identifier "$MODEL_ID" \
+                        --region "$TF_VAR_aws_region" \
+                        --query 'status' \
+                        --output text 2>/dev/null)
+                fi
 
-for MODEL_ID in $MODEL_IDS_CLEAN; do
-    echo "🔍 Checking AWS Bedrock Model ($MODEL_ID) Status..."
-    
-    # 1. First, try to query it as a standard Foundation Model
-    MODEL_STATUS=$(aws bedrock get-foundation-model \
-        --model-id "$MODEL_ID" \
-        --region "$TF_VAR_aws_region" \
-        --query 'modelDetails.modelLifecycle.status' \
-        --output text 2>/dev/null)
+                if [ "$MODEL_STATUS" == "ACTIVE" ]; then
+                    echo "✅ Model $MODEL_ID is ACTIVE."
+                    ACTIVE_MODELS=$((ACTIVE_MODELS + 1))
+                else
+                    echo "⚠️  WARNING: Model '$MODEL_ID' is not ACTIVE in region '$TF_VAR_aws_region'. It will be skipped."
+                fi
+            done
 
-    # 2. If it fails or is empty, try querying it as a Cross-Region Inference Profile
-    if [ -z "$MODEL_STATUS" ] || [ "$MODEL_STATUS" == "None" ] || [[ "$MODEL_STATUS" == *"An error occurred"* ]]; then
-        MODEL_STATUS=$(aws bedrock get-inference-profile \
-            --inference-profile-identifier "$MODEL_ID" \
-            --region "$TF_VAR_aws_region" \
-            --query 'status' \
-            --output text 2>/dev/null)
-    fi
-
-    if [ "$MODEL_STATUS" == "ACTIVE" ]; then
-        echo "✅ Model $MODEL_ID is ACTIVE."
-        ACTIVE_MODELS=$((ACTIVE_MODELS + 1))
+            if [ "$ACTIVE_MODELS" -eq 0 ]; then
+                echo "❌ ERROR: None of the specified Bedrock models are active in region '$TF_VAR_aws_region'. Deployment cannot continue."
+                FAILED=1
+            fi
+        fi
     else
-        echo "⚠️  WARNING: Model '$MODEL_ID' is not ACTIVE in region '$TF_VAR_aws_region'. It will be skipped."
+        echo "❌ ERROR: Terraform binary is missing. Skipping Bedrock model checks."
+        FAILED=1
     fi
-done
-
-if [ "$ACTIVE_MODELS" -eq 0 ]; then
-    echo "❌ ERROR: None of the specified Bedrock models are active in region '$TF_VAR_aws_region'. Deployment cannot continue."
-    exit 1
+    cd ../..
+else
+    echo "❌ ERROR: terraform/aws directory not found."
+    FAILED=1
 fi
 
 if [ -z "$TF_VAR_prisma_airs_ips" ]; then
