@@ -13,7 +13,7 @@ output "deployment_summary" {
   🛡️ Security Notice : CSP firewalls are RESTRICTED to your auto-detected subnet
                        (${local.my_auto_subnet}) and Prisma AIRS nodes (${join(", ", var.prisma_airs_ips)}).
   
-  ⏳ Readiness Note  : Please note it takes approximately 15 minutes for the startup 
+  ⏳ Readiness Note  : Please note it takes approximately 5 minutes for the startup 
                        scripts to finish installing the application. The dashboard 
                        will be available once the process completes.
 

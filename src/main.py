@@ -304,7 +304,7 @@ async def chat(
     # Dynamically determine the model ID passed to the client payload
     llm_model_id = model_id
     if GATEWAY_PROVIDER == "portkey" and model_id == "auto-router":
-        llm_model_id = "gemini-3.5-flash-lite"
+        llm_model_id = ""
 
     execution_phase = "Initial Inference"
 
