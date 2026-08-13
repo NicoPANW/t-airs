@@ -24,9 +24,12 @@ if [ -n "$TF_VAR_portkey_api_key" ]; then
     python3 -c "
 import sys, urllib.request, urllib.error
 try:
+    headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key'}
+    if '$TF_VAR_portkey_slug':
+        headers['x-portkey-virtual-key'] = '$TF_VAR_portkey_slug'
     req = urllib.request.Request(
-        'https://api.portkey.ai/v1/models',
-        headers={'x-portkey-api-key': '$TF_VAR_portkey_api_key'}
+        'https://aigw.portkey.ai/v1/models',
+        headers=headers
     )
     with urllib.request.urlopen(req, timeout=5) as response:
         if response.status == 200:
