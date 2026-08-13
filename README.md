@@ -293,9 +293,10 @@ Once logged in, you can check your live app logs, reset the service, or check yo
 
 ```bash
 sudo journalctl -u t-airs.service -n 75 -f
-sudo systemctl restart t-airs#if local-llm, checking Nvidi T4 is ready
-sudo journalctl -u litellm.service -n 50 --no-pager
-sudo /opt/t-airs/venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; print('⏳ Attempting foreground download...'); SentenceTransformer('BAAI/bge-small-en-v1.5'); print('✅ Download complete.')" #it may happen after several deployements huggingface download does not work, so app is stuck. To prove this, you can run this command. A workaround is to use another CSP region, it will come with new IPs and bypass HF rate limiters
+sudo systemctl restart t-airs
+# If using Litellm AI gateway:
+sudo journalctl -u litellm.service -n 75 -f
+sudo systemctl restart litellm
 ```
 
 <img width="1661" height="1031" alt="Screenshot 2026-04-10 at 16 24 26" src="https://github.com/user-attachments/assets/04a4865c-3b56-4655-bf88-ee34cd7e2dd6" />
