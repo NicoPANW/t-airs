@@ -45,7 +45,7 @@ else
     FAILED=1
 fi
 
-echo "🔍 Checking Required APIs.."
+echo "🔍 Checking Required APIs..."
 if command -v gcloud &> /dev/null && [ -n "$TF_VAR_gcp_project_id" ] && [ -n "$TOKEN" ]; then
     ENABLED_SERVICES=$(gcloud services list --project="$TF_VAR_gcp_project_id" --format="value(config.name)" 2>/dev/null)
     API_ERR=0
