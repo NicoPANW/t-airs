@@ -426,7 +426,8 @@ async def chat(
                 # Utilize a secure saved Integration Slug to bypass block_inline_config restrictions
                 extra_headers = createHeaders(
                     api_key=args.portkey_api_key,
-                    virtual_key=slug_to_use
+                    virtual_key=slug_to_use,
+                    user=end_user
                 )
             else:
                 is_gemini = "gemini" in llm_model_id or "google" in llm_model_id
@@ -434,7 +435,8 @@ async def chat(
                 extra_headers = createHeaders(
                     api_key=args.portkey_api_key,
                     provider=provider_name,
-                    model=llm_model_id
+                    model=llm_model_id,
+                    user=end_user
                 )
         elif GATEWAY_PROVIDER == "litellm":
             if enforcement_placement == "gateway" and airs_enabled:
@@ -450,6 +452,7 @@ async def chat(
                     debug_headers[k] = v
         print(f"🔧 [DEBUG] Gateway Request Details:")
         print(f"   - Base URL: {llm_client.base_url}")
+        print(f"   - User: {end_user}")
         print(f"   - Extra Headers: {debug_headers}")
         print(f"   - Extra Body Parameter: {extra_body if extra_body else 'None'}")
 
