@@ -22,35 +22,6 @@ if [ -z "$TF_VAR_airs_profile" ]; then
     FAILED=1
 fi
 
-# --- 1.5 PORTKEY API CONNECTIVITY CHECK ---
-if [ -n "$TF_VAR_portkey_api_key" ]; then
-    echo "📡 Verifying Portkey API Connectivity via Python..."
-    python3 -c "
-import sys, urllib.request, urllib.error
-try:
-    headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key', 'User-Agent': 'Mozilla/5.0'}
-    if '$TF_VAR_portkey_slug':
-        headers['x-portkey-virtual-key'] = '$TF_VAR_portkey_slug'
-    req = urllib.request.Request(
-        'https://aigw.portkey.ai/v1/models',
-        headers=headers
-    )
-    with urllib.request.urlopen(req, timeout=5) as response:
-        if response.status == 200:
-            print('✅ Portkey connectivity and API key verified successfully.')
-            sys.exit(0)
-except urllib.error.HTTPError as e:
-    print(f'❌ Portkey API Error ({e.code}): {e.read().decode(\"utf-8\")}')
-    sys.exit(1)
-except Exception as e:
-    print(f'❌ Network Error: {e}')
-    sys.exit(1)
-"
-    if [ $? -ne 0 ]; then
-        exit 1
-    fi
-fi
-
 # --- 2. AWS CHECKS ---
 if [ -z "$TF_VAR_aws_region" ]; then
     echo "❌ ERROR: Missing AWS environment variables."
@@ -64,14 +35,22 @@ if ! command -v aws &> /dev/null; then
 fi
 
 echo "🔍 Checking AWS Authentication..."
-if ! aws sts get-caller-identity &> /dev/null; then
-    echo "❌ ERROR: Not logged into AWS. Check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
+if command -v aws &> /dev/null; then
+    if ! aws sts get-caller-identity &> /dev/null; then
+        echo "❌ ERROR: Not logged into AWS. Check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
+        FAILED=1
+    else
+        echo "✅ AWS Authentication successful."
+    fi
+else
+    echo "❌ ERROR: Cannot check AWS Authentication because AWS CLI is not installed."
     FAILED=1
 fi
 
 if cd terraform/aws 2>/dev/null; then
     if command -v terraform &> /dev/null; then
         terraform init > /dev/null
+        echo "✅ Terraform workspace initialized successfully."
 
         # 1. Get the list of models from Terraform as a JSON string
         echo "🔍 Resolving Bedrock Model IDs from Terraform..."
@@ -127,6 +106,35 @@ if cd terraform/aws 2>/dev/null; then
 else
     echo "❌ ERROR: terraform/aws directory not found."
     FAILED=1
+fi
+
+# --- 3. PORTKEY API CONNECTIVITY CHECK ---
+if [ -n "$TF_VAR_portkey_api_key" ]; then
+    echo "📡 Verifying Portkey API Connectivity via Python..."
+    python3 -c "
+import sys, urllib.request, urllib.error
+try:
+    headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key', 'User-Agent': 'Mozilla/5.0'}
+    if '$TF_VAR_portkey_slug':
+        headers['x-portkey-virtual-key'] = '$TF_VAR_portkey_slug'
+    req = urllib.request.Request(
+        'https://aigw.portkey.ai/v1/models',
+        headers=headers
+    )
+    with urllib.request.urlopen(req, timeout=5) as response:
+        if response.status == 200:
+            print('✅ Portkey connectivity and API key verified successfully.')
+            sys.exit(0)
+except urllib.error.HTTPError as e:
+    print(f'❌ Portkey API Error ({e.code}): {e.read().decode(\"utf-8\")}')
+    sys.exit(1)
+except Exception as e:
+    print(f'❌ Network Error: {e}')
+    sys.exit(1)
+"
+    if [ $? -ne 0 ]; then
+        FAILED=1
+    fi
 fi
 
 if [ -z "$TF_VAR_prisma_airs_ips" ]; then
