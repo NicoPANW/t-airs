@@ -6,7 +6,11 @@ output "deployment_summary" {
   🚀 T-AIRS LAB DEPLOYMENT SUCCESSFUL (GCP)
   ========================================================================
 
-  📊 Dashboard URL   : http://${google_compute_instance.t_airs_node.network_interface[0].access_config[0].nat_ip}:8000
+  📦 App Version     : v${fileexists("${path.module}/../../VERSION") ? chomp(file("${path.module}/../../VERSION")) : (fileexists("${path.module}/../../version") ? chomp(file("${path.module}/../../version")) : "unknown")}
+
+  🌐 Environment     : ${local.env}
+
+  � Dashboard URL   : http://${google_compute_instance.t_airs_node.network_interface[0].access_config[0].nat_ip}:8000
   
   💻 SSH Command     : gcloud compute ssh ${google_compute_instance.t_airs_node.name} --zone=${google_compute_instance.t_airs_node.zone}
   

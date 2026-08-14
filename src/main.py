@@ -57,6 +57,8 @@ APP_VERSION = "unknown"
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     version_file = os.path.join(base_dir, '..', 'VERSION')
+    if not os.path.exists(version_file):
+        version_file = os.path.join(base_dir, '..', 'version')
     with open(version_file, 'r') as f:
         version_content = f.read().strip()
         if version_content:

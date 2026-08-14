@@ -6,6 +6,10 @@ output "deployment_summary" {
   🚀 T-AIRS LAB DEPLOYMENT SUCCESSFUL (AWS)
   ========================================================================
 
+  📦 App Version     : v${fileexists("${path.module}/../../VERSION") ? chomp(file("${path.module}/../../VERSION")) : (fileexists("${path.module}/../../version") ? chomp(file("${path.module}/../../version")) : "unknown")}
+
+  🌐 Environment     : ${local.env}
+
   📊 Dashboard URL   : http://${aws_instance.t_airs_node.public_ip}:8000
   
   💻 SSH Command     : ssh -i ${local_sensitive_file.private_key.filename} ubuntu@${aws_instance.t_airs_node.public_ip}
