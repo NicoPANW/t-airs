@@ -182,7 +182,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
 async def lifespan(app: FastAPI):
     global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools, async_scanner
     print("\n" + "="*50, flush=True)
-    print("🚀 T-AIRS STARTUP", flush=True)
+    print(f"🚀 T-AIRS STARTUP (v{APP_VERSION})", flush=True)
     print("="*50, flush=True)
 
     if AIRS_KEY and AIRS_PROFILE_NAME:
