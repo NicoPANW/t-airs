@@ -64,6 +64,8 @@ try:
 except Exception as e:
     print(f"Warning: Could not read VERSION file. Error: {e}")
 
+APP_ENV = os.getenv("APP_ENV", "dev")
+
 # --- CAPTURE CLI ARGUMENTS ---
 parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
@@ -266,7 +268,7 @@ async def update_persona(persona_id: str = Form(...), new_context: str = Form(..
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html", context={"app_version": APP_VERSION})
+    return templates.TemplateResponse(request=request, name="index.html", context={"app_version": APP_VERSION, "app_env": APP_ENV})
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():

@@ -47,6 +47,11 @@
             <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
             <h1 class="text-xl font-black tracking-tighter text-white uppercase italic">T-AIRS</h1>
             <span class="text-[10px] font-mono bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">v{{ app_version }}</span>
+            {% if app_env == 'prod' %}
+            <span class="text-[10px] font-mono bg-emerald-600 text-emerald-100 px-2 py-0.5 rounded-full uppercase">prod</span>
+            {% else %}
+            <span class="text-[10px] font-mono bg-amber-600 text-amber-100 px-2 py-0.5 rounded-full uppercase">{{ app_env }}</span>
+            {% endif %}
         </div>
 
         <div class="flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto pr-2 sidebar-scroll pb-4">

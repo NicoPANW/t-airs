@@ -51,6 +51,14 @@ echo "Deploying from git branch: $BRANCH"
 git clone --branch $BRANCH https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
 
+# Read application version and update the hostname dynamically
+if [ -f "/opt/t-airs/VERSION" ]; then
+    APP_VERSION=$(cat /opt/t-airs/VERSION | tr -d '\r\n[:space:]')
+    CLEAN_VERSION=$(echo "$APP_VERSION" | tr '.' '-')
+    echo "Updating hostname to include version: v$APP_VERSION"
+    hostnamectl set-hostname "t-airs-node-${target_cloud}-${env}-v$CLEAN_VERSION"
+fi
+
 # Create the SQLite database and populate it with initial customer data.
 # This provides the structured data for the MCP agent to interact with.
 echo "Executing SQL Seeder"
@@ -258,6 +266,7 @@ Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
 # Inject Portkey credentials from Terraform (ignored if LiteLLM is active)
 Environment="PORTKEY_API_KEY=${portkey_api_key}"
 Environment="PORTKEY_SLUG=${portkey_slug}"
+Environment="APP_ENV=${env}"
 
 WorkingDirectory=/opt/t-airs/src
 
