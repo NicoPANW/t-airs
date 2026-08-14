@@ -699,16 +699,39 @@ async def chat(
                 SESSION_HISTORY[session_id].pop()
 
         if GATEWAY_PROVIDER == "portkey":
-            if "portkey" in error_str.lower() or "blocked" in error_str.lower():
+            is_guardrail_block = "446" in error_str or "hooks_failed" in error_str or ("blocked" in error_str.lower() and "guardrail" in error_str.lower())
+            if is_guardrail_block:
                 clean_msg = "🛡️ Blocked by Prisma AIRS (Portkey Gateway) policy violation."
-                print(f"🛑 AIRS GATEWAY BLOCK: Request blocked by Gateway proxy rules.")
+                category = "Security"
+                sidebar_log = {"raw_error": error_str}
+                try:
+                    start_idx = error_str.find("{")
+                    if start_idx != -1:
+                        inner_str = error_str[start_idx:]
+                        try:
+                            parsed_dict = json.loads(inner_str.replace("'", "\"").replace("None", "null").replace("True", "true").replace("False", "false"))
+                        except Exception:
+                            parsed_dict = ast.literal_eval(inner_str)
+                        sidebar_log = parsed_dict
+                        hooks = parsed_dict.get("hook_results", {}).get("before_request_hooks", [])
+                        for hook in hooks:
+                            for check in hook.get("checks", []):
+                                check_data = check.get("data", {})
+                                if check_data and check_data.get("action") == "block":
+                                    category = str(check_data.get("category", "Security")).capitalize()
+                                    clean_msg = f"🛡️ Blocked by Prisma AIRS (Portkey Gateway): {category} policy violation."
+                                    break
+                except Exception as parse_error:
+                    print(f"Debug: Failed to parse inner Portkey error: {parse_error}")
+
+                print(f"🛑 AIRS GATEWAY BLOCK: Portkey Hook blocked request | Category: {category}")
                 print(f"{'='*40}\n")
                 return {
                     "bot": clean_msg,
                     "output": clean_msg,
                     "logs": {
                         "security_scan": "GATEWAY BLOCK",
-                        "raw_response": json.dumps({"error": error_str}, indent=2),
+                        "raw_response": json.dumps(sidebar_log, indent=2),
                         "trace": architecture_trace
                     }
                 }
