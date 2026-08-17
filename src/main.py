@@ -89,6 +89,7 @@ airs_error_msg = "Not initialized"
 ai_profile_obj = None
 async_scanner = None  # Global async scanner instance
 validated_models = []
+PORTKEY_CONNECTED = False
 PERSONAS = personas.PERSONAS
 SESSION_HISTORY = {}
 MAX_HISTORY = 10
@@ -184,7 +185,7 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
 # --- APP LIFESPAN MANAGEMENT ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools, async_scanner
+    global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools, async_scanner, PORTKEY_CONNECTED
     print("\n" + "="*50, flush=True)
     print(f"🚀 T-AIRS STARTUP (v{APP_VERSION})", flush=True)
     print("="*50, flush=True)
@@ -222,10 +223,13 @@ async def lifespan(app: FastAPI):
             response = requests.get(f"{PORTKEY_GATEWAY_URL}/models", headers=headers, timeout=5)
             if response.status_code == 200:
                 print("RESULT: ✅ PORTKEY GATEWAY ONLINE", flush=True)
+                PORTKEY_CONNECTED = True
             else:
                 print(f"RESULT: ❌ PORTKEY GATEWAY UNHEALTHY - Status Code {response.status_code}", flush=True)
+                PORTKEY_CONNECTED = False
         except Exception as e:
             print(f"RESULT: ❌ PORTKEY GATEWAY OFFLINE - Connection Error: {e}", flush=True)
+            PORTKEY_CONNECTED = False
 
     validated_models = discover_gateway_models()
     init_rag_pipeline()
@@ -291,7 +295,7 @@ async def health_airs():
         except Exception:
             gateway_status = "disconnected"
     else:
-        if not validated_models:
+        if not PORTKEY_CONNECTED:
             gateway_status = "disconnected"
     return {
         "status": "connected" if AIRS_CONFIGURED else "disconnected",
