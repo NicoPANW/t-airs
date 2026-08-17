@@ -83,7 +83,7 @@ Before you begin, you need to meet a few requirements:
 
 ### 🤖 AI Runtime (API) specific prerequisites
 
-Below shows to define the Prisma AIRS profile and API key.
+Below shows how to define the Prisma AIRS profile and API key.
 
 **1. Create a security profile (this name will be required foar passing as env parameter)**
 <img width="1847" height="840" alt="Screenshot 2026-04-01 at 16 15 41" src="https://github.com/user-attachments/assets/6b1d96a3-74cf-43b7-9cce-783824087118" />
@@ -104,7 +104,17 @@ Below shows to define the Prisma AIRS profile and API key.
 <img width="1849" height="842" alt="Screenshot 2026-04-01 at 16 12 26" src="https://github.com/user-attachments/assets/554479ae-28c0-404d-b1fd-d4f2450d7b18" />
 
 ### 🤖 Portkey AI gateway specific prerequisites
-TBC
+
+Below shows how to define the minimal config for Portkey to get the Slug and the API key.
+
+**1. Create an integration with an AI provider (ie. Vertex AI, Bedrock, etc.). Copy the Slug to then export it Terraform env var**
+<img width="1512" height="982" alt="Screenshot 2026-08-17 at 13 18 49" src="https://github.com/user-attachments/assets/f927ae0d-5b6b-465b-bd2f-755578ac3079" />
+
+<img width="1512" height="814" alt="Screenshot 2026-08-17 at 13 20 55" src="https://github.com/user-attachments/assets/4cde808e-6a2c-4d0f-9248-14d2950aa2cc" />
+
+**2. Create a gateway API key and copy it to then export it Terraform env var**
+<img width="1512" height="973" alt="Screenshot 2026-08-17 at 13 21 19" src="https://github.com/user-attachments/assets/81ecd83b-432e-4880-861b-87852004df18" />
+
 
 ---
 
