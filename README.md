@@ -107,12 +107,12 @@ Below shows how to define the Prisma AIRS profile and API key.
 
 Below shows how to define the minimal config for Portkey to get the Slug and the API key.
 
-**1. Create an integration with an AI provider (ie. Vertex AI, Bedrock, etc.). Copy the Slug to then export it Terraform env var**
+**1. Create an integration with an AI provider (ie. Vertex AI, Bedrock, etc.). Copy the Slug to then export it Terraform env var detailed in next section**
 <img width="1512" height="982" alt="Screenshot 2026-08-17 at 13 18 49" src="https://github.com/user-attachments/assets/f927ae0d-5b6b-465b-bd2f-755578ac3079" />
 
 <img width="1512" height="814" alt="Screenshot 2026-08-17 at 13 20 55" src="https://github.com/user-attachments/assets/4cde808e-6a2c-4d0f-9248-14d2950aa2cc" />
 
-**2. Create a gateway API key and copy it to then export it Terraform env var**
+**2. Create a gateway API key and copy it to then export it Terraform env var detailed in next section**
 <img width="1512" height="973" alt="Screenshot 2026-08-17 at 13 21 19" src="https://github.com/user-attachments/assets/81ecd83b-432e-4880-861b-87852004df18" />
 
 
