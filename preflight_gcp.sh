@@ -137,9 +137,17 @@ else
 fi
 
 # --- 4. PORTKEY API CONNECTIVITY CHECK ---
-if [ -n "$TF_VAR_portkey_api_key" ]; then
-    echo "📡 Verifying Portkey API Connectivity via Python..."
-    python3 -c "
+GW_PROVIDER=${TF_VAR_gateway_provider:-portkey}
+
+if [ "$GW_PROVIDER" = "portkey" ]; then
+    if [ -z "$TF_VAR_portkey_api_key" ]; then
+        echo "❌ ERROR: TF_VAR_portkey_api_key is not set, but gateway_provider is set to (or defaults to) 'portkey'."
+        echo "   Please export your key: export TF_VAR_portkey_api_key='your_key_here'"
+        echo "   Alternatively, to use LiteLLM, export TF_VAR_gateway_provider='litellm'"
+        FAILED=1
+    else
+        echo "📡 Verifying Portkey API Connectivity via Python..."
+        python3 -c "
 import sys, urllib.request, urllib.error
 try:
     headers = {'x-portkey-api-key': '$TF_VAR_portkey_api_key', 'User-Agent': 'Mozilla/5.0'}
@@ -160,8 +168,9 @@ except Exception as e:
     print(f'❌ Network Error: {e}')
     sys.exit(1)
 "
-    if [ $? -ne 0 ]; then
-                FAILED=1
+        if [ $? -ne 0 ]; then
+            FAILED=1
+        fi
     fi
 fi
 
