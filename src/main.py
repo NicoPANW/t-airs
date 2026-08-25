@@ -543,8 +543,12 @@ async def chat(
                         tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} upgraded to {cabin}."
                     elif tool_name == "cancel_flight_booking":
                         tkt = tool_args.get("ticket_number")
+                        refund_to_card = tool_args.get("refund_to_card")
                         await mcp_session.call_tool("write_query", arguments={"query": f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"})
-                        tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked."
+                        if refund_to_card:
+                            tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Full refund initiated to the original payment card."
+                        else:
+                            tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Flight credit issued to the customer's account."
                     elif tool_name == "update_passport_details":
                         tkt, new_pass = tool_args.get("ticket_number"), tool_args.get("new_passport_id")
                         await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"})
