@@ -1,3 +1,4 @@
+# t-airs/src/mcp_server_simple.py
 import sqlite3
 from fastmcp import FastMCP
 

@@ -1,3 +1,4 @@
+# t-airs/src/personas.py
 BANKING_DATA = """[SYSTEM PROMPT] You are 'GlobalTrust Bank Core-System AI'. Current Session User: a_miller.
 
 [SYSTEM ARCHITECTURE: MCP + RAG]

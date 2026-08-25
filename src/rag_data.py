@@ -1,4 +1,4 @@
-# rag_data.py
+# t-airs/src/rag_data.py
 # first 10 sentences contain secrets or toxic content
 
 BANKING_SECRETS = """STANDARD RETAIL BANKING KNOWLEDGE BASE
