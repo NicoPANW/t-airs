@@ -81,8 +81,8 @@ async def handle_call_tool(request: types.CallToolRequest) -> types.CallToolResu
     
     return types.CallToolResult(content=[TextContent(type="text", text=f"Error: unknown tool {name}")], isError=True)
 
-server.set_request_handler(types.ListToolsRequest, handle_list_tools)
-server.set_request_handler(types.CallToolRequest, handle_call_tool)
+server._request_handlers[types.ListToolsRequest] = handle_list_tools
+server._request_handlers[types.CallToolRequest] = handle_call_tool
 
 async def main():
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
