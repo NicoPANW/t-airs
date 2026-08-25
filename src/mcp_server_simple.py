@@ -88,11 +88,8 @@ server._request_handlers[types.CallToolRequest] = handle_call_tool
 async def main():
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
         init_options = InitializationOptions(
-            serverInfo=types.Implementation(
-                name="sqlite-server",
-                version="1.0.0"
-            ),
-            protocolVersion=types.LATEST_PROTOCOL_VERSION,
+            server_name="sqlite-server",
+            server_version="1.0.0",
             capabilities=types.ServerCapabilities(
                 tools=types.ToolsCapability(listChanged=True)
             )
