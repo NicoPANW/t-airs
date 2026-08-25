@@ -2,7 +2,6 @@
 portkey-ai==2.3.4
 fastapi==0.141.1
 mcp==2.1.0
-fastmcp==3.4.7
 uvloop==0.22.1
 uvicorn==0.52.4
 requests==2.34.2
