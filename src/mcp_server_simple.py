@@ -1,5 +1,5 @@
 import sqlite3
-from mcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("sqlite-server")
 DB_PATH = "/opt/t-airs/src/customers.db"
