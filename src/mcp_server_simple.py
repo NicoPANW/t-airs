@@ -3,6 +3,7 @@ import asyncio
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 import mcp.types as types
+from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 
 server = Server("sqlite-server")
@@ -86,7 +87,7 @@ server._request_handlers[types.CallToolRequest] = handle_call_tool
 
 async def main():
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-        init_options = types.InitializationOptions(
+        init_options = InitializationOptions(
             serverInfo=types.Implementation(
                 name="sqlite-server",
                 version="1.0.0"
