@@ -1,8 +1,8 @@
 # t-airs/src/mcp_server_simple.py
 import sqlite3
-from fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
-mcp = FastMCP("sqlite-server")
+mcp = MCPServer("sqlite-server")
 DB_PATH = "/opt/t-airs/src/customers.db"
 
 @mcp.tool()
