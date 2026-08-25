@@ -102,8 +102,8 @@ else:
 mcp_session = None
 openai_tools = []
 server_params = StdioServerParameters(
-    command="/opt/t-airs/venv/bin/mcp-sqlite3",
-    args=["--db-path", "/opt/t-airs/src/customers.db"]
+    command="/opt/t-airs/venv/bin/python3",
+    args=["-m", "mcp_sqlite3", "/opt/t-airs/src/customers.db"]
 )
 
 chroma_client = None
