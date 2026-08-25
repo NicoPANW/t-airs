@@ -10,4 +10,3 @@ openai==3.3.1
 mcp==2.1.0
 chromadb==1.5.9
 sentence-transformers==6.0.0
-mcp-sqlite3==0.1.3
