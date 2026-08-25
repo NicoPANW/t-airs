@@ -86,10 +86,20 @@ server._request_handlers[types.CallToolRequest] = handle_call_tool
 
 async def main():
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+        init_options = types.InitializationOptions(
+            serverInfo=types.Implementation(
+                name="sqlite-server",
+                version="1.0.0"
+            ),
+            protocolVersion=types.LATEST_PROTOCOL_VERSION,
+            capabilities=types.ServerCapabilities(
+                tools=types.ToolsCapability(listChanged=True)
+            )
+        )
         await server.run(
             read_stream,
             write_stream,
-            server.create_initialization_options()
+            init_options
         )
 
 if __name__ == "__main__":
