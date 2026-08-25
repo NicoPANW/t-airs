@@ -102,7 +102,7 @@ else:
 mcp_session = None
 openai_tools = []
 server_params = StdioServerParameters(
-    command="/opt/t-airs/venv/bin/mcp-server-sqlite",
+    command="/opt/t-airs/venv/bin/mcp-sqlite3",
     args=["--db-path", "/opt/t-airs/src/customers.db"]
 )
 
