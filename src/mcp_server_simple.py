@@ -8,7 +8,6 @@ import mcp.server.stdio
 server = Server("sqlite-server")
 DB_PATH = "/opt/t-airs/src/customers.db"
 
-@server.request_handler(types.ListToolsRequest)
 async def handle_list_tools(request: types.ListToolsRequest) -> types.ListToolsResult:
     return types.ListToolsResult(
         tools=[
@@ -37,7 +36,6 @@ async def handle_list_tools(request: types.ListToolsRequest) -> types.ListToolsR
         ]
     )
 
-@server.request_handler(types.CallToolRequest)
 async def handle_call_tool(request: types.CallToolRequest) -> types.CallToolResult:
     name = request.params.name
     arguments = request.params.arguments
@@ -82,6 +80,9 @@ async def handle_call_tool(request: types.CallToolRequest) -> types.CallToolResu
             return types.CallToolResult(content=[TextContent(type="text", text=f"Error: {str(e)}")], isError=True)
     
     return types.CallToolResult(content=[TextContent(type="text", text=f"Error: unknown tool {name}")], isError=True)
+
+server.set_request_handler(types.ListToolsRequest, handle_list_tools)
+server.set_request_handler(types.CallToolRequest, handle_call_tool)
 
 async def main():
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
