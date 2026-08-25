@@ -86,7 +86,7 @@ if not hasattr(utils, 'get_flat_dependant'):
 # Pre-download the embedding model for the RAG system from HuggingFace.
 # This prevents a long delay on the first application startup.
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."
-python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-base-en-v1.5')"
+python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-small-en-v1.5')"
 echo "✅ BAAI Model successfully cached!"
 
 
