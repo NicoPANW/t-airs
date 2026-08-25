@@ -245,7 +245,7 @@ async def lifespan(app: FastAPI):
         for t in mcp_tools.tools:
             openai_tools.append({
                 "type": "function",
-                "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}
+                "function": {"name": t.name, "description": t.description, "parameters": t.input_schema}
             })
         print(f"RESULT: ✅ MCP ONLINE. Tools loaded: {[t.name for t in mcp_tools.tools]}")
         print("="*50 + "\n")
