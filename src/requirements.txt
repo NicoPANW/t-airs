@@ -1,13 +1,14 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 portkey-ai==2.3.4
 pan-aisecurity==0.11.0
+litellm==1.104.0
 fastapi==0.141.1
-mcp==2.1.0
+mcp==2.3.0
 uvloop==0.22.1
-uvicorn==0.52.4
+uvicorn==0.53
 requests==2.34.2
 Jinja2==3.1.6
 python-multipart==0.0.32
-openai==3.3.1
+openai==3.19.0
 chromadb==1.5.9
-sentence-transformers==6.0.0
+sentence-transformers==6.1.0
