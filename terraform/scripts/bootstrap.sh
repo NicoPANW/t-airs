@@ -74,13 +74,6 @@ echo "Installing remaining Python requirements..."
 /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
 
 
-# Inject FastAPI 0.115+ compatibility shim for LiteLLM versions expecting 'get_flat_dependant'
-/opt/t-airs/venv/bin/python3 -c "
-import fastapi.dependencies.utils as utils
-if not hasattr(utils, 'get_flat_dependant'):
-    with open(utils.__file__, 'a') as f:
-        f.write('\n\ndef get_flat_dependant(dependant, *, skip_repeats: bool = False):\n    flat = [dependant]\n    for dep in dependant.dependencies:\n        flat.extend(get_flat_dependant(dep, skip_repeats=skip_repeats))\n    return flat\n')
-"
 
 
 # Pre-download the embedding model for the RAG system from HuggingFace.
@@ -95,8 +88,10 @@ echo "✅ BAAI Model successfully cached!"
 # Only build this if LiteLLM is the active gateway
 # ==========================================
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
-    echo "Installing LiteLLM packages conditionally..."
-    /opt/t-airs/venv/bin/pip install "litellm==1.96.2" "litellm[proxy]==1.96.2" "litellm-enterprise==0.1.53" "litellm-proxy-extras==0.4.81" "google-auth==2.56.3"
+    echo "Installing LiteLLM packages conditionally while honoring version constraints..."
+    # Using -c constraints ensures pip does not upgrade fastapi higher version
+    /opt/t-airs/venv/bin/pip install -c /opt/t-airs/src/requirements.txt \
+        "litellm[proxy]" "litellm-enterprise==0.1.53" "litellm-proxy-extras==0.4.81" "google-auth==2.56.3"
 
     echo "Building LiteLLM routing configuration..."
     cat <<EOF > /opt/t-airs/src/litellm_config.yaml
