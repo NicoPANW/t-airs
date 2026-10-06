@@ -68,9 +68,16 @@ python3 /opt/t-airs/src/sql_data.py
 python3 -m venv venv
 source venv/bin/activate
 
+# Conditionally append LiteLLM dependencies to the requirements file
+if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
+    echo "litellm[proxy]==1.104.0" >> /opt/t-airs/src/requirements.txt
+    echo "litellm-enterprise==0.1.53" >> /opt/t-airs/src/requirements.txt
+    echo "litellm-proxy-extras==0.4.81" >> /opt/t-airs/src/requirements.txt
+    echo "google-auth==2.56.3" >> /opt/t-airs/src/requirements.txt
+fi
 
-# Install all other Python packages required by the application.
-echo "Installing remaining Python requirements..."
+# Install all Python packages in one single pass
+echo "Installing Python requirements..."
 /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
 
 
@@ -88,11 +95,6 @@ echo "✅ BAAI Model successfully cached!"
 # Only build this if LiteLLM is the active gateway
 # ==========================================
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
-    echo "Installing LiteLLM Enterprise packages conditionally..."
-    # litellm[proxy] is already handled by requirements.txt. We just install the enterprise plugins here.
-    /opt/t-airs/venv/bin/pip install -c /opt/t-airs/src/requirements.txt \
-        "litellm-enterprise==0.1.53" "litellm-proxy-extras==0.4.81" "google-auth==2.56.3"
-
     echo "Building LiteLLM routing configuration..."
     cat <<EOF > /opt/t-airs/src/litellm_config.yaml
 model_list:
