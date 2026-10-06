@@ -88,10 +88,10 @@ echo "✅ BAAI Model successfully cached!"
 # Only build this if LiteLLM is the active gateway
 # ==========================================
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
-    echo "Installing LiteLLM packages conditionally while honoring version constraints..."
-    # Using -c constraints ensures pip does not upgrade fastapi higher version
+    echo "Installing LiteLLM Enterprise packages conditionally..."
+    # litellm[proxy] is already handled by requirements.txt. We just install the enterprise plugins here.
     /opt/t-airs/venv/bin/pip install -c /opt/t-airs/src/requirements.txt \
-        "litellm[proxy]" "litellm-enterprise==0.1.53" "litellm-proxy-extras==0.4.81" "google-auth==2.56.3"
+        "litellm-enterprise==0.1.53" "litellm-proxy-extras==0.4.81" "google-auth==2.56.3"
 
     echo "Building LiteLLM routing configuration..."
     cat <<EOF > /opt/t-airs/src/litellm_config.yaml
@@ -232,6 +232,7 @@ WorkingDirectory=/opt/t-airs/src
 Environment="PANW_PRISMA_AIRS_API_KEY=${airs_key}"
 Environment="AIRS_API_KEY=${airs_key}"
 Environment="AIRS_PROFILE=${airs_profile}"
+Environment="LITELLM_DANGEROUSLY_PERMIT_WEAK_OR_UNSET_MASTER_KEY=true"
 ExecStart=/opt/t-airs/venv/bin/litellm --config litellm_config.yaml --port 4000
 Restart=always
 User=root

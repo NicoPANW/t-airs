@@ -2,6 +2,7 @@
 portkey-ai==2.3.4
 pan-aisecurity==0.11.0
 litellm==1.104.0
+litellm[proxy]==1.104.0
 fastapi==0.139.2
 mcp==2.3.0
 uvloop==0.22.1
