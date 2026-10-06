@@ -74,7 +74,7 @@ if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
     echo "litellm[proxy]==1.104.0" >> /opt/t-airs/src/requirements.txt
     echo "litellm-enterprise" >> /opt/t-airs/src/requirements.txt
     echo "litellm-proxy-extras" >> /opt/t-airs/src/requirements.txt
-    echo "google-auth==2.56.3" >> /opt/t-airs/src/requirements.txt
+    echo "google-auth==2.59.1" >> /opt/t-airs/src/requirements.txt
 fi
 
 # Install all Python packages in one single pass
