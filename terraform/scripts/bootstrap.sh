@@ -15,7 +15,7 @@ hostnamectl set-hostname "t-airs-node-${target_cloud}-${env}"
 echo "Updating system packages..."
 # Use a loop to handle potential 'apt lock' issues on fresh VMs.
 # This ensures that automated background updates don't interfere with our setup.
-until apt-get update && apt-get install -y python3-pip python3-venv git curl unattended-upgrades sqlite3; do
+until apt-get update && apt-get install -y python3-pip python3-venv git curl unattended-upgrades sqlite3 jq; do
     echo "Apt is locked or network is busy. Retrying in 5s..."
     sleep 5
 done
@@ -115,36 +115,21 @@ EOF
       vertex_location: "global"
 EOF
             done
-        fi
-    cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+
+            cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 
   # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
+EOF
+            for model in $(jq -r '.[]' /opt/t-airs/src/gemini_models.json); do
+            cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: auto-router
     litellm_params:
-      model: vertex_ai/gemini-3.8-flash
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: auto-router
-    litellm_params:
-      model: vertex_ai/gemini-3.5-flash-lite
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: auto-router
-    litellm_params:
-      model: vertex_ai/gemini-2.5-pro
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: auto-router
-    litellm_params:
-      model: vertex_ai/gemini-2.5-flash
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: auto-router
-    litellm_params:
-      model: vertex_ai/gemini-2.5-flash-lite
+      model: vertex_ai/$model
       vertex_project: "${gcp_project}"
       vertex_location: "global"
 EOF
+            done
+        fi
     # Inject AWS model definitions if the target cloud is AWS.
     elif [ "${target_cloud}" == "aws" ]; then
     # Loop through each model ID passed from Terraform and add it to the config.
