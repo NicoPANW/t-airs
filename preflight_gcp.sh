@@ -97,13 +97,12 @@ fi
 echo "📡 Verifying Global Vertex AI Connectivity..."
 if [ -n "$TOKEN" ] && [ -n "$TF_VAR_gcp_project_id" ]; then
     # Define the precise list of Gemini models to verify
-    GEMINI_MODELS=(
-        "gemini-2.5-flash"
-        "gemini-2.5-flash-lite"
-        "gemini-2.5-pro"
-        "gemini-3.5-flash-lite"
-        "gemini-3.8-flash"
-    )
+    if ! command -v jq &> /dev/null; then
+        echo "❌ ERROR: jq is not installed. It is required to parse the model list."
+        FAILED=1
+    else
+        GEMINI_MODELS=($(jq -r '.[]' "src/gemini_models.json"))
+    fi
 
     ACTIVE_MODELS=0
 

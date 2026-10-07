@@ -117,14 +117,13 @@ embedder = None
 def discover_gateway_models():
     if GATEWAY_PROVIDER == "portkey":
         # Bypass local LiteLLM port checks and return supported SaaS sandbox models
-        models = [
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-pro",
-            "gemini-3.5-flash-lite",
-            "gemini-3.8-flash"
-        ]
-        return sorted(models)
+        try:
+            with open("src/gemini_models.json", "r") as f:
+                models = json.load(f)
+            return sorted(models)
+        except Exception as e:
+            print(f"CRITICAL: Could not read gemini_models.json. Error: {e}")
+            return []
     found = []
     try:
         response = requests.get(f"{GATEWAY_URL}/v1/models", timeout=5)

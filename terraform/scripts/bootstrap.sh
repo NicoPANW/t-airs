@@ -103,32 +103,20 @@ EOF
 
     # Inject GCP model definitions if the target cloud is GCP.
     if [ "${target_cloud}" == "gcp" ]; then
+        if ! command -v jq &> /dev/null; then
+            echo "jq could not be found, which is needed to build the config from the JSON file."
+        else
+            for model in $(jq -r '.[]' /opt/t-airs/src/gemini_models.json); do
+            cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+  - model_name: $model
+    litellm_params:
+      model: vertex_ai/$model
+      vertex_project: "${gcp_project}"
+      vertex_location: "global"
+EOF
+            done
+        fi
     cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
-  - model_name: gemini-3.8-flash
-    litellm_params:
-      model: vertex_ai/gemini-3.8-flash
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: gemini-3.5-flash-lite
-    litellm_params:
-      model: vertex_ai/gemini-3.5-flash-lite
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: gemini-2.5-pro
-    litellm_params:
-      model: vertex_ai/gemini-2.5-pro
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: gemini-2.5-flash
-    litellm_params:
-      model: vertex_ai/gemini-2.5-flash
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
-  - model_name: gemini-2.5-flash-lite
-    litellm_params:
-      model: vertex_ai/gemini-2.5-flash-lite
-      vertex_project: "${gcp_project}"
-      vertex_location: "global"
 
   # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
   - model_name: auto-router
