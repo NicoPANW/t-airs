@@ -71,7 +71,7 @@ source venv/bin/activate
 # Conditionally append LiteLLM dependencies to the requirements file
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
     echo "" >> /opt/t-airs/src/requirements.txt
-    echo "litellm[proxy]==1.104.0" >> /opt/t-airs/src/requirements.txt
+    echo "litellm[proxy]==1.104.2" >> /opt/t-airs/src/requirements.txt
     echo "litellm-enterprise" >> /opt/t-airs/src/requirements.txt
     echo "litellm-proxy-extras" >> /opt/t-airs/src/requirements.txt
     echo "google-auth==2.59.1" >> /opt/t-airs/src/requirements.txt
