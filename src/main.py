@@ -359,7 +359,7 @@ async def chat(
             scan_response = await async_scanner.sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
-                metadata={"app_user": end_user, "ai_model": model_id}
+                metadata={"app_user": end_user, "ai_model": model_id, "app_env": APP_ENV}
             )
             res_data = scan_response.to_dict()
             ingress_data = res_data[0] if isinstance(res_data, list) and len(res_data) > 0 else res_data
@@ -390,7 +390,7 @@ async def chat(
                 rag_scan = await async_scanner.sync_scan(
                     ai_profile=ai_profile_obj,
                     content=Content(prompt=raw_rag_text), 
-                    metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "rag_data"}
+                    metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "rag_data", "app_env": APP_ENV}
                 )
                 r_data = rag_scan.to_dict()
                 if str(r_data.get("action", "pass")).lower() == "block":
@@ -599,7 +599,7 @@ async def chat(
                         tool_scan_response = await async_scanner.sync_scan(
                             ai_profile=ai_profile_obj,
                             content=Content(tool_event=mcp_event_obj),
-                            metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool"}
+                            metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool", "app_env": APP_ENV}
                         )
                         
                         tool_data = tool_scan_response.to_dict()
@@ -650,7 +650,7 @@ async def chat(
             out_scan_response = await async_scanner.sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),
-                metadata={"app_user": end_user, "ai_model": model_id}
+                metadata={"app_user": end_user, "ai_model": model_id, "app_env": APP_ENV}
             )
             out_res_data = out_scan_response.to_dict()
             out_data = out_res_data[0] if isinstance(out_res_data, list) and len(out_res_data) > 0 else out_res_data
