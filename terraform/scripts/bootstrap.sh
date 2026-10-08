@@ -106,7 +106,8 @@ EOF
         if ! command -v jq &> /dev/null; then
             echo "jq could not be found, which is needed to build the config from the JSON file."
         else
-            for model in $(jq -r '.[]' /opt/t-airs/src/gemini_models.json); do
+            cd /opt/t-airs
+            for model in $(jq -r '.[]' src/gemini_models.json); do
             cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: $model
     litellm_params:
@@ -120,7 +121,7 @@ EOF
 
   # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
 EOF
-            for model in $(jq -r '.[]' /opt/t-airs/src/gemini_models.json); do
+            for model in $(jq -r '.[]' src/gemini_models.json); do
             cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: auto-router
     litellm_params:

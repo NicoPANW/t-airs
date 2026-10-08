@@ -118,7 +118,9 @@ def discover_gateway_models():
     if GATEWAY_PROVIDER == "portkey":
         # Bypass local LiteLLM port checks and return supported SaaS sandbox models
         try:
-            with open("src/gemini_models.json", "r") as f:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            json_path = os.path.join(script_dir, "gemini_models.json")
+            with open(json_path, "r") as f:
                 models = json.load(f)
             return sorted(models)
         except Exception as e:
