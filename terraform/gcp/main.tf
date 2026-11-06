@@ -11,6 +11,13 @@ terraform {
   }
 }
 
+# Optional static external IP address. If left blank, an ephemeral IP is assigned dynamically.
+variable "static_ip" {
+  description = "Optional pre-allocated static external IP. If empty, an ephemeral IP is used."
+  type        = string
+  default     = ""
+}
+
 # Configures the Google Cloud provider with the specified project and region.
 provider "google" {
   project = var.gcp_project_id
@@ -144,6 +151,8 @@ resource "google_compute_instance" "t_airs_node" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.t_airs_sub.id
-    access_config {} # An empty access_config block assigns an ephemeral public IP.
+    access_config {
+      nat_ip = var.static_ip != "" ? var.static_ip : null
+    }
   }
 }
