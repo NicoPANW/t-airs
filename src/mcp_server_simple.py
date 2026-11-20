@@ -100,14 +100,17 @@ def create_app():
     if HAS_TRANSPORT_SECURITY:
         # Disable strict loopback Host-header rejection so Prisma AIRS AI Gateway and VPC IPs can connect
         sec_settings = TransportSecuritySettings(enable_dns_rebinding_protection=False)
-        base_app = mcp.streamable_http_app(transport_security=sec_settings)
+        base_app = mcp.streamable_http_app(
+            stateless_http=True,
+            transport_security=sec_settings,
+        )
     else:
-        base_app = mcp.streamable_http_app()
+        base_app = mcp.streamable_http_app(stateless_http=True)
 
     return BearerAuthASGIMiddleware(base_app, MCP_AUTH_TOKEN)
 
 
 if __name__ == "__main__":
     auth_mode = "Bearer Token Enabled" if MCP_AUTH_TOKEN else "WARNING: No Auth Token Set"
-    print(f"🚀 Starting T-AIRS Remote SQLite MCP Server on {MCP_HOST}:{MCP_PORT}/mcp ({auth_mode})", flush=True)
+    print(f"🚀 Starting T-AIRS Remote SQLite MCP Server on {MCP_HOST}:{MCP_PORT}/mcp ({auth_mode}, stateless_http=True)", flush=True)
     uvicorn.run(create_app(), host=MCP_HOST, port=MCP_PORT)

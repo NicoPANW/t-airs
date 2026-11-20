@@ -147,14 +147,18 @@ def get_mcp_gateway_config():
 
 @asynccontextmanager
 async def open_mcp_gateway_session():
-    """Opens a Streamable HTTP MCP client session through Prisma AIRS AI Gateway (mcp==2.3.0)."""
+    """Opens a Streamable HTTP MCP client session using the standard initialize handshake (mode='legacy')."""
     mcp_url, mcp_headers = get_mcp_gateway_config()
     async with httpx2.AsyncClient(
         headers=mcp_headers,
         timeout=httpx2.Timeout(30.0, read=300.0),
     ) as http_client:
-        transport = streamable_http_client(mcp_url, http_client=http_client)
-        async with Client(transport) as client:
+        transport = streamable_http_client(
+            mcp_url,
+            http_client=http_client,
+            terminate_on_close=False,
+        )
+        async with Client(transport, mode="legacy") as client:
             yield client
 
 
