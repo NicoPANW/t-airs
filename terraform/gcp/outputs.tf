@@ -36,7 +36,7 @@ output "deployment_summary" {
        Header Value: Bearer <your TF_VAR_mcp_auth_token or run: terraform output -raw mcp_auth_token>
   3. Enable workspace access & verify tools (read_query, write_query) appear.
   4. Agent traffic path:
-     App VM -> https://aigw.portkey.ai/m/${var.portkey_mcp_slug}/mcp -> MCP VM
+     App VM -> https://mcp-aigw.portkey.ai/${var.portkey_mcp_slug}/mcp -> MCP VM
 
   🛡️ Security Notice      : App VM firewall is restricted to ${local.my_auto_subnet}
                             and Prisma AIRS nodes. MCP VM port ${var.mcp_port} is restricted

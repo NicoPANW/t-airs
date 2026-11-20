@@ -27,7 +27,7 @@ try:
 except ImportError:
     PORTKEY_AVAILABLE = False
 PORTKEY_GATEWAY_URL = "https://aigw.portkey.ai/v1"
-PORTKEY_MCP_BASE_URL = "https://aigw.portkey.ai/m"
+PORTKEY_MCP_BASE_URL = "https://mcp-aigw.portkey.ai"
 
 # 2. MCP Imports (Remote Streamable HTTP via AI Gateway - mcp==2.3.0)
 from mcp import Client
