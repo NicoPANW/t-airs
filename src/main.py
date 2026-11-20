@@ -13,7 +13,7 @@ import re
 import requests
 import asyncio
 import ast
-import httpx
+import httpx2
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, Response
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -29,8 +29,8 @@ except ImportError:
 PORTKEY_GATEWAY_URL = "https://aigw.portkey.ai/v1"
 PORTKEY_MCP_BASE_URL = "https://aigw.portkey.ai/m"
 
-# 2. MCP Imports (Remote Streamable HTTP via AI Gateway)
-from mcp import ClientSession
+# 2. MCP Imports (Remote Streamable HTTP via AI Gateway - mcp==2.3.0)
+from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
 # 3. RAG Imports
@@ -112,6 +112,14 @@ rag_collections = {}
 embedder = None
 
 
+def format_exception_detail(exc: BaseException) -> str:
+    """Unwraps Python 3.11+ BaseExceptionGroup / TaskGroup errors into readable sub-exceptions."""
+    if isinstance(exc, BaseExceptionGroup):
+        details = [format_exception_detail(sub) for sub in exc.exceptions]
+        return " | ".join(details)
+    return f"{type(exc).__name__}: {exc}"
+
+
 # --- REMOTE MCP VIA AI GATEWAY HELPERS ---
 def get_mcp_gateway_config():
     """Returns (mcp_endpoint_url, headers_dict) routed through the active AI Gateway."""
@@ -139,13 +147,15 @@ def get_mcp_gateway_config():
 
 @asynccontextmanager
 async def open_mcp_gateway_session():
-    """Opens a stateless Streamable HTTP MCP client session through Prisma AIRS AI Gateway."""
+    """Opens a Streamable HTTP MCP client session through Prisma AIRS AI Gateway (mcp==2.3.0)."""
     mcp_url, mcp_headers = get_mcp_gateway_config()
-    async with httpx.AsyncClient(headers=mcp_headers, timeout=30.0) as http_client:
-        async with streamable_http_client(mcp_url, http_client=http_client) as (read_stream, write_stream):
-            async with ClientSession(read_stream, write_stream) as session:
-                await session.initialize()
-                yield session
+    async with httpx2.AsyncClient(
+        headers=mcp_headers,
+        timeout=httpx2.Timeout(30.0, read=300.0),
+    ) as http_client:
+        transport = streamable_http_client(mcp_url, http_client=http_client)
+        async with Client(transport) as client:
+            yield client
 
 
 async def sync_mcp_tools(force: bool = False) -> list:
@@ -172,10 +182,12 @@ async def sync_mcp_tools(force: bool = False) -> list:
             MCP_CONNECTED = True
             mcp_error_msg = f"Connected via {mcp_url}"
             print(f"RESULT: ✅ MCP ONLINE via AI Gateway ({mcp_url}). Tools loaded: {[t.name for t in mcp_tools.tools]}", flush=True)
-    except Exception as e:
+    except BaseException as e:
+        if isinstance(e, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
+            raise
         MCP_CONNECTED = False
-        mcp_error_msg = str(e)
-        print(f"RESULT: ⚠️ MCP GATEWAY NOT READY ({mcp_url}) - {e}", flush=True)
+        mcp_error_msg = format_exception_detail(e)
+        print(f"RESULT: ⚠️ MCP GATEWAY NOT READY ({mcp_url}) - {mcp_error_msg}", flush=True)
 
     return openai_tools
 
@@ -524,6 +536,7 @@ async def chat(
         print(f"🔧 [DEBUG] Gateway Request Details:")
         print(f"   - Base URL: {llm_client.base_url}")
         print(f"   - MCP Gateway URL: {mcp_url}")
+        print(f"   - Active Tools: {[t['function']['name'] for t in active_tools]}")
         print(f"   - User: {end_user}")
         print(f"   - Extra Headers: {debug_headers}")
         print(f"   - Extra Body Parameter: {extra_body if extra_body else 'None'}")
@@ -634,7 +647,7 @@ async def chat(
                         tool_output += " (Transaction permanently recorded in backend database)."
                     else:
                         mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                        tool_output = mcp_res.content[0].text
+                        tool_output = mcp_res.content[0].text if mcp_res.content else ""
 
                     messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
                     architecture_trace["mcp_execution"].append({
@@ -753,8 +766,11 @@ async def chat(
     except AISecSDKException as e:
         print(f"⚠️ Prisma AIRS SDK Error: {e}")
         return {"bot": "⚠️ Secure Connection to Prisma AIRS failed.", "output": "⚠️ Secure Connection to Prisma AIRS failed.", "logs": {"security_scan": "SDK Error", "raw_response": str(e), "trace": architecture_trace}}
-    except Exception as e:
-        error_str = str(e)
+    except BaseException as e:
+        if isinstance(e, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
+            raise
+        error_str = format_exception_detail(e)
+        print(f"❌ PIPELINE ERROR: {error_str}", flush=True)
 
         if "429" in error_str or "rate limit" in error_str.lower() or "too many requests" in error_str.lower():
             print(f"🚦 RATE LIMIT HIT: {error_str}")
