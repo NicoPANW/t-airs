@@ -1,20 +1,20 @@
 # t-airs/src/main.py
 """
-T-AIRS: Enterprise AI Application with Prisma AIRS Security, RAG, and MCP
-=========================================================================
+T-AIRS: Enterprise AI Application with Prisma AIRS Security, RAG, and Remote MCP via AI Gateway
+===============================================================================================
 This application serves as a demonstration of a secure, full-stack AI chatbot.
 """
 
 import os
 import argparse
 import uvicorn
-import subprocess
 import json
 import re
 import requests
 import asyncio
 import ast
-from contextlib import asynccontextmanager, AsyncExitStack
+import httpx
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -27,15 +27,16 @@ try:
 except ImportError:
     PORTKEY_AVAILABLE = False
 PORTKEY_GATEWAY_URL = "https://aigw.portkey.ai/v1"
+PORTKEY_MCP_BASE_URL = "https://aigw.portkey.ai/m"
 
-# 2. MCP Imports (Database Tool Calling)
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+# 2. MCP Imports (Remote Streamable HTTP via AI Gateway)
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
 
-# 3. RAG Imports 
+# 3. RAG Imports
 import chromadb
 from sentence_transformers import SentenceTransformer
-import rag_data 
+import rag_data
 import importlib
 importlib.reload(rag_data)
 
@@ -45,7 +46,6 @@ from aisecurity.exceptions import AISecSDKException
 from aisecurity.generated_openapi_client.models.ai_profile import AiProfile
 from aisecurity.generated_openapi_client.models.tool_event import ToolEvent
 from aisecurity.generated_openapi_client.models.tool_event_metadata import ToolEventMetadata
-# ✅ FIX: Using the asynchronous scanner for high-concurrency FastAPI environments
 from aisecurity.scan.asyncio.scanner import Scanner
 from aisecurity.scan.models.content import Content
 
@@ -73,8 +73,11 @@ APP_ENV = os.getenv("APP_ENV", "dev")
 parser = argparse.ArgumentParser(description="T-AIRS")
 parser.add_argument("--airs-key", help="Prisma AIRS API Key", default=None)
 parser.add_argument("--airs-profile", help="Prisma AIRS Security Profile", default="default")
-parser.add_argument("--portkey-api-key", help="Portkey API Key", default=os.getenv("PORTKEY_API_KEY"))
-parser.add_argument("--portkey-slug", help="Portkey Slug (Saved Integration)", default=os.getenv("PORTKEY_SLUG"))
+parser.add_argument("--portkey-api-key", help="Portkey / Prisma AIRS AI Gateway API Key", default=os.getenv("PORTKEY_API_KEY"))
+parser.add_argument("--portkey-slug", help="Portkey LLM Slug (Saved Integration)", default=os.getenv("PORTKEY_SLUG"))
+parser.add_argument("--portkey-mcp-slug", help="Prisma AIRS AI Gateway MCP Server Slug", default=os.getenv("PORTKEY_MCP_SLUG", "t-airs-sqlite"))
+parser.add_argument("--mcp-gateway-url", help="Explicit MCP Gateway Endpoint URL override", default=os.getenv("MCP_GATEWAY_URL", ""))
+parser.add_argument("--mcp-auth-token", help="Optional upstream MCP Bearer token (used in LiteLLM mode)", default=os.getenv("MCP_AUTH_TOKEN", ""))
 parser.add_argument("--gateway-url", help="URL for LiteLLM Gateway", default="http://localhost:4000")
 parser.add_argument("--gateway-provider", help="AI Gateway Provider", choices=["portkey", "litellm"], default="portkey")
 args, _ = parser.parse_known_args()
@@ -88,9 +91,11 @@ GATEWAY_PROVIDER = args.gateway_provider
 AIRS_CONFIGURED = False
 airs_error_msg = "Not initialized"
 ai_profile_obj = None
-async_scanner = None  # Global async scanner instance
+async_scanner = None
 validated_models = []
 PORTKEY_CONNECTED = False
+MCP_CONNECTED = False
+mcp_error_msg = "Not initialized"
 PERSONAS = personas.PERSONAS
 SESSION_HISTORY = {}
 MAX_HISTORY = 10
@@ -100,23 +105,84 @@ if GATEWAY_PROVIDER == "portkey":
 else:
     llm_client = AsyncOpenAI(base_url=f"{GATEWAY_URL}/v1", api_key="sk-t-airs-dummy-key")
 
-mcp_session = None
 openai_tools = []
-server_params = StdioServerParameters(
-    command="/opt/t-airs/venv/bin/python3",
-    args=["/opt/t-airs/src/mcp_server_simple.py"]
-)
 
 chroma_client = None
 rag_collections = {}
 embedder = None
 
+
+# --- REMOTE MCP VIA AI GATEWAY HELPERS ---
+def get_mcp_gateway_config():
+    """Returns (mcp_endpoint_url, headers_dict) routed through the active AI Gateway."""
+    if args.mcp_gateway_url:
+        url = args.mcp_gateway_url.strip()
+    elif GATEWAY_PROVIDER == "portkey":
+        slug = (args.portkey_mcp_slug or "t-airs-sqlite").strip().strip("/")
+        url = f"{PORTKEY_MCP_BASE_URL}/{slug}/mcp"
+    else:
+        url = f"{GATEWAY_URL.rstrip('/')}/sqlite_server/mcp"
+
+    headers = {"User-Agent": "t-airs-agent/2.0"}
+    if GATEWAY_PROVIDER == "portkey":
+        api_key = args.portkey_api_key or ""
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            headers["x-portkey-api-key"] = api_key
+    else:
+        headers["x-litellm-api-key"] = "Bearer sk-t-airs-dummy-key"
+        if args.mcp_auth_token:
+            headers["Authorization"] = f"Bearer {args.mcp_auth_token}"
+
+    return url, headers
+
+
+@asynccontextmanager
+async def open_mcp_gateway_session():
+    """Opens a stateless Streamable HTTP MCP client session through Prisma AIRS AI Gateway."""
+    mcp_url, mcp_headers = get_mcp_gateway_config()
+    async with httpx.AsyncClient(headers=mcp_headers, timeout=30.0) as http_client:
+        async with streamable_http_client(mcp_url, http_client=http_client) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                yield session
+
+
+async def sync_mcp_tools(force: bool = False) -> list:
+    """Discovers tools from the remote MCP VM via Prisma AIRS AI Gateway."""
+    global openai_tools, MCP_CONNECTED, mcp_error_msg
+    if openai_tools and not force:
+        return openai_tools
+
+    mcp_url, _ = get_mcp_gateway_config()
+    try:
+        async with open_mcp_gateway_session() as session:
+            mcp_tools = await session.list_tools()
+            loaded = []
+            for t in mcp_tools.tools:
+                loaded.append({
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.input_schema
+                    }
+                })
+            openai_tools = loaded
+            MCP_CONNECTED = True
+            mcp_error_msg = f"Connected via {mcp_url}"
+            print(f"RESULT: ✅ MCP ONLINE via AI Gateway ({mcp_url}). Tools loaded: {[t.name for t in mcp_tools.tools]}", flush=True)
+    except Exception as e:
+        MCP_CONNECTED = False
+        mcp_error_msg = str(e)
+        print(f"RESULT: ⚠️ MCP GATEWAY NOT READY ({mcp_url}) - {e}", flush=True)
+
+    return openai_tools
+
+
 # --- CORE LOGIC HELPERS ---
-
-
 def discover_gateway_models():
     if GATEWAY_PROVIDER == "portkey":
-        # Bypass local LiteLLM port checks and return supported SaaS sandbox models
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             json_path = os.path.join(script_dir, "gemini_models.json")
@@ -136,6 +202,7 @@ def discover_gateway_models():
         print(f"CRITICAL: Could not connect to AI Gateway. Error: {e}")
     found.sort()
     return found
+
 
 def init_rag_pipeline():
     global chroma_client, rag_collections, embedder
@@ -160,6 +227,7 @@ def init_rag_pipeline():
     except Exception as e:
         print(f"❌ RAG Initialization Failed: {e}")
 
+
 def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
     target_collection = rag_collections.get(persona)
     if not target_collection:
@@ -182,22 +250,20 @@ def retrieve_rag_context(user_prompt: str, persona: str, top_k: int = 2):
         print(f"RAG Retrieval Error: {e}")
     return "", filtered_docs, rejected_docs
 
+
 # --- APP LIFESPAN MANAGEMENT ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, mcp_session, openai_tools, async_scanner, PORTKEY_CONNECTED
-    print("\n" + "="*50, flush=True)
+    global AIRS_CONFIGURED, airs_error_msg, ai_profile_obj, validated_models, async_scanner, PORTKEY_CONNECTED
+    print("\n" + "=" * 50, flush=True)
     print(f"🚀 T-AIRS STARTUP (v{APP_VERSION})", flush=True)
-    print("="*50, flush=True)
+    print("=" * 50, flush=True)
 
     if AIRS_KEY and AIRS_PROFILE_NAME:
         print(f"Handshaking with Prisma AIRS App SDK: {AIRS_PROFILE_NAME}...", flush=True)
         try:
             aisecurity.init(api_key=AIRS_KEY)
             ai_profile_obj = AiProfile(profile_name=AIRS_PROFILE_NAME)
-            # We initialize the Prisma AIRS asynchronous scanner here at the application lifespan level.
-            # This ensures all concurrent FastAPI requests share a single underlying aiohttp connection pool, 
-            # preventing socket exhaustion and massive latency spikes under heavy user load.
             async_scanner = Scanner()
             await async_scanner.sync_scan(ai_profile=ai_profile_obj, content=Content(prompt="healthcheck"))
             AIRS_CONFIGURED = True
@@ -212,7 +278,7 @@ async def lifespan(app: FastAPI):
         print("RESULT: ⚠️ AIRS Keys missing. App SDK Disabled.")
 
     if GATEWAY_PROVIDER == "portkey":
-        print("Handshaking with Portkey AI Gateway...", flush=True)
+        print("Handshaking with Prisma AIRS AI Gateway (Portkey)...", flush=True)
         try:
             headers = {
                 "x-portkey-api-key": args.portkey_api_key or "",
@@ -222,42 +288,33 @@ async def lifespan(app: FastAPI):
                 headers["x-portkey-virtual-key"] = args.portkey_slug
             response = requests.get(f"{PORTKEY_GATEWAY_URL}/models", headers=headers, timeout=5)
             if response.status_code == 200:
-                print("RESULT: ✅ PORTKEY GATEWAY ONLINE", flush=True)
+                print("RESULT: ✅ PRISMA AIRS AI GATEWAY ONLINE", flush=True)
                 PORTKEY_CONNECTED = True
             else:
-                print(f"RESULT: ❌ PORTKEY GATEWAY UNHEALTHY - Status Code {response.status_code}", flush=True)
+                print(f"RESULT: ❌ PRISMA AIRS AI GATEWAY UNHEALTHY - Status Code {response.status_code}", flush=True)
                 PORTKEY_CONNECTED = False
         except Exception as e:
-            print(f"RESULT: ❌ PORTKEY GATEWAY OFFLINE - Connection Error: {e}", flush=True)
+            print(f"RESULT: ❌ PRISMA AIRS AI GATEWAY OFFLINE - Connection Error: {e}", flush=True)
             PORTKEY_CONNECTED = False
 
     validated_models = discover_gateway_models()
     init_rag_pipeline()
 
-    async with AsyncExitStack() as stack:
-        print("🔌 Booting SQLite MCP Server...")
-        read, write = await stack.enter_async_context(stdio_client(server_params))
-        mcp_session = await stack.enter_async_context(ClientSession(read, write))
-        await mcp_session.initialize()
+    mcp_url, _ = get_mcp_gateway_config()
+    print(f"🔌 Connecting to Remote SQLite MCP Server via AI Gateway: {mcp_url}...", flush=True)
+    await sync_mcp_tools(force=True)
+    print("=" * 50 + "\n", flush=True)
 
-        mcp_tools = await mcp_session.list_tools()
-        for t in mcp_tools.tools:
-            openai_tools.append({
-                "type": "function",
-                "function": {"name": t.name, "description": t.description, "parameters": t.input_schema}
-            })
-        print(f"RESULT: ✅ MCP ONLINE. Tools loaded: {[t.name for t in mcp_tools.tools]}")
-        print("="*50 + "\n")
-        
-        yield  # Application runs here
+    yield  # Application runs here
 
-        # ✅ FIX: Explicit cleanup of aiohttp connection pool on shutdown
-        if async_scanner:
-            print("Shutting down Prisma AIRS connection pool...", flush=True)
-            await async_scanner.close()
+    if async_scanner:
+        print("Shutting down Prisma AIRS connection pool...", flush=True)
+        await async_scanner.close()
+
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
+
 
 # --- UI ENDPOINTS ---
 @app.post("/update-persona")
@@ -272,17 +329,21 @@ async def update_persona(persona_id: str = Form(...), new_context: str = Form(..
             return {"status": "error", "message": str(e)}
     return {"status": "not found"}
 
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html", context={"app_version": APP_VERSION, "app_env": APP_ENV})
+
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return Response(content="", media_type="image/x-icon")
 
+
 @app.get("/models")
 async def list_models():
     return {"models": validated_models}
+
 
 @app.get("/health-airs")
 async def health_airs():
@@ -297,17 +358,24 @@ async def health_airs():
     else:
         if not PORTKEY_CONNECTED:
             gateway_status = "disconnected"
+
+    mcp_url, _ = get_mcp_gateway_config()
     return {
         "status": "connected" if AIRS_CONFIGURED else "disconnected",
         "profile": AIRS_PROFILE_NAME,
         "reason": airs_error_msg,
         "gateway_provider": GATEWAY_PROVIDER,
-        "gateway_status": gateway_status
+        "gateway_status": gateway_status,
+        "mcp_status": "connected" if MCP_CONNECTED else "disconnected",
+        "mcp_gateway_url": mcp_url,
+        "mcp_reason": mcp_error_msg
     }
+
 
 @app.get("/get-persona-context/{persona_id}")
 async def get_persona_context(persona_id: str):
     return {"context": PERSONAS.get(persona_id, "Not found.")}
+
 
 # --- THE CORE AI PIPELINE ---
 @app.post("/chat")
@@ -325,13 +393,14 @@ async def chat(
     security_status = "Bypassed"
     raw_sec_log = "{}"
     ingress_data = {}
-    
-    print(f"\n{'='*40}")
+    mcp_url, _ = get_mcp_gateway_config()
+
+    print(f"\n{'=' * 40}")
     print(f"📥 NEW REQUEST | Session: {session_id} | Persona: {persona} | AIRS placement: {enforcement_placement.upper()}")
     print(f"💬 PROMPT: {message}")
 
     architecture_trace = {
-        "ai_gateway": {"routed_to": model_id},
+        "ai_gateway": {"routed_to": model_id, "mcp_gateway_url": mcp_url},
         "rag_pipeline": {"chunks_injected": [], "chunks_rejected": []},
         "mcp_execution": []
     }
@@ -343,7 +412,6 @@ async def chat(
             model_id = validated_models[0] if validated_models else None
         architecture_trace["ai_gateway"]["routed_to"] = model_id
 
-    # Dynamically determine the model ID passed to the client payload
     llm_model_id = model_id
     if GATEWAY_PROVIDER == "portkey" and model_id == "auto-router":
         llm_model_id = ""
@@ -352,10 +420,9 @@ async def chat(
 
     try:
         # =====================================================================
-        # 1. LOCAL INGRESS SCAN 
+        # 1. LOCAL INGRESS SCAN
         # =====================================================================
         if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner:
-            # ✅ FIX: Awaiting async_scanner
             scan_response = await async_scanner.sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(prompt=message),
@@ -369,9 +436,9 @@ async def chat(
                 block_txt = f"🛡️ Blocked by Prisma AIRS [User ➔ LLM]: {category} policy violation."
                 print(f"🛑 AIRS BLOCK: INGRESS | Category: {category}")
                 print(f"🏁 REQUEST ABORTED | Security Status: Blocked by App SDK")
-                print(f"{'='*40}\n")
+                print(f"{'=' * 40}\n")
                 return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": "INGRESS BLOCK (User ➔ LLM)", "raw_response": json.dumps(ingress_data, indent=2), "trace": architecture_trace}}
-            
+
             security_status = "Passed App Input"
             raw_sec_log = json.dumps(ingress_data, indent=2)
 
@@ -386,10 +453,9 @@ async def chat(
             print(f"🔍 Scanning RAG Context via AIRS...")
             raw_rag_text = "\n".join(raw_rag_docs)
             try:
-                # ✅ FIX: Awaiting async_scanner
                 rag_scan = await async_scanner.sync_scan(
                     ai_profile=ai_profile_obj,
-                    content=Content(prompt=raw_rag_text), 
+                    content=Content(prompt=raw_rag_text),
                     metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "rag_data", "app_env": APP_ENV}
                 )
                 r_data = rag_scan.to_dict()
@@ -398,13 +464,13 @@ async def chat(
                     block_msg = f"🛡️ AIRS Blocked RAG Retrieval: {category} violation (Indirect Injection detected)."
                     print(f"🛑 AIRS BLOCK: RAG DATA | Category: {category}")
                     return {"bot": block_msg, "output": block_msg, "logs": {"security_scan": "RAG DATA BLOCK", "raw_response": json.dumps(r_data, indent=2), "trace": architecture_trace}}
-            except Exception as e: 
+            except Exception as e:
                 print(f"⚠️ RAG Scan Error: {e}")
-        
+
         system_instruction = f"{selected_prompt}\n{rag_context}"
 
         # =====================================================================
-        # 3. BUILD MESSAGE PAYLOAD
+        # 3. BUILD MESSAGE PAYLOAD & ENSURE REMOTE MCP TOOLS ARE LOADED
         # =====================================================================
         if history_enabled:
             if session_id not in SESSION_HISTORY:
@@ -416,7 +482,8 @@ async def chat(
 
         messages = [{"role": "system", "content": system_instruction}] + current_context
 
-        active_tools = openai_tools.copy() if openai_tools else []
+        discovered_mcp_tools = await sync_mcp_tools(force=False)
+        active_tools = discovered_mcp_tools.copy() if discovered_mcp_tools else []
         if persona in PERSONA_TOOLS:
             active_tools.extend(PERSONA_TOOLS[persona])
 
@@ -431,7 +498,6 @@ async def chat(
         if GATEWAY_PROVIDER == "portkey" and PORTKEY_AVAILABLE:
             slug_to_use = args.portkey_slug
             if slug_to_use:
-                # Utilize a secure saved Integration Slug to bypass block_inline_config restrictions
                 extra_headers = createHeaders(
                     api_key=args.portkey_api_key,
                     virtual_key=slug_to_use
@@ -448,7 +514,6 @@ async def chat(
             if enforcement_placement == "gateway" and airs_enabled:
                 extra_body = {"guardrails": ["airs-mcp-scan"]}
 
-        # --- 🔧 DEBUG REQUEST PRINT ---
         debug_headers = {}
         if extra_headers:
             for k, v in extra_headers.items():
@@ -458,6 +523,7 @@ async def chat(
                     debug_headers[k] = v
         print(f"🔧 [DEBUG] Gateway Request Details:")
         print(f"   - Base URL: {llm_client.base_url}")
+        print(f"   - MCP Gateway URL: {mcp_url}")
         print(f"   - User: {end_user}")
         print(f"   - Extra Headers: {debug_headers}")
         print(f"   - Extra Body Parameter: {extra_body if extra_body else 'None'}")
@@ -470,14 +536,12 @@ async def chat(
             "extra_headers": extra_headers if extra_headers else None,
             "extra_body": extra_body if extra_body else None
         }
-        # Suppress deprecation warnings by avoiding passing temperature to Gemini 3+ models
         if not (llm_model_id and ("gemini-3" in llm_model_id or llm_model_id.startswith("gemini-3."))):
             inference_kwargs["temperature"] = 0.7
 
         raw_response = await llm_client.chat.completions.with_raw_response.create(**inference_kwargs)
-
         response = raw_response.parse()
-        
+
         actual_model = getattr(response, "model", llm_model_id)
 
         if GATEWAY_PROVIDER == "portkey":
@@ -498,7 +562,7 @@ async def chat(
         response_msg = response.choices[0].message
 
         # =====================================================================
-        # 5. THE MULTI-STEP AGENT LOOP
+        # 5. THE MULTI-STEP AGENT LOOP (MCP VIA PRISMA AIRS AI GATEWAY)
         # =====================================================================
         iteration = 0
         MAX_ITERATIONS = 5
@@ -510,111 +574,108 @@ async def chat(
                 "upgrade_flight_seat", "cancel_flight_booking", "update_passport_details",
                 "issue_store_refund", "apply_admin_discount", "update_billing_zip"
             ]
-            
+
             messages.append(response_msg)
 
-            for tool_call in response_msg.tool_calls:
-                tool_name = tool_call.function.name
-                tool_args = json.loads(tool_call.function.arguments)
-                print(f"🛠️  MODEL REQUESTED TOOL [{iteration}/{MAX_ITERATIONS}]: {tool_name}")
+            async with open_mcp_gateway_session() as mcp_session:
+                for tool_call in response_msg.tool_calls:
+                    tool_name = tool_call.function.name
+                    tool_args = json.loads(tool_call.function.arguments)
+                    print(f"🛠️  MODEL REQUESTED TOOL [{iteration}/{MAX_ITERATIONS}]: {tool_name} (via {mcp_url})")
 
-                # --- 🔌 EXECUTE TOOL ---
-                if tool_name in action_tools:
-                    await mcp_session.call_tool("write_query", arguments={"query": "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"})
-                    
-                    details, tool_output = "", ""
-                    if tool_name == "transfer_funds":
-                        src, dst, amt = tool_args.get("source_account"), tool_args.get("dest_account"), tool_args.get("amount")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance - {amt} WHERE id = '{src}';"})
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance + {amt} WHERE id = '{dst}';"})
-                        tool_output = f"⚠️ Wire transfer of ${amt} executed."
-                    elif tool_name == "freeze_account":
-                        acc, reason = tool_args.get("account_id"), tool_args.get("reason")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
-                        tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} frozen."
-                    elif tool_name == "issue_replacement_card":
-                        acc = tool_args.get("account_id")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"})
-                        tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
-                    elif tool_name == "upgrade_flight_seat":
-                        tkt, cabin = tool_args.get("ticket_number"), tool_args.get("new_class")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"})
-                        tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} upgraded to {cabin}."
-                    elif tool_name == "cancel_flight_booking":
-                        tkt = tool_args.get("ticket_number")
-                        refund_to_card = tool_args.get("refund_to_card")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"})
-                        if refund_to_card:
-                            tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Full refund initiated to the original payment card."
-                        else:
-                            tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Flight credit issued to the customer's account."
-                    elif tool_name == "update_passport_details":
-                        tkt, new_pass = tool_args.get("ticket_number"), tool_args.get("new_passport_id")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"})
-                        tool_output = f"🛂 PASSPORT UPDATED: New document saved to manifest."
-                    elif tool_name == "issue_store_refund":
-                        order, amt = tool_args.get("order_id"), tool_args.get("amount")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"})
-                        tool_output = f"✅ REFUND PROCESSED: ${amt} credited back to payment method for order {order}."
-                    elif tool_name == "apply_admin_discount":
-                        order, disc = tool_args.get("order_id"), tool_args.get("discount_percentage")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"})
-                        tool_output = f"💸 DISCOUNT APPLIED: {disc}% off order {order}."
-                    elif tool_name == "update_billing_zip":
-                        order, new_zip = tool_args.get("order_id"), tool_args.get("new_zip_code")
-                        await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"})
-                        tool_output = f"📦 ADDRESS UPDATED: Billing zip changed to {new_zip}."
-                    
-                    await mcp_session.call_tool("write_query", arguments={"query": f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', 'Action executed.');"})
-                    tool_output += " (Transaction permanently recorded in backend database)."
+                    # --- 🔌 EXECUTE TOOL THROUGH PRISMA AIRS AI GATEWAY ---
+                    if tool_name in action_tools:
+                        await mcp_session.call_tool("write_query", arguments={"query": "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"})
 
-                else:
-                    mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
-                    tool_output = mcp_res.content[0].text
-                    
+                        tool_output = ""
+                        if tool_name == "transfer_funds":
+                            src, dst, amt = tool_args.get("source_account"), tool_args.get("dest_account"), tool_args.get("amount")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance - {amt} WHERE id = '{src}';"})
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance + {amt} WHERE id = '{dst}';"})
+                            tool_output = f"⚠️ Wire transfer of ${amt} executed."
+                        elif tool_name == "freeze_account":
+                            acc, reason = tool_args.get("account_id"), tool_args.get("reason")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
+                            tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} frozen."
+                        elif tool_name == "issue_replacement_card":
+                            acc = tool_args.get("account_id")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"})
+                            tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
+                        elif tool_name == "upgrade_flight_seat":
+                            tkt, cabin = tool_args.get("ticket_number"), tool_args.get("new_class")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"})
+                            tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} upgraded to {cabin}."
+                        elif tool_name == "cancel_flight_booking":
+                            tkt = tool_args.get("ticket_number")
+                            refund_to_card = tool_args.get("refund_to_card")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"})
+                            if refund_to_card:
+                                tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Full refund initiated to the original payment card."
+                            else:
+                                tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Flight credit issued to the customer's account."
+                        elif tool_name == "update_passport_details":
+                            tkt, new_pass = tool_args.get("ticket_number"), tool_args.get("new_passport_id")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"})
+                            tool_output = f"🛂 PASSPORT UPDATED: New document saved to manifest."
+                        elif tool_name == "issue_store_refund":
+                            order, amt = tool_args.get("order_id"), tool_args.get("amount")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"})
+                            tool_output = f"✅ REFUND PROCESSED: ${amt} credited back to payment method for order {order}."
+                        elif tool_name == "apply_admin_discount":
+                            order, disc = tool_args.get("order_id"), tool_args.get("discount_percentage")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"})
+                            tool_output = f"💸 DISCOUNT APPLIED: {disc}% off order {order}."
+                        elif tool_name == "update_billing_zip":
+                            order, new_zip = tool_args.get("order_id"), tool_args.get("new_zip_code")
+                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"})
+                            tool_output = f"📦 ADDRESS UPDATED: Billing zip changed to {new_zip}."
 
+                        await mcp_session.call_tool("write_query", arguments={"query": f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', 'Action executed.');"})
+                        tool_output += " (Transaction permanently recorded in backend database)."
+                    else:
+                        mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
+                        tool_output = mcp_res.content[0].text
 
-                # Log trace *before* security scan so early-blocks are fully observable
-                messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
-                architecture_trace["mcp_execution"].append({"tool": tool_name, "arguments": tool_args, "database_result": tool_output})
+                    messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
+                    architecture_trace["mcp_execution"].append({
+                        "tool": tool_name,
+                        "gateway_endpoint": mcp_url,
+                        "arguments": tool_args,
+                        "database_result": tool_output
+                    })
 
-                # =====================================================================
-                # 🚀 EXPLICIT MCP TOOL SCAN 
-                # =====================================================================
-                if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner:
-                    print(f"🔍 Logging explicit ToolEvent to AIRS for {tool_name}...")
-                    try:
-                        mcp_metadata = ToolEventMetadata(
-                            tool_invoked=tool_name,
-                            ecosystem="mcp",
-                            method="tools/call",
-                            server_name="mcp-server-sqlite"
-                        )
-                        mcp_event_obj = ToolEvent(
-                            metadata=mcp_metadata,
-                            input=json.dumps(tool_args),
-                            output=json.dumps({"result": tool_output})
-                        )
-                        # ✅ FIX: Awaiting async_scanner
-                        tool_scan_response = await async_scanner.sync_scan(
-                            ai_profile=ai_profile_obj,
-                            content=Content(tool_event=mcp_event_obj),
-                            metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool", "app_env": APP_ENV}
-                        )
-                        
-                        tool_data = tool_scan_response.to_dict()
-                        if str(tool_data.get("action", "pass")).lower() == "block":
-                            category = str(tool_data.get("category", "Security")).capitalize()
-                            block_txt = f"🛡️ Blocked by Prisma AIRS [MCP Tool ➔ LLM]: '{tool_name}' returned a {category} violation."
-                            return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": f"TOOL BLOCK ({tool_name})", "raw_response": json.dumps(tool_data, indent=2), "trace": architecture_trace}}
-                    except Exception as e:
-                        print(f"⚠️ ToolEvent Log Error: {e}")
+                    # =====================================================================
+                    # EXPLICIT MCP TOOL SCAN TELEMETRY
+                    # =====================================================================
+                    if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner:
+                        print(f"🔍 Logging explicit ToolEvent to AIRS for {tool_name}...")
+                        try:
+                            mcp_metadata = ToolEventMetadata(
+                                tool_invoked=tool_name,
+                                ecosystem="mcp",
+                                method="tools/call",
+                                server_name=args.portkey_mcp_slug or "mcp-server-sqlite"
+                            )
+                            mcp_event_obj = ToolEvent(
+                                metadata=mcp_metadata,
+                                input=json.dumps(tool_args),
+                                output=json.dumps({"result": tool_output})
+                            )
+                            tool_scan_response = await async_scanner.sync_scan(
+                                ai_profile=ai_profile_obj,
+                                content=Content(tool_event=mcp_event_obj),
+                                metadata={"app_user": end_user, "ai_model": model_id, "scan_type": "mcp_tool", "app_env": APP_ENV}
+                            )
 
-            # Fetch the next step from the LLM
+                            tool_data = tool_scan_response.to_dict()
+                            if str(tool_data.get("action", "pass")).lower() == "block":
+                                category = str(tool_data.get("category", "Security")).capitalize()
+                                block_txt = f"🛡️ Blocked by Prisma AIRS [MCP Tool ➔ LLM]: '{tool_name}' returned a {category} violation."
+                                return {"bot": block_txt, "output": block_txt, "logs": {"security_scan": f"TOOL BLOCK ({tool_name})", "raw_response": json.dumps(tool_data, indent=2), "trace": architecture_trace}}
+                        except Exception as e:
+                            print(f"⚠️ ToolEvent Log Error: {e}")
+
             print(f"🔧 [DEBUG] Executing Agent Iteration Step {iteration} with same Gateway request config...")
-            if debug_headers:
-                print(f"   - Active Headers: {debug_headers}")
-
             execution_phase = f"Agent Iteration {iteration}"
             iteration_kwargs = {
                 "model": llm_model_id,
@@ -624,7 +685,6 @@ async def chat(
                 "extra_headers": extra_headers if extra_headers else None,
                 "extra_body": extra_body if extra_body else None
             }
-            # Suppress deprecation warnings by avoiding passing temperature to Gemini 3+ models
             if not (llm_model_id and ("gemini-3" in llm_model_id or llm_model_id.startswith("gemini-3."))):
                 iteration_kwargs["temperature"] = 0.7
 
@@ -646,7 +706,6 @@ async def chat(
         # 6. APP-LEVEL EGRESS SCAN
         # =====================================================================
         if AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner and "Error:" not in bot_response:
-            # ✅ FIX: Awaiting async_scanner
             out_scan_response = await async_scanner.sync_scan(
                 ai_profile=ai_profile_obj,
                 content=Content(response=bot_response),
@@ -660,7 +719,7 @@ async def chat(
                 block_txt = f"🛡️ Blocked by Prisma AIRS [LLM ➔ User]: {category} policy violation."
                 print(f"🛑 AIRS BLOCK: EGRESS | Category: {category}")
                 print(f"🏁 REQUEST ABORTED | Security Status: Blocked by App SDK")
-                print(f"{'='*40}\n")
+                print(f"{'=' * 40}\n")
                 return {
                     "bot": block_txt,
                     "output": block_txt,
@@ -675,25 +734,23 @@ async def chat(
             security_status = "Passed App Input & Output"
             raw_sec_log = json.dumps({"input_scan": ingress_data, "output_scan": out_data}, indent=2)
 
-        # --- PERSIST HISTORY ---
         if history_enabled:
             SESSION_HISTORY[session_id].append({"role": "assistant", "content": bot_response})
             if len(SESSION_HISTORY[session_id]) > 10:
                 SESSION_HISTORY[session_id] = SESSION_HISTORY[session_id][-10:]
 
         if enforcement_placement == "gateway" and airs_enabled:
-             security_status = "Checked & Passed by Gateway"
+            security_status = "Checked & Passed by Gateway"
 
         print(f"🏁 REQUEST COMPLETE | Security Status: {security_status}")
-        print(f"{'='*40}\n")
-        
+        print(f"{'=' * 40}\n")
+
         return {"bot": bot_response, "output": bot_response, "logs": {"security_scan": security_status, "raw_response": raw_sec_log, "trace": architecture_trace}}
 
     # =====================================================================
     # EXCEPTION & PROXY GUARDRAIL HANDLING
     # =====================================================================
     except AISecSDKException as e:
-        # ✅ FIX: Native catch for Prisma AIRS connection and logic faults
         print(f"⚠️ Prisma AIRS SDK Error: {e}")
         return {"bot": "⚠️ Secure Connection to Prisma AIRS failed.", "output": "⚠️ Secure Connection to Prisma AIRS failed.", "logs": {"security_scan": "SDK Error", "raw_response": str(e), "trace": architecture_trace}}
     except Exception as e:
@@ -701,9 +758,6 @@ async def chat(
 
         if "429" in error_str or "rate limit" in error_str.lower() or "too many requests" in error_str.lower():
             print(f"🚦 RATE LIMIT HIT: {error_str}")
-            print("⏳ Passing HTTP 429 back to Prisma AIRS scanner to trigger backoff...")
-            print(f"🏁 REQUEST ABORTED | Security Status: Rate Limited")
-            print(f"{'='*40}\n")
             return JSONResponse(status_code=429, content={"error": {"message": "Rate limit reached", "type": "rate_limit_error", "code": 429}})
 
         if history_enabled and session_id in SESSION_HISTORY:
@@ -713,7 +767,7 @@ async def chat(
         if GATEWAY_PROVIDER == "portkey":
             is_guardrail_block = "446" in error_str or "hooks_failed" in error_str or ("blocked" in error_str.lower() and "guardrail" in error_str.lower())
             if is_guardrail_block:
-                clean_msg = "🛡️ Blocked by Prisma AIRS (Portkey Gateway) policy violation."
+                clean_msg = "🛡️ Blocked by Prisma AIRS (AI Gateway) policy violation."
                 category = "Security"
                 sidebar_log = {"raw_error": error_str}
                 try:
@@ -731,13 +785,13 @@ async def chat(
                                 check_data = check.get("data", {})
                                 if check_data and check_data.get("action") == "block":
                                     category = str(check_data.get("category", "Security")).capitalize()
-                                    clean_msg = f"🛡️ Blocked by Prisma AIRS (Portkey Gateway): {category} policy violation."
+                                    clean_msg = f"🛡️ Blocked by Prisma AIRS (AI Gateway): {category} policy violation."
                                     break
                 except Exception as parse_error:
-                    print(f"Debug: Failed to parse inner Portkey error: {parse_error}")
+                    print(f"Debug: Failed to parse inner Gateway error: {parse_error}")
 
-                print(f"🛑 AIRS GATEWAY BLOCK: Portkey Hook blocked request | Category: {category}")
-                print(f"{'='*40}\n")
+                print(f"🛑 AIRS GATEWAY BLOCK: Gateway Hook blocked request | Category: {category}")
+                print(f"{'=' * 40}\n")
                 return {
                     "bot": clean_msg,
                     "output": clean_msg,
@@ -761,7 +815,7 @@ async def chat(
                 category = category_match.group(1).capitalize() if category_match else "Security"
 
                 if "http_400_error" in error_str or "scan_failed" in error_str:
-                    clean_msg = f"⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
+                    clean_msg = "⚠️ [System: Gateway Scan Failed. The LLM executed the tool but likely returned an empty string, causing the Egress AIRS scan to reject the 0-byte payload.]"
                 else:
                     clean_msg = f"🛡️ Blocked by Prisma AIRS [{direction}]: {category} policy violation."
 
@@ -777,7 +831,7 @@ async def chat(
 
                 print(f"🛑 AIRS GATEWAY BLOCK: {scan_type} | Direction: {direction} | Category: {category}")
                 print(f"🏁 REQUEST ABORTED | Security Status: Blocked by Gateway")
-                print(f"{'='*40}\n")
+                print(f"{'=' * 40}\n")
                 return {
                     "bot": clean_msg,
                     "output": clean_msg,
@@ -793,6 +847,7 @@ async def chat(
             "output": f"Error: {error_str}",
             "logs": {"security_scan": "Error", "raw_response": raw_sec_log, "trace": architecture_trace}
         }
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

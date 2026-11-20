@@ -1,27 +1,26 @@
 #!/bin/bash
 
-# Capture the Terraform variables passed into the template.
-# These variables control which blocks of this script are executed.
-GATEWAY_PROVIDER="${gateway_provider}" # e.g., "litellm" or "portkey"
+NODE_ROLE="${node_role}"               # "app" or "mcp"
+GATEWAY_PROVIDER="${gateway_provider}" # "portkey" or "litellm"
+MCP_PORT="${mcp_port}"
 
-# Set a unique and descriptive hostname for the VM based on its cloud and environment.
-# This makes it easier to identify instances in the cloud console.
-echo "Setting custom hostname for ${target_cloud}..."
-hostnamectl set-hostname "t-airs-node-${target_cloud}-${env}"
+if [ -z "$NODE_ROLE" ]; then
+    NODE_ROLE="app"
+fi
+if [ -z "$MCP_PORT" ]; then
+    MCP_PORT="8080"
+fi
 
+echo "Setting custom hostname for ${target_cloud} ($NODE_ROLE)..."
+hostnamectl set-hostname "t-airs-$NODE_ROLE-${target_cloud}-${env}"
 
 # --- 0. ROBUST UPDATE & INSTALL ---
-# This section ensures the base OS is up-to-date and has essential tools.
 echo "Updating system packages..."
-# Use a loop to handle potential 'apt lock' issues on fresh VMs.
-# This ensures that automated background updates don't interfere with our setup.
 until apt-get update && apt-get install -y python3-pip python3-venv git curl unattended-upgrades sqlite3 jq; do
     echo "Apt is locked or network is busy. Retrying in 5s..."
     sleep 5
 done
 
-# Configure the system to automatically install security updates.
-# This is a best practice for maintaining a secure, "zero-touch" server.
 cat <<EOF > /etc/apt/apt.conf.d/20auto-upgrades
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Download-Upgradeable-Packages "1";
@@ -30,16 +29,9 @@ APT::Periodic::AutocleanInterval "7";
 EOF
 systemctl restart unattended-upgrades
 
-
-
-
-# --- 3. Deploy Application Code, AI Gateway, MCP & RAG ---
-# This section sets up the core T-AIRS application.
+# --- 1. CLONE REPOSITORY ---
 mkdir -p /opt/t-airs
 
-# Determine which branch to clone based on the environment.
-# 'prod' environment (from 'default' workspace) uses the 'main' branch.
-# 'dev' environment uses the 'dev' branch.
 if [ "${env}" == "dev" ]; then
     BRANCH="dev"
 else
@@ -47,28 +39,62 @@ else
 fi
 echo "Deploying from git branch: $BRANCH"
 
-# Clone the specific branch of the application source code from the GitHub repository.
 git clone --branch $BRANCH https://github.com/NicoPANW/t-airs.git /opt/t-airs
 cd /opt/t-airs
 
-# Read application version and update the hostname dynamically
 if [ -f "/opt/t-airs/VERSION" ]; then
     APP_VERSION=$(cat /opt/t-airs/VERSION | tr -d '\r\n[:space:]')
     CLEAN_VERSION=$(echo "$APP_VERSION" | tr '.' '-')
-    echo "Updating hostname to include version: v$APP_VERSION"
-    hostnamectl set-hostname "t-airs-node-${target_cloud}-${env}-v$CLEAN_VERSION"
+    hostnamectl set-hostname "t-airs-$NODE_ROLE-${target_cloud}-${env}-v$CLEAN_VERSION"
 fi
 
-# Create the SQLite database and populate it with initial customer data.
-# This provides the structured data for the MCP agent to interact with.
-echo "Executing SQL Seeder"
-python3 /opt/t-airs/src/sql_data.py
+# ==============================================================================
+# ROLE A: DEDICATED REMOTE SQLITE MCP SERVER VM
+# ==============================================================================
+if [ "$NODE_ROLE" == "mcp" ]; then
+    echo "🗄️ Configuring Dedicated Remote MCP Server VM..."
 
-# Set up a Python virtual environment to isolate dependencies.
-python3 -m venv venv
-source venv/bin/activate
+    echo "Executing SQL Seeder on MCP VM..."
+    python3 /opt/t-airs/src/sql_data.py
 
-# Conditionally append LiteLLM dependencies to the requirements file
+    python3 -m venv /opt/t-airs/venv
+    /opt/t-airs/venv/bin/pip install --upgrade pip
+    /opt/t-airs/venv/bin/pip install "mcp==2.3.0" "uvicorn>=0.30.0" "starlette>=0.40.0"
+
+    cat <<EOF > /etc/systemd/system/t-airs-mcp.service
+[Unit]
+Description=T-AIRS Remote SQLite MCP Server (Streamable HTTP)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/t-airs/src
+Environment="MCP_HOST=0.0.0.0"
+Environment="MCP_PORT=$MCP_PORT"
+Environment="MCP_DB_PATH=/opt/t-airs/src/customers.db"
+Environment="MCP_AUTH_TOKEN=${mcp_auth_token}"
+ExecStart=/opt/t-airs/venv/bin/python3 /opt/t-airs/src/mcp_server_simple.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable t-airs-mcp
+    systemctl start t-airs-mcp
+    echo "✅ Remote MCP Server VM setup complete!"
+    exit 0
+fi
+
+# ==============================================================================
+# ROLE B: MAIN AI AGENT & WEB UI VM
+# ==============================================================================
+echo "🤖 Configuring Main T-AIRS Agent VM (Remote MCP via AI Gateway)..."
+
+python3 -m venv /opt/t-airs/venv
+source /opt/t-airs/venv/bin/activate
+
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
     echo "" >> /opt/t-airs/src/requirements.txt
     echo "litellm[proxy]==1.104.2" >> /opt/t-airs/src/requirements.txt
@@ -77,37 +103,25 @@ if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
     echo "google-auth==2.59.1" >> /opt/t-airs/src/requirements.txt
 fi
 
-# Install all Python packages in one single pass
 echo "Installing Python requirements..."
 /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
 
-
-
-
-# Pre-download the embedding model for the RAG system from HuggingFace.
-# This prevents a long delay on the first application startup.
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."
 python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-small-en-v1.5')"
 echo "✅ BAAI Model successfully cached!"
 
-
-# ==========================================
-# 3.5 DYNAMICALLY BUILD THE AI GATEWAY CONFIG
-# Only build this if LiteLLM is the active gateway
-# ==========================================
+# ==============================================================================
+# DYNAMICALLY BUILD LITELLM CONFIG (IF LITELLM GATEWAY IS SELECTED)
+# ==============================================================================
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
-    echo "Building LiteLLM routing configuration..."
+    echo "Building LiteLLM routing configuration with remote VPC MCP server..."
     cat <<EOF > /opt/t-airs/src/litellm_config.yaml
 model_list:
 EOF
 
-    # Inject GCP model definitions if the target cloud is GCP.
     if [ "${target_cloud}" == "gcp" ]; then
-        if ! command -v jq &> /dev/null; then
-            echo "jq could not be found, which is needed to build the config from the JSON file."
-        else
-            cd /opt/t-airs
-            for model in $(jq -r '.[]' src/gemini_models.json); do
+        cd /opt/t-airs
+        for model in $(jq -r '.[]' src/gemini_models.json); do
             cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: $model
     litellm_params:
@@ -115,13 +129,13 @@ EOF
       vertex_project: "${gcp_project}"
       vertex_location: "global"
 EOF
-            done
+        done
 
-            cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+        cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
 
   # --- ALL MODELS IN THE AUTO-ROUTER GROUP ---
 EOF
-            for model in $(jq -r '.[]' src/gemini_models.json); do
+        for model in $(jq -r '.[]' src/gemini_models.json); do
             cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: auto-router
     litellm_params:
@@ -129,13 +143,10 @@ EOF
       vertex_project: "${gcp_project}"
       vertex_location: "global"
 EOF
-            done
-        fi
-    # Inject AWS model definitions if the target cloud is AWS.
+        done
     elif [ "${target_cloud}" == "aws" ]; then
-    # Loop through each model ID passed from Terraform and add it to the config.
-    for model_id in ${bedrock_model_ids}; do
-    cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+        for model_id in ${bedrock_model_ids}; do
+            cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
   - model_name: $${model_id}
     litellm_params:
       model: bedrock/$${model_id}
@@ -145,12 +156,18 @@ EOF
       model: bedrock/$${model_id}
       aws_region_name: "${aws_region}"
 EOF
-    done
+        done
     fi
 
-
-    # Add the final settings for routing and Prisma AIRS guardrails.
     cat <<EOF >> /opt/t-airs/src/litellm_config.yaml
+mcp_servers:
+  sqlite_server:
+    url: "http://${mcp_internal_ip}:$MCP_PORT/mcp"
+    transport: "http"
+    auth_type: "bearer_token"
+    auth_value: "${mcp_auth_token}"
+    allow_all_keys: true
+
 litellm_settings:
   drop_params: true
   modify_params: true
@@ -174,28 +191,28 @@ guardrails:
       default_on: false
       api_key: os.environ/AIRS_API_KEY
       profile_name: os.environ/AIRS_PROFILE
-  
-  - guardrail_name: "airs-mcp-scan"
+
+  - guardrail_name: "airs-mcp-pre-scan"
     litellm_params:
       guardrail: panw_prisma_airs
       mode: "pre_mcp_call"
-      default_on: false
+      default_on: true
+      api_key: os.environ/AIRS_API_KEY
+      profile_name: os.environ/AIRS_PROFILE
+
+  - guardrail_name: "airs-mcp-post-scan"
+    litellm_params:
+      guardrail: panw_prisma_airs
+      mode: "post_mcp_call"
+      default_on: true
       api_key: os.environ/AIRS_API_KEY
       profile_name: os.environ/AIRS_PROFILE
 EOF
 fi
 
-
-# --- 4. Create Systemd Services ---
-# This section creates systemd service files to ensure the application and its
-# dependencies run automatically on boot and restart if they crash.
-
-echo "Configuring Prisma AIRS Integration Mode: $AIRS_MODE"
-
-# Determine base dependencies for T-AIRS
+# --- CREATE SYSTEMD SERVICES ---
 TAIRS_AFTER="network.target"
 
-# Only configure and start LiteLLM if it is the chosen gateway
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
     echo "Configuring LiteLLM Service..."
     cat <<EOF > /etc/systemd/system/litellm.service
@@ -205,7 +222,6 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/t-airs/src
-# Inject the AIRS credentials directly into the gateway's environment.
 Environment="PANW_PRISMA_AIRS_API_KEY=${airs_key}"
 Environment="AIRS_API_KEY=${airs_key}"
 Environment="AIRS_PROFILE=${airs_profile}"
@@ -221,8 +237,7 @@ EOF
     systemctl daemon-reload
     systemctl enable litellm
     systemctl start litellm
-    
-    # Add litellm to T-AIRS dependencies
+
     TAIRS_AFTER="$TAIRS_AFTER litellm.service"
 fi
 
@@ -232,22 +247,21 @@ Description=T-AIRS
 After=$${TAIRS_AFTER}
 
 [Service]
-# Set environment variables required by HuggingFace libraries to cache models correctly.
 Environment="HOME=/root"
 Environment="HF_HOME=/root/.cache/huggingface"
 Environment="HF_HUB_CACHE=/root/.cache/huggingface/hub"
-# Inject Portkey credentials from Terraform (ignored if LiteLLM is active)
 Environment="PORTKEY_API_KEY=${portkey_api_key}"
 Environment="PORTKEY_SLUG=${portkey_slug}"
+Environment="PORTKEY_MCP_SLUG=${portkey_mcp_slug}"
+Environment="MCP_GATEWAY_URL=${mcp_gateway_url}"
+Environment="MCP_AUTH_TOKEN=${mcp_auth_token}"
 Environment="APP_ENV=${env}"
 
 WorkingDirectory=/opt/t-airs/src
 
-# Before starting the app, wait until the AI Gateway is fully responsive IF using LiteLLM
 ExecStartPre=/bin/bash -c 'if [ "${gateway_provider}" == "litellm" ]; then until curl -s -f http://127.0.0.1:4000/health/readiness > /dev/null; do echo "Waiting for local LiteLLM AI Gateway..."; sleep 2; done; fi'
 
-# Launch the main Python application dynamically configured for the selected provider
-ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000 --gateway-provider ${gateway_provider} --portkey-slug "${portkey_slug}"
+ExecStart=/opt/t-airs/venv/bin/python3 main.py --airs-key ${airs_key} --airs-profile ${airs_profile} --gateway-url http://127.0.0.1:4000 --gateway-provider ${gateway_provider} --portkey-slug "${portkey_slug}" --portkey-mcp-slug "${portkey_mcp_slug}"
 Restart=always
 User=root
 
@@ -255,9 +269,6 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# --- 5. Start Services ---
-# Reload the systemd daemon to recognize the new service files,
-# then enable and start the services.
 systemctl daemon-reload
 systemctl enable t-airs
 systemctl start t-airs
