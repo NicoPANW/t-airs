@@ -120,17 +120,10 @@ resource "google_compute_firewall" "restricted_access" {
   source_ranges = local.allowed_ingress
 }
 
-# Firewall for the Remote MCP VM:
-# Permits MCP Streamable HTTP (8080) ONLY from Prisma AIRS AI Gateway egress IPs,
-# the internal VPC subnet, and your admin subnet.
-resource "google_compute_firewall" "mcp_access" {
-  name    = "t-airs-mcp-firewall-${local.env}"
+# Firewall 1 for Remote MCP VM: SSH strictly restricted to admin subnet + Prisma AIRS scanner IPs
+resource "google_compute_firewall" "mcp_ssh_access" {
+  name    = "t-airs-mcp-ssh-${local.env}"
   network = google_compute_network.t_airs_vpc.name
-
-  allow {
-    protocol = "tcp"
-    ports    = [tostring(var.mcp_port)]
-  }
 
   allow {
     protocol = "tcp"
@@ -138,7 +131,21 @@ resource "google_compute_firewall" "mcp_access" {
   }
 
   target_tags   = ["t-airs-mcp"]
-  source_ranges = concat(local.allowed_ingress, [var.gcp_subnet_cidr])
+  source_ranges = local.allowed_ingress
+}
+
+# Firewall 2 for Remote MCP VM: MCP Streamable HTTP endpoint (protected by Bearer token auth)
+resource "google_compute_firewall" "mcp_http_access" {
+  name    = "t-airs-mcp-http-${local.env}"
+  network = google_compute_network.t_airs_vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = [tostring(var.mcp_port)]
+  }
+
+  target_tags   = ["t-airs-mcp"]
+  source_ranges = distinct(concat(var.mcp_allowed_cidrs, [var.gcp_subnet_cidr]))
 }
 
 # ==========================================
@@ -160,7 +167,7 @@ resource "google_project_iam_member" "vertex_access" {
 # GCP COMPUTE INSTANCES (SAME VPC)
 # ==========================================
 
-# 1. Dedicated Remote SQLite MCP Server VM (with optional reserved static IP)
+# 1. Dedicated Remote SQLite MCP Server VM
 resource "google_compute_instance" "t_airs_mcp" {
   name         = "t-airs-mcp-${local.env}"
   zone         = "${var.gcp_region}-a"
@@ -184,7 +191,7 @@ resource "google_compute_instance" "t_airs_mcp" {
   }
 }
 
-# 2. Main AI Agent & FastAPI UI VM (with optional reserved static IP)
+# 2. Main AI Agent & FastAPI UI VM
 resource "google_compute_instance" "t_airs_node" {
   name         = "t-airs-node-${local.env}"
   zone         = "${var.gcp_region}-a"
