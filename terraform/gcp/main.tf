@@ -11,12 +11,6 @@ terraform {
   }
 }
 
-variable "static_ip" {
-  description = "Optional pre-allocated static external IP for the App VM. If empty, an ephemeral IP is used."
-  type        = string
-  default     = ""
-}
-
 provider "google" {
   project = var.gcp_project_id
   region  = var.gcp_region
@@ -166,7 +160,7 @@ resource "google_project_iam_member" "vertex_access" {
 # GCP COMPUTE INSTANCES (SAME VPC)
 # ==========================================
 
-# 1. Dedicated Remote SQLite MCP Server VM
+# 1. Dedicated Remote SQLite MCP Server VM (with optional reserved static IP)
 resource "google_compute_instance" "t_airs_mcp" {
   name         = "t-airs-mcp-${local.env}"
   zone         = "${var.gcp_region}-a"
@@ -184,11 +178,13 @@ resource "google_compute_instance" "t_airs_mcp" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.t_airs_sub.id
-    access_config {}
+    access_config {
+      nat_ip = var.mcp_static_ip != "" ? var.mcp_static_ip : null
+    }
   }
 }
 
-# 2. Main AI Agent & FastAPI UI VM
+# 2. Main AI Agent & FastAPI UI VM (with optional reserved static IP)
 resource "google_compute_instance" "t_airs_node" {
   name         = "t-airs-node-${local.env}"
   zone         = "${var.gcp_region}-a"

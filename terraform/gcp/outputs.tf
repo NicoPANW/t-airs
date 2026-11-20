@@ -31,10 +31,9 @@ output "deployment_summary" {
      - Slug        : ${var.portkey_mcp_slug}
      - Server Type : HTTP (Streamable HTTP)
      - Server URL  : http://${google_compute_instance.t_airs_mcp.network_interface[0].access_config[0].nat_ip}:${var.mcp_port}/mcp
-                     (Use http://${google_compute_instance.t_airs_mcp.network_interface[0].network_ip}:${var.mcp_port}/mcp if self-hosting AI Gateway inside this VPC)
      - Auth Type   : Headers
        Header Key  : Authorization
-       Header Value: Bearer <run: terraform output -raw mcp_auth_token>
+       Header Value: Bearer ${var.mcp_auth_token != "" ? "<your TF_VAR_mcp_auth_token>" : "<run: terraform output -raw mcp_auth_token>"}
   3. Enable workspace access & verify tools (read_query, write_query) appear.
   4. Agent traffic path:
      App VM -> https://aigw.portkey.ai/m/${var.portkey_mcp_slug}/mcp -> MCP VM

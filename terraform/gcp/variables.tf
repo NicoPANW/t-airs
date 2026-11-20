@@ -65,6 +65,18 @@ variable "gcp_subnet_cidr" {
   default     = "10.10.0.0/24"
 }
 
+variable "static_ip" {
+  description = "Optional pre-allocated static external IP for the App VM. If empty, an ephemeral IP is used."
+  type        = string
+  default     = ""
+}
+
+variable "mcp_static_ip" {
+  description = "Optional pre-allocated static external IP for the remote MCP VM. If empty, an ephemeral IP is used."
+  type        = string
+  default     = ""
+}
+
 variable "portkey_api_key" {
   description = "Prisma AIRS AI Gateway (Portkey) API Key"
   type        = string
@@ -97,7 +109,7 @@ variable "mcp_port" {
 }
 
 variable "mcp_auth_token" {
-  description = "Optional Bearer token protecting the remote MCP VM. Leave empty to auto-generate."
+  description = "Bearer token protecting the remote MCP VM (Passed via TF_VAR_mcp_auth_token). Leave empty to auto-generate."
   type        = string
   default     = ""
   sensitive   = true
