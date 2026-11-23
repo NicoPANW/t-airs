@@ -3,12 +3,12 @@ portkey-ai==2.3.4
 pan-aisecurity==0.11.0
 fastapi==0.139.2
 mcp==2.3.0
-httpx2>=2.16.2
+httpx2==2.16.2
 uvloop==0.22.1
 uvicorn==0.53
 requests==2.34.2
 Jinja2==3.1.6
 python-multipart==0.0.32
-openai<3.0.0
+openai==3.57.0
 chromadb==1.5.9
 sentence-transformers==6.1.0

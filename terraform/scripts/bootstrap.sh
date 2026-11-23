@@ -97,10 +97,10 @@ source /opt/t-airs/venv/bin/activate
 
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
     echo "" >> /opt/t-airs/src/requirements.txt
-    echo "litellm[proxy]==1.104.2" >> /opt/t-airs/src/requirements.txt
+    echo "litellm[proxy]==1.110.2" >> /opt/t-airs/src/requirements.txt
     echo "litellm-enterprise" >> /opt/t-airs/src/requirements.txt
     echo "litellm-proxy-extras" >> /opt/t-airs/src/requirements.txt
-    echo "google-auth==2.59.1" >> /opt/t-airs/src/requirements.txt
+    echo "google-auth==2.63.1" >> /opt/t-airs/src/requirements.txt
 fi
 
 echo "Installing Python requirements..."
