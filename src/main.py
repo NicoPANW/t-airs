@@ -1,4 +1,5 @@
 # t-airs/src/main.py
+# Core FastAPI backend orchestrating the AI chatbot, Prisma AIRS security scans, RAG retrieval, and remote MCP tool calling.
 """
 T-AIRS: Enterprise AI Application with Prisma AIRS Security, RAG, and Remote MCP via AI Gateway
 ===============================================================================================

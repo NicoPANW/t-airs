@@ -1,5 +1,6 @@
 #!/bin/bash
 # t-airs/preflight_gcp.sh
+# Validates GCP environment credentials, required APIs, quota/zones, static IPs, and AI Gateway connectivity prior to deployment.
 
 echo "🛫 Starting Pre-Flight Checks for GCP (Multi-VM + AI Gateway Mode)..."
 

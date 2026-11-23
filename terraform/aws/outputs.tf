@@ -1,4 +1,5 @@
 # t-airs/terraform/aws/outputs.tf
+# Output definitions and deployment summary details for the AWS multi-VM architecture.
 output "mcp_auth_token" {
   description = "Bearer token required in the Authorization header when registering the MCP VM in Prisma AIRS AI Gateway"
   value       = local.effective_mcp_token

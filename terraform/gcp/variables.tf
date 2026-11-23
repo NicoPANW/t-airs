@@ -1,3 +1,5 @@
+# t-airs/terraform/gcp/variables.tf
+# Input variable definitions for provisioning GCP networking, compute instances, and Prisma AIRS configuration.
 # ==========================================
 # GLOBAL VARIABLES
 # ==========================================

@@ -1,4 +1,5 @@
 # t-airs/src/rag_data.py
+# Knowledge base data used for RAG embeddings and testing security guardrails against data poisoning and secret leakage.
 # first 10 sentences contain secrets or toxic content
 
 BANKING_SECRETS = """STANDARD RETAIL BANKING KNOWLEDGE BASE

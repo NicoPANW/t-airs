@@ -1,4 +1,5 @@
 # t-airs/src/sql_data.py
+# Generates deterministic test records with valid PII/DLP structures in SQLite for MCP agent tool interactions.
 import sqlite3
 import random
 

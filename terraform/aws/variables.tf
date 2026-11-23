@@ -1,3 +1,5 @@
+# t-airs/terraform/aws/variables.tf
+# Input variable definitions for provisioning AWS networking, EC2 instances, and Prisma AIRS configuration.
 # ==========================================
 # GLOBAL VARIABLES
 # ==========================================

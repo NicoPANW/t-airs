@@ -1,4 +1,5 @@
 <!-- t-airs/README.md -->
+<!-- Comprehensive documentation, architectural overview, deployment guides, and testing procedures for T-AIRS. -->
 <h1 align="center">🛡️ T-AIRS: AI chatbot/agent app deployed on GCP or AWS and used to test Prisma AIRS features</h1>
 
 <p align="center">
