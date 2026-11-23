@@ -195,7 +195,7 @@ resource "google_compute_instance" "t_airs_mcp" {
 resource "google_compute_instance" "t_airs_node" {
   name         = "t-airs-node-${local.env}"
   zone         = "${var.gcp_region}-a"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-medium"
   tags         = ["t-airs-app"]
 
   boot_disk {
