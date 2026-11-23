@@ -61,7 +61,7 @@ if [ "$NODE_ROLE" == "mcp" ]; then
 
     python3 -m venv /opt/t-airs/venv
     /opt/t-airs/venv/bin/pip install --upgrade pip
-    /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
+    /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements-mcp.txt
 
     cat <<EOF > /etc/systemd/system/t-airs-mcp.service
 [Unit]
@@ -98,22 +98,12 @@ python3 -m venv /opt/t-airs/venv
 source /opt/t-airs/venv/bin/activate
 /opt/t-airs/venv/bin/pip install --upgrade pip
 
-echo "Installing Core Python requirements..."
+echo "Installing App Python requirements..."
 /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
 
-echo "Installing App-only RAG & Vector DB dependencies (CPU PyTorch + ChromaDB)..."
-/opt/t-airs/venv/bin/pip install \
-    --extra-index-url https://download.pytorch.org/whl/cpu \
-    "chromadb==1.5.9" \
-    "sentence-transformers==6.3.0"
-
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
-    echo "Installing LiteLLM AI Gateway dependencies..."
-    /opt/t-airs/venv/bin/pip install \
-        "litellm[proxy]==1.110.2" \
-        "litellm-enterprise" \
-        "litellm-proxy-extras" \
-        "google-auth==2.63.1"
+    echo "Installing LiteLLM AI Gateway requirements..."
+    /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements-litellm.txt
 fi
 
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."

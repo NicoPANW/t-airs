@@ -1,0 +1,4 @@
+litellm[proxy]==1.110.2
+litellm-enterprise
+litellm-proxy-extras
+google-auth==2.63.1
