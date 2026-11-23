@@ -61,7 +61,7 @@ if [ "$NODE_ROLE" == "mcp" ]; then
 
     python3 -m venv /opt/t-airs/venv
     /opt/t-airs/venv/bin/pip install --upgrade pip
-    /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements-mcp.txt
+    /opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
 
     cat <<EOF > /etc/systemd/system/t-airs-mcp.service
 [Unit]
