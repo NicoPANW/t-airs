@@ -96,17 +96,25 @@ echo "🤖 Configuring Main T-AIRS Agent VM (Remote MCP via AI Gateway)..."
 
 python3 -m venv /opt/t-airs/venv
 source /opt/t-airs/venv/bin/activate
+/opt/t-airs/venv/bin/pip install --upgrade pip
+
+echo "Installing Core Python requirements..."
+/opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
+
+echo "Installing App-only RAG & Vector DB dependencies (CPU PyTorch + ChromaDB)..."
+/opt/t-airs/venv/bin/pip install \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    "chromadb==1.5.9" \
+    "sentence-transformers==6.3.0"
 
 if [ "$GATEWAY_PROVIDER" == "litellm" ]; then
-    echo "" >> /opt/t-airs/src/requirements.txt
-    echo "litellm[proxy]==1.110.2" >> /opt/t-airs/src/requirements.txt
-    echo "litellm-enterprise" >> /opt/t-airs/src/requirements.txt
-    echo "litellm-proxy-extras" >> /opt/t-airs/src/requirements.txt
-    echo "google-auth==2.63.1" >> /opt/t-airs/src/requirements.txt
+    echo "Installing LiteLLM AI Gateway dependencies..."
+    /opt/t-airs/venv/bin/pip install \
+        "litellm[proxy]==1.110.2" \
+        "litellm-enterprise" \
+        "litellm-proxy-extras" \
+        "google-auth==2.63.1"
 fi
-
-echo "Installing Python requirements..."
-/opt/t-airs/venv/bin/pip install -r /opt/t-airs/src/requirements.txt
 
 echo "Pre-downloading HuggingFace BAAI Embedding Model..."
 python3 -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-small-en-v1.5')"
