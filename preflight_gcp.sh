@@ -1,4 +1,5 @@
 #!/bin/bash
+# t-airs/preflight_gcp.sh
 
 echo "🛫 Starting Pre-Flight Checks for GCP (Multi-VM + AI Gateway Mode)..."
 

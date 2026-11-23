@@ -4,13 +4,13 @@
 variable "prisma_airs_ips" {
   description = "List of official Prisma AIRS Egress IPs"
   type        = list(string)
-  default     = [
-    "3.210.133.47/32", 
-    "34.235.13.250/32", 
-    "34.75.54.101/32", 
-    "35.185.127.202/32", 
-    "35.197.73.227/32", 
-    "104.198.97.107/32", 
+  default = [
+    "3.210.133.47/32",
+    "34.235.13.250/32",
+    "34.75.54.101/32",
+    "35.185.127.202/32",
+    "35.197.73.227/32",
+    "104.198.97.107/32",
     "136.117.114.204/32"
   ]
 }
@@ -35,6 +35,7 @@ variable "airs_profile" {
 
 # ==========================================
 # AWS-SPECIFIC VARIABLES
+# t-airs/terraform/aws/variables.tf
 # ==========================================
 variable "aws_region" {
   description = "The AWS Region for Bedrock"
@@ -54,6 +55,24 @@ variable "aws_subnet_cidr" {
   default     = "10.0.1.0/24"
 }
 
+variable "static_ip" {
+  description = "Optional pre-allocated AWS Elastic IP (public IP or eipalloc-xxx) for the App EC2 instance."
+  type        = string
+  default     = ""
+}
+
+variable "mcp_static_ip" {
+  description = "Optional pre-allocated AWS Elastic IP (public IP or eipalloc-xxx) for the remote MCP EC2 instance."
+  type        = string
+  default     = ""
+}
+
+variable "mcp_allowed_cidrs" {
+  description = "CIDR ranges allowed to reach the MCP HTTP port (8080). Protected by MCP_AUTH_TOKEN Bearer auth."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
 variable "bedrock_model_ids" {
   description = "A list of AWS Bedrock model IDs to enable in the application."
   type        = list(string)
@@ -67,14 +86,39 @@ variable "gateway_provider" {
 }
 
 variable "portkey_api_key" {
-  description = "Portkey API Key"
+  description = "Prisma AIRS AI Gateway (Portkey) API Key"
   type        = string
   default     = ""
   sensitive   = true
 }
 
 variable "portkey_slug" {
-  description = "Portkey Slug (Saved Integration Virtual Key, e.g. @slug-name)"
+  description = "Prisma AIRS AI Gateway LLM Integration Slug (e.g. @slug-name)"
   type        = string
   default     = ""
+}
+
+variable "portkey_mcp_slug" {
+  description = "Prisma AIRS AI Gateway MCP Server Slug registered in MCP Registry"
+  type        = string
+  default     = "t-airs-sqlite"
+}
+
+variable "mcp_gateway_url" {
+  description = "Optional full MCP Gateway URL override (e.g. for self-hosted Prisma AIRS AI Gateway in VPC)"
+  type        = string
+  default     = ""
+}
+
+variable "mcp_port" {
+  description = "Listening TCP port for the remote MCP Streamable HTTP server"
+  type        = number
+  default     = 8080
+}
+
+variable "mcp_auth_token" {
+  description = "Bearer token protecting the remote MCP VM (Passed via TF_VAR_mcp_auth_token). Leave empty to auto-generate."
+  type        = string
+  default     = ""
+  sensitive   = true
 }
