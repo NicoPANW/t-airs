@@ -1,4 +1,6 @@
 #!/bin/bash
+# t-airs/terraform/scripts/bootstrap.sh
+# Cloud-init VM startup script provisioning system dependencies, configuring services (MCP or App/LiteLLM), and initializing systemd units.
 
 NODE_ROLE="${node_role}"               # "app" or "mcp"
 GATEWAY_PROVIDER="${gateway_provider}" # "portkey" or "litellm"

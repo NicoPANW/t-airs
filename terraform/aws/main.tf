@@ -1,3 +1,5 @@
+# t-airs/terraform/aws/main.tf
+# Provisions the AWS infrastructure for T-AIRS, including VPC networking, security groups, IAM roles/policies, and EC2 instances for the App and MCP servers.
 # ==========================================
 # TERRAFORM & PROVIDER CONFIGURATION
 # ==========================================

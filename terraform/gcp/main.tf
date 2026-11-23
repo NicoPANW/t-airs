@@ -1,3 +1,5 @@
+# t-airs/terraform/gcp/main.tf
+# Provisions the GCP infrastructure for T-AIRS, including VPC networking, firewall rules, service accounts, and Compute Engine instances for the App and MCP servers.
 # ==========================================
 # TERRAFORM & PROVIDER CONFIGURATION
 # ==========================================
