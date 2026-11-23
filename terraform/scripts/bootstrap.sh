@@ -173,7 +173,7 @@ litellm_settings:
   modify_params: true
 
 router_settings:
-  routing_strategy: cost-based-routing
+  routing_strategy: simple-shuffle
 
 guardrails:
   - guardrail_name: "airs-ingress-scan"

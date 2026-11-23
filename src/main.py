@@ -120,6 +120,60 @@ def format_exception_detail(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
+def parse_litellm_mcp_block(tool_name: str, mcp_res, tool_args: dict, mcp_url: str, architecture_trace: dict):
+    """Detects and formats Prisma AIRS guardrail blocks returned inside MCP CallToolResult(isError=True)."""
+    tool_output = mcp_res.content[0].text if getattr(mcp_res, "content", None) else ""
+    is_error = bool(getattr(mcp_res, "isError", False))
+
+    if not is_error and "panw_prisma_airs" not in tool_output and "guardrail_violation" not in tool_output:
+        return None
+
+    if not any(marker in tool_output for marker in ["panw_prisma_airs", "guardrail_violation", "airs-mcp-", "blocked by panw"]):
+        return None
+
+    is_pre_call = "airs-mcp-pre-scan" in tool_output or "pre_mcp_call" in tool_output
+    direction = "LLM ➔ MCP Tool" if is_pre_call else "MCP Tool ➔ LLM"
+    scan_label = f"TOOL BLOCK ({tool_name} | {direction})"
+
+    category = "Security"
+    category_match = re.search(r"'category':\s*'([^']+)'", tool_output)
+    if not category_match:
+        category_match = re.search(r'"category":\s*"([^"]+)"', tool_output)
+    if category_match:
+        category = category_match.group(1).capitalize()
+
+    sidebar_log = {"raw_error": tool_output}
+    start_idx = tool_output.find("{")
+    if start_idx != -1:
+        inner_str = tool_output[start_idx:]
+        try:
+            sidebar_log = ast.literal_eval(inner_str)
+        except Exception:
+            try:
+                sidebar_log = json.loads(inner_str)
+            except Exception:
+                pass
+
+    architecture_trace["mcp_execution"].append({
+        "tool": tool_name,
+        "gateway_endpoint": mcp_url,
+        "arguments": tool_args,
+        "database_result": f"BLOCKED BY LITELLM GUARDRAIL ({direction})"
+    })
+
+    block_txt = f"🛡️ Blocked by Prisma AIRS [{direction}]: '{tool_name}' triggered a {category} policy violation."
+    print(f"🛑 AIRS GATEWAY MCP BLOCK: {scan_label} | Category: {category}", flush=True)
+    return {
+        "bot": block_txt,
+        "output": block_txt,
+        "logs": {
+            "security_scan": scan_label,
+            "raw_response": json.dumps(sidebar_log, indent=2),
+            "trace": architecture_trace
+        }
+    }
+
+
 # --- REMOTE MCP VIA AI GATEWAY HELPERS ---
 def get_mcp_gateway_config():
     """Returns (mcp_endpoint_url, headers_dict) routed through the active AI Gateway."""
@@ -528,7 +582,7 @@ async def chat(
                 )
         elif GATEWAY_PROVIDER == "litellm":
             if enforcement_placement == "gateway" and airs_enabled:
-                extra_body = {"guardrails": ["airs-mcp-scan"]}
+                extra_body = {"guardrails": ["airs-ingress-scan", "airs-egress-scan"]}
 
         debug_headers = {}
         if extra_headers:
@@ -600,57 +654,72 @@ async def chat(
                     tool_args = json.loads(tool_call.function.arguments)
                     print(f"🛠️  MODEL REQUESTED TOOL [{iteration}/{MAX_ITERATIONS}]: {tool_name} (via {mcp_url})")
 
-                    # --- 🔌 EXECUTE TOOL THROUGH PRISMA AIRS AI GATEWAY ---
+                    # --- 🔌 EXECUTE TOOL THROUGH AI GATEWAY ---
                     if tool_name in action_tools:
-                        await mcp_session.call_tool("write_query", arguments={"query": "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"})
+                        init_res = await mcp_session.call_tool("write_query", arguments={"query": "CREATE TABLE IF NOT EXISTS unauthorized_actions_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tool_used TEXT, details TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);"})
+                        blocked = parse_litellm_mcp_block("write_query", init_res, tool_args, mcp_url, architecture_trace)
+                        if blocked:
+                            return blocked
 
                         tool_output = ""
+                        last_res = None
                         if tool_name == "transfer_funds":
                             src, dst, amt = tool_args.get("source_account"), tool_args.get("dest_account"), tool_args.get("amount")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance - {amt} WHERE id = '{src}';"})
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance + {amt} WHERE id = '{dst}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance - {amt} WHERE id = '{src}';"})
+                            blocked = parse_litellm_mcp_block(tool_name, last_res, tool_args, mcp_url, architecture_trace)
+                            if blocked:
+                                return blocked
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET balance = balance + {amt} WHERE id = '{dst}';"})
                             tool_output = f"⚠️ Wire transfer of ${amt} executed."
                         elif tool_name == "freeze_account":
                             acc, reason = tool_args.get("account_id"), tool_args.get("reason")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'FROZEN: {reason}' WHERE id = '{acc}';"})
                             tool_output = f"🔒 ACCOUNT LOCKED: Account {acc} frozen."
                         elif tool_name == "issue_replacement_card":
                             acc = tool_args.get("account_id")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE bank_accounts SET notes = 'CARD REPLACED', cc_number = '0000-0000-0000-0000' WHERE id = '{acc}';"})
                             tool_output = f"💳 CARD REPLACED: Old card voided for account {acc}."
                         elif tool_name == "upgrade_flight_seat":
                             tkt, cabin = tool_args.get("ticket_number"), tool_args.get("new_class")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET cabin_class = '{cabin}' WHERE ticket_number = '{tkt}';"})
                             tool_output = f"✅ BOOKING UPDATED: Ticket {tkt} upgraded to {cabin}."
                         elif tool_name == "cancel_flight_booking":
                             tkt = tool_args.get("ticket_number")
                             refund_to_card = tool_args.get("refund_to_card")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"DELETE FROM passenger_manifest WHERE ticket_number = '{tkt}';"})
                             if refund_to_card:
                                 tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Full refund initiated to the original payment card."
                             else:
                                 tool_output = f"🚫 FLIGHT CANCELED: Ticket {tkt} revoked. Flight credit issued to the customer's account."
                         elif tool_name == "update_passport_details":
                             tkt, new_pass = tool_args.get("ticket_number"), tool_args.get("new_passport_id")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE passenger_manifest SET passport_number = '{new_pass}' WHERE ticket_number = '{tkt}';"})
                             tool_output = f"🛂 PASSPORT UPDATED: New document saved to manifest."
                         elif tool_name == "issue_store_refund":
                             order, amt = tool_args.get("order_id"), tool_args.get("amount")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [REFUNDED ${amt}]' WHERE order_id = '{order}';"})
                             tool_output = f"✅ REFUND PROCESSED: ${amt} credited back to payment method for order {order}."
                         elif tool_name == "apply_admin_discount":
                             order, disc = tool_args.get("order_id"), tool_args.get("discount_percentage")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET customer_name = customer_name || ' [DISCOUNT: {disc}%]' WHERE order_id = '{order}';"})
                             tool_output = f"💸 DISCOUNT APPLIED: {disc}% off order {order}."
                         elif tool_name == "update_billing_zip":
                             order, new_zip = tool_args.get("order_id"), tool_args.get("new_zip_code")
-                            await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"})
+                            last_res = await mcp_session.call_tool("write_query", arguments={"query": f"UPDATE pending_orders SET billing_zip = '{new_zip}' WHERE order_id = '{order}';"})
                             tool_output = f"📦 ADDRESS UPDATED: Billing zip changed to {new_zip}."
+
+                        if last_res is not None:
+                            blocked = parse_litellm_mcp_block(tool_name, last_res, tool_args, mcp_url, architecture_trace)
+                            if blocked:
+                                return blocked
 
                         await mcp_session.call_tool("write_query", arguments={"query": f"INSERT INTO unauthorized_actions_log (tool_used, details) VALUES ('{tool_name}', 'Action executed.');"})
                         tool_output += " (Transaction permanently recorded in backend database)."
                     else:
                         mcp_res = await mcp_session.call_tool(tool_name, arguments=tool_args)
+                        blocked = parse_litellm_mcp_block(tool_name, mcp_res, tool_args, mcp_url, architecture_trace)
+                        if blocked:
+                            return blocked
                         tool_output = mcp_res.content[0].text if mcp_res.content else ""
 
                     messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_name, "content": tool_output})
@@ -662,9 +731,9 @@ async def chat(
                     })
 
                     # =====================================================================
-                    # EXPLICIT MCP TOOL SCAN TELEMETRY
+                    # EXPLICIT MCP TOOL SCAN TELEMETRY (PORTKEY MODE)
                     # =====================================================================
-                    if enforcement_placement == "gateway" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner:
+                    if enforcement_placement == "gateway" and GATEWAY_PROVIDER == "portkey" and AIRS_CONFIGURED and airs_enabled and ai_profile_obj and async_scanner:
                         print(f"🔍 Logging explicit ToolEvent to AIRS for {tool_name}...")
                         try:
                             mcp_metadata = ToolEventMetadata(
@@ -823,13 +892,22 @@ async def chat(
                 }
         else:
             if enforcement_placement == "gateway" and ("panw_prisma_airs" in error_str or "blocked" in error_str.lower() or "airs-" in error_str):
-                scan_type = "EGRESS BLOCK" if "airs-egress-scan" in error_str else "INGRESS BLOCK"
-                log_key = "output_scan" if "egress" in scan_type.lower() else "input_scan"
-
-                if execution_phase == "Initial Inference":
-                    direction = "User ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ MCP Tool (or User)"
+                if "airs-mcp-pre-scan" in error_str:
+                    scan_type = "TOOL BLOCK"
+                    direction = "LLM ➔ MCP Tool"
+                    log_key = "input_scan"
+                elif "airs-mcp-post-scan" in error_str:
+                    scan_type = "TOOL BLOCK"
+                    direction = "MCP Tool ➔ LLM"
+                    log_key = "output_scan"
+                elif "airs-egress-scan" in error_str:
+                    scan_type = "EGRESS BLOCK"
+                    direction = "LLM ➔ User"
+                    log_key = "output_scan"
                 else:
-                    direction = "MCP Tool ➔ LLM" if scan_type == "INGRESS BLOCK" else "LLM ➔ User"
+                    scan_type = "INGRESS BLOCK"
+                    direction = "User ➔ LLM" if execution_phase == "Initial Inference" else "MCP Tool ➔ LLM"
+                    log_key = "input_scan"
 
                 category_match = re.search(r"'category':\s*'([^']+)'", error_str)
                 category = category_match.group(1).capitalize() if category_match else "Security"
