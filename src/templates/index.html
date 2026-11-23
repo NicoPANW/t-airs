@@ -102,11 +102,11 @@
 
                     <div class="border-t border-slate-700/50 my-2"></div>
 
-                    <!-- 3. Remote MCP via AI Gateway Status -->
+                    <!-- 3. Remote MCP Server via AI Gateway Status -->
                     <div class="flex items-center justify-between mb-1.5">
                         <div class="flex items-center gap-2">
-                            <i data-lucide="database" class="w-3.5 h-3.5 text-teal-400"></i>
-                            <p class="text-[10px] font-bold text-teal-400 uppercase tracking-widest">Remote MCP (AI GW)</p>
+                            <i data-lucide="database" class="w-3.5 h-3.5 text-blue-400"></i>
+                            <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Remote MCP (AI GW)</p>
                         </div>
                     </div>
                     <div id="mcp-status-light" class="w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
@@ -114,7 +114,7 @@
                     </div>
                     <div class="flex flex-col gap-0.5 overflow-hidden">
                         <span id="mcp-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
-                        <span id="mcp-url-text" class="text-[8px] text-teal-400/80 font-mono truncate tracking-tighter" title="">UNKNOWN_ENDPOINT</span>
+                        <span id="mcp-url-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter" title="">UNKNOWN_ENDPOINT</span>
                     </div>
                 </div>
 
@@ -377,9 +377,9 @@
                 mcpUrlText.title = mcpUrl;
 
                 if (data.mcp_status === "connected") {
-                    mcpBar.className = "w-full h-full bg-teal-400 shadow-[0_0_8px_#2dd4bf]";
+                    mcpBar.className = "w-full h-full bg-green-500 shadow-[0_0_8px_#22c55e]";
                     mcpStatusText.innerText = "MCP TOOLS LOADED";
-                    mcpStatusText.className = "text-[9px] font-bold text-teal-400 uppercase tracking-tight";
+                    mcpStatusText.className = "text-[9px] font-bold text-green-400 uppercase tracking-tight";
                 } else {
                     mcpBar.className = "w-full h-full bg-amber-500 shadow-[0_0_8px_#f59e0b]";
                     mcpStatusText.innerText = data.mcp_reason || "PENDING / OFFLINE";
