@@ -7,22 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* * Custom scrollbar styling to keep the UI looking sleek and modern.
-         * Specific scrollbars are targeted for the chat, the system prompt text area,
-         * and the left configuration sidebar.
-         */
         .chat-container::-webkit-scrollbar { width: 6px; }
         .chat-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        
-        /* * .log-hidden is used to smoothly collapse the right-side Observability Trace panel 
-         * when the "Inspector Logs" button is toggled.
-         */
+
         .log-hidden { width: 0 !important; opacity: 0; pointer-events: none; border-left: none !important; }
         #log-panel { transition: all 0.3s ease; }
-        
-        /* Highlight local LLM options in the dropdown differently than cloud models */
+
         #model-select option.local-option { background-color: #1e293b; color: #60a5fa; font-weight: bold; }
-        
+
         #persona-context-display::-webkit-scrollbar { width: 4px; }
         #persona-context-display::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
         .sidebar-scroll::-webkit-scrollbar { width: 4px; }
@@ -30,7 +22,6 @@
         .sidebar-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        /* Reusable card styling for the left sidebar configuration blocks */
         .sidebar-section {
             background-color: rgba(30, 41, 59, 0.4);
             border: 1px solid rgba(51, 65, 85, 0.5);
@@ -43,7 +34,7 @@
 <body class="bg-slate-50 text-slate-900 h-screen flex overflow-hidden font-sans">
 
     <aside class="w-80 bg-slate-900 text-white p-5 flex flex-col shadow-xl shrink-0 border-r border-slate-800">
-        <div class="flex items-center gap-3 mb-10 px-1">
+        <div class="flex items-center gap-3 mb-8 px-1">
             <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
             <h1 class="text-xl font-black tracking-tighter text-white uppercase italic">T-AIRS</h1>
             <span class="text-[10px] font-mono bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">v{{ app_version }}</span>
@@ -54,8 +45,8 @@
             {% endif %}
         </div>
 
-        <div class="flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto pr-2 sidebar-scroll pb-4">
-            
+        <div class="flex flex-col gap-5 flex-1 min-h-0 overflow-y-auto pr-2 sidebar-scroll pb-4">
+
             <div class="sidebar-section">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
@@ -67,10 +58,11 @@
                     <input type="text" id="end-user-input" value="user1" class="w-full bg-transparent p-2.5 text-[11px] font-mono text-slate-300 outline-none selection:bg-emerald-500/30 transition-colors focus:bg-slate-900/50" spellcheck="false" placeholder="e.g. user1, admin, nico...">
                 </div>
             </div>
-            
+
             <div class="sidebar-section flex flex-col gap-3">
-                
+
                 <div class="flex flex-col bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
+                    <!-- 1. Prisma AIRS Runtime SDK Status -->
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
                             <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-blue-400"></i>
@@ -81,11 +73,11 @@
                             <div class="w-8 h-4 bg-slate-600 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4 shadow-sm"></div>
                         </label>
                     </div>
-                    
+
                     <div id="airs-status-light" class="w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
                         <div id="status-bar" class="w-0 h-full bg-slate-500 transition-all duration-700"></div>
                     </div>
-                    
+
                     <div class="flex flex-col gap-0.5 overflow-hidden">
                         <span id="airs-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
                         <span id="airs-profile-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter">NO_PROFILE</span>
@@ -93,6 +85,7 @@
 
                     <div class="border-t border-slate-700/50 my-2"></div>
 
+                    <!-- 2. LLM AI Gateway Status -->
                     <div class="flex items-center justify-between mb-1.5">
                         <div class="flex items-center gap-2">
                             <i data-lucide="server" class="w-3.5 h-3.5 text-blue-400"></i>
@@ -106,17 +99,34 @@
                         <span id="gw-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
                         <span id="gw-provider-text" class="text-[9px] text-blue-400 font-mono font-bold truncate tracking-tighter">UNKNOWN_PROVIDER</span>
                     </div>
+
+                    <div class="border-t border-slate-700/50 my-2"></div>
+
+                    <!-- 3. Remote MCP via AI Gateway Status -->
+                    <div class="flex items-center justify-between mb-1.5">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="database" class="w-3.5 h-3.5 text-teal-400"></i>
+                            <p class="text-[10px] font-bold text-teal-400 uppercase tracking-widest">Remote MCP (AI GW)</p>
+                        </div>
+                    </div>
+                    <div id="mcp-status-light" class="w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
+                        <div id="mcp-status-bar" class="w-0 h-full bg-slate-500 transition-all duration-700"></div>
+                    </div>
+                    <div class="flex flex-col gap-0.5 overflow-hidden">
+                        <span id="mcp-status-text" class="text-[9px] font-bold text-slate-400 uppercase leading-tight italic truncate">Handshaking...</span>
+                        <span id="mcp-url-text" class="text-[8px] text-teal-400/80 font-mono truncate tracking-tighter" title="">UNKNOWN_ENDPOINT</span>
+                    </div>
                 </div>
 
                 <div class="flex flex-col gap-2 bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
                     <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center mb-0.5">Placement</span>
                     <div class="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-md shadow-inner">
                         <label class="cursor-pointer text-center" title="Scans only Ingress/Egress locally">
-                            <input type="radio" name="enforcement" value="prompt_only" class="peer sr-only" checked>
+                            <input type="radio" name="enforcement" value="prompt_only" class="peer sr-only">
                             <div class="px-1 py-1.5 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm truncate">PROMPT-ONLY</div>
                         </label>
-                        <label class="cursor-pointer text-center" title="Scans Prompt, RAG, and MCP Tools">
-                            <input type="radio" name="enforcement" value="gateway" class="peer sr-only">
+                        <label class="cursor-pointer text-center" title="Scans Prompt, RAG, and Remote MCP Tools via AI Gateway">
+                            <input type="radio" name="enforcement" value="gateway" class="peer sr-only" checked>
                             <div class="px-1 py-1.5 text-[9px] font-bold rounded text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all shadow-sm truncate">AI GATEWAY</div>
                         </label>
                     </div>
@@ -131,7 +141,7 @@
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LLM Engine</p>
                     </div>
                 </div>
-                
+
                 <div id="manual-model-container" class="transition-all duration-300">
                     <select id="model-select" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
                         <option value="">Discovering models...</option>
@@ -170,7 +180,7 @@
 
     <main class="flex-1 flex flex-col bg-white relative">
         <header class="px-8 py-4 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0 z-20 shadow-sm">
-            
+
             <div class="flex items-center gap-4">
                 <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
                     <label class="flex items-center gap-2 px-4 py-1.5 rounded-lg cursor-pointer hover:text-slate-800 text-slate-500 font-semibold text-sm transition-all has-[:checked]:bg-white has-[:checked]:text-blue-600 has-[:checked]:shadow-sm">
@@ -186,7 +196,7 @@
                         <i data-lucide="shopping-bag" class="w-4 h-4"></i> E-Shop
                     </label>
                 </div>
-                
+
                 <div class="hidden md:flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200" id="engine-tag">-</div>
             </div>
 
@@ -205,7 +215,7 @@
         <footer class="p-6 border-t border-slate-100 bg-white">
             <form id="chat-form" class="max-w-3xl mx-auto relative shadow-sm">
                 <input type="text" id="msg" autoComplete="off" class="w-full bg-slate-100 rounded-2xl py-4 pl-6 pr-16 outline-none focus:ring-2 focus:ring-blue-500 border border-transparent transition-all" placeholder="Enter attack vector or prompt..." required>
-                <button type="submit" class="absolute right-2 top-2 bottom-2 bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg">
+                <button type="submit" id="send-btn" class="absolute right-2 top-2 bottom-2 bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg">
                     <i data-lucide="send" class="w-4 h-4"></i>
                 </button>
             </form>
@@ -221,19 +231,28 @@
     </aside>
 
     <script>
-        lucide.createIcons(); // Initialize all data-lucide icons
-        
-        // Generate a random session ID on boot to isolate this conversation's history
+        lucide.createIcons();
+
         let sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
-        
+
         const chatForm = document.getElementById('chat-form');
         const chatBox = document.getElementById('chat-box');
         const logContainer = document.getElementById('log-container');
 
         /**
-         * Fetch the predefined system prompt for the selected persona (Banking/Travel/EShop)
-         * and populate the editable textarea in the left sidebar.
+         * Escapes HTML special characters to prevent XSS when rendering untrusted
+         * model outputs, RAG documents, SQLite query results, or raw security logs.
          */
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         async function updatePersonaDisplay(personaId) {
             const display = document.getElementById('persona-context-display');
             try {
@@ -241,20 +260,19 @@
                 const data = await res.json();
                 display.value = data.context;
                 display.scrollTop = 0;
-            } catch (e) { display.value = "Error loading context."; }
+            } catch (e) {
+                display.value = "Error loading context.";
+            }
         }
 
-        /**
-         * Handles saving changes made to the system prompt in the UI back to the server.
-         */
         document.getElementById('save-persona-btn').addEventListener('click', async () => {
             const btn = document.getElementById('save-persona-btn');
             const newContext = document.getElementById('persona-context-display').value;
             const activePersona = document.querySelector('input[name="persona"]:checked').value;
-            
+
             btn.innerText = "SAVING...";
             btn.classList.add("text-white", "bg-orange-500");
-            
+
             try {
                 const res = await fetch('/update-persona', {
                     method: 'POST',
@@ -269,37 +287,30 @@
                 btn.innerText = "ERROR";
                 btn.classList.replace("bg-orange-500", "bg-red-500");
             }
-            
-            // Revert button state after 2 seconds
+
             setTimeout(() => {
                 btn.innerText = "SAVE";
                 btn.className = "text-[9px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded hover:bg-orange-500/40 transition font-bold tracking-widest cursor-pointer";
             }, 2000);
         });
 
-        /**
-         * Queries the Python backend to fetch the list of AI models discovered 
-         * on the LiteLLM Gateway and populates the dropdown list.
-         */
         async function fetchModels() {
             try {
                 const res = await fetch('/models');
                 const data = await res.json();
                 const select = document.getElementById('model-select');
                 const msgInput = document.getElementById('msg');
-                const submitBtn = chatForm.querySelector('button[type="submit"]');
+                const submitBtn = document.getElementById('send-btn');
 
                 if (data.models && data.models.length > 0) {
-                    // Filter out the internal 'auto-router' alias from the raw list
                     const cleanModels = data.models.filter(m => m !== 'auto-router');
 
-                    // Differentiate local models (e.g., Ollama) from cloud models visually
                     select.innerHTML = cleanModels.map(m => {
                         const isLocal = m.startsWith('local-');
-                        return `<option value="${m}" class="${isLocal ? 'local-option' : ''}">${isLocal ? '🏠 ' + m + ' (Local)' : '☁️ ' + m}</option>`;
+                        const safeM = escapeHtml(m);
+                        return `<option value="${safeM}" class="${isLocal ? 'local-option' : ''}">${isLocal ? '🏠 ' + safeM + ' (Local)' : '☁️ ' + safeM}</option>`;
                     }).join('');
-                    
-                    // Enable chat input if models are found
+
                     if (cleanModels.length > 0) {
                         select.value = cleanModels[0];
                         document.getElementById('engine-tag').innerText = select.value;
@@ -308,30 +319,24 @@
                         msgInput.placeholder = "Enter attack vector or prompt...";
                     }
                 } else {
-                    // Disable chat input if no models are available
                     select.innerHTML = '<option value="">❌ No Cloud LLMs Detected</option>';
                     document.getElementById('engine-tag').innerText = "OFFLINE";
                     msgInput.disabled = true;
                     submitBtn.disabled = true;
                 }
-            } catch (e) { 
-                console.error("Failed to fetch models:", e); 
+            } catch (e) {
+                console.error("Failed to fetch models:", e);
             }
         }
 
-        /**
-         * [🔍 AIRS HEALTH CHECK INITIALIZATION]
-         * Queries the Python backend to see if the Prisma AIRS SDK successfully 
-         * authenticated and loaded the Security Profile during server boot.
-         */
         async function checkAirsHealth() {
             try {
                 const res = await fetch('/health-airs');
                 const data = await res.json();
+
+                // 1. Prisma AIRS Runtime SDK
                 const bar = document.getElementById('status-bar');
                 const statusText = document.getElementById('airs-status-text');
-
-                // Visual updates based on SDK connection state
                 if (data.status === "connected") {
                     bar.className = "w-full h-full bg-green-500 shadow-[0_0_8px_#22c55e]";
                     statusText.innerText = "CONNECTED Prisma AIRS profile";
@@ -339,11 +344,12 @@
                     document.getElementById('airs-profile-text').innerText = data.profile;
                 } else {
                     bar.className = "w-full h-full bg-red-500 shadow-[0_0_8px_#ef4444]";
-                    statusText.innerText = data.reason;
+                    statusText.innerText = data.reason || "DISCONNECTED";
                     statusText.className = "text-[8px] font-mono text-red-400 leading-tight break-all";
                     document.getElementById('airs-profile-text').innerText = "ERROR";
                 }
 
+                // 2. LLM AI Gateway
                 const gwBar = document.getElementById('gw-status-bar');
                 const gwStatusText = document.getElementById('gw-status-text');
                 const gwProviderText = document.getElementById('gw-provider-text');
@@ -360,47 +366,60 @@
                     gwStatusText.className = "text-[9px] font-bold text-red-400 uppercase tracking-tight";
                     gwProviderText.innerText = providerName + " OFFLINE";
                 }
+
+                // 3. Remote MCP Server via AI Gateway
+                const mcpBar = document.getElementById('mcp-status-bar');
+                const mcpStatusText = document.getElementById('mcp-status-text');
+                const mcpUrlText = document.getElementById('mcp-url-text');
+                const mcpUrl = data.mcp_gateway_url || "NOT_CONFIGURED";
+
+                mcpUrlText.innerText = mcpUrl;
+                mcpUrlText.title = mcpUrl;
+
+                if (data.mcp_status === "connected") {
+                    mcpBar.className = "w-full h-full bg-teal-400 shadow-[0_0_8px_#2dd4bf]";
+                    mcpStatusText.innerText = "MCP TOOLS LOADED";
+                    mcpStatusText.className = "text-[9px] font-bold text-teal-400 uppercase tracking-tight";
+                } else {
+                    mcpBar.className = "w-full h-full bg-amber-500 shadow-[0_0_8px_#f59e0b]";
+                    mcpStatusText.innerText = data.mcp_reason || "PENDING / OFFLINE";
+                    mcpStatusText.className = "text-[8px] font-mono text-amber-400 leading-tight truncate";
+                    mcpStatusText.title = data.mcp_reason || "";
+                }
             } catch (e) {}
         }
 
-        // --- Event Listeners for UI interaction ---
-        
-        // Update Persona textarea when user clicks different radio tabs
         document.querySelectorAll('input[name="persona"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
-                const val = e.target.value;
-                updatePersonaDisplay(val);
+                updatePersonaDisplay(e.target.value);
             });
         });
 
-        // Update the tiny engine badge when a new model is selected
         document.getElementById('model-select').addEventListener('change', (e) => {
             document.getElementById('engine-tag').innerText = e.target.value;
         });
 
-        // Toggle the right-hand Observability panel visibility
-        document.getElementById('toggle-logs').addEventListener('click', () => document.getElementById('log-panel').classList.toggle('log-hidden'));
-        
-        // Generate a new Session ID and clear the screen
+        document.getElementById('toggle-logs').addEventListener('click', () => {
+            document.getElementById('log-panel').classList.toggle('log-hidden');
+        });
+
         document.getElementById('reset-session').addEventListener('click', () => {
-            if(confirm("Start a fresh session? This clears chat and generates a new session ID.")) {
+            if (confirm("Start a fresh session? This clears chat and generates a new session ID.")) {
                 sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
                 chatBox.innerHTML = '';
                 logContainer.innerHTML = '';
             }
         });
 
-        /**
-         * Helper function to build and inject the HTML for a user or bot message bubble.
-         */
         function appendMessage(role, text) {
             const isBot = role === 'bot';
+            const safeText = escapeHtml(text).replace(/\n/g, '<br>');
             const html = `<div class="flex gap-3 ${isBot ? '' : 'flex-row-reverse ml-auto'} max-w-[85%] animate-in fade-in slide-in-from-bottom-2">
                 <div class="w-8 h-8 rounded-full ${isBot ? 'bg-slate-100 border' : 'bg-blue-600'} flex items-center justify-center shrink-0 shadow-sm transition-transform hover:scale-110">
                     <i data-lucide="${isBot ? 'bot' : 'user'}" class="w-4 h-4 ${isBot ? 'text-slate-500' : 'text-white'}"></i>
                 </div>
                 <div class="${isBot ? 'bg-white text-slate-700 rounded-tl-none' : 'bg-blue-600 text-white rounded-tr-none'} p-4 rounded-2xl shadow-sm border text-sm leading-relaxed border-slate-200/50">
-                    ${text.replace(/\n/g, '<br>')}
+                    ${safeText}
                 </div>
             </div>`;
             chatBox.insertAdjacentHTML('beforeend', html);
@@ -408,96 +427,82 @@
             lucide.createIcons();
         }
 
-        // =====================================================================
-        // CORE CHAT SUBMISSION LOGIC
-        // =====================================================================
         chatForm.onsubmit = async (e) => {
             e.preventDefault();
-            
-            // Determine which model to send
+
             const modelId = document.getElementById('model-select').value;
-            
             if (!modelId) {
                 appendMessage('bot', "⚠️ Cannot send message: No AI engine is currently available.");
-                return; 
+                return;
             }
 
-            // Gather all configuration variables from the left sidebar UI
             const historyToggle = document.getElementById('history-toggle');
             const historyEnabled = historyToggle ? historyToggle.checked : true;
             const msgInput = document.getElementById('msg');
+            const submitBtn = document.getElementById('send-btn');
             const message = msgInput.value;
             const persona = document.querySelector('input[name="persona"]:checked').value;
             const endUser = document.getElementById('end-user-input').value || "user1";
-
-            // [🔍 AIRS SCANNER INVOCATION TRIGGER]
-            // We capture these two variables to tell the Python backend exactly HOW to scan.
-            // airsEnabled: Master on/off switch for security.
-            // enforcementPlacement: 'prompt_only' (fast local check) OR 'gateway' (deep proxy check).
             const airsEnabled = document.getElementById('airs-toggle').checked;
             const enforcementPlacement = document.querySelector('input[name="enforcement"]:checked').value;
 
-            // Display user message immediately
             appendMessage('user', message);
             msgInput.value = '';
+            submitBtn.disabled = true;
 
-            // Render a loading indicator
             const loadId = 'l-' + Date.now();
             chatBox.insertAdjacentHTML('beforeend', `<div id="${loadId}" class="text-[10px] text-slate-400 ml-11 italic flex items-center gap-2"><div class="w-1 h-1 bg-slate-400 rounded-full animate-ping"></div>Processing Request...</div>`);
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                // Post all configurations and the message to the Python backend
                 const res = await fetch('/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: new URLSearchParams({
-                        'message': message, 
-                        'persona': persona, 
+                        'message': message,
+                        'persona': persona,
                         'session_id': sessionId,
-                        'airs_enabled': airsEnabled, 
-                        'model_id': modelId, 
+                        'airs_enabled': airsEnabled,
+                        'model_id': modelId,
                         'history_enabled': historyEnabled,
-                        'enforcement_placement': enforcementPlacement, 
+                        'enforcement_placement': enforcementPlacement,
                         'end_user': endUser
                     })
                 });
-                
+
                 const data = await res.json();
-                
-                // Remove loading indicator
                 if (document.getElementById(loadId)) document.getElementById(loadId).remove();
 
-                if (data.bot) {
-                    // Display the final text response from the LLM
-                    appendMessage('bot', data.bot);
-                    
-                    // =========================================================
-                    // OBSERVABILITY TRACE RENDERING
-                    // =========================================================
-                    // Parses the rich `architecture_trace` object returned by the backend
-                    // to visualize RAG grounding, Tool Execution, and Security Blocks.
+                if (!res.ok) {
+                    const errMsg = data?.error?.message || `HTTP ${res.status} Error`;
+                    appendMessage('bot', `⚠️ Gateway / Server Notice: ${errMsg}`);
+                    return;
+                }
 
-                    // Determine border/badge colors based on security scan outcome
-                    const statusText = data.logs.security_scan || "";
+                if (data.bot) {
+                    appendMessage('bot', data.bot);
+
+                    const statusText = data.logs?.security_scan || "";
                     let borderColor = "border-l-slate-500";
                     let badgeColor = "bg-slate-900/50 text-slate-400";
-                    
-                    if (statusText.includes("INGRESS BLOCK")) {
+
+                    if (statusText.includes("INGRESS BLOCK") || statusText.includes("GATEWAY BLOCK")) {
                         borderColor = "border-l-red-500";
                         badgeColor = "bg-red-900/50 text-red-400";
+                    } else if (statusText.includes("TOOL BLOCK") || statusText.includes("RAG DATA BLOCK")) {
+                        borderColor = "border-l-amber-500";
+                        badgeColor = "bg-amber-900/50 text-amber-300";
                     } else if (statusText.includes("EGRESS BLOCK")) {
                         borderColor = "border-l-orange-500";
                         badgeColor = "bg-orange-900/50 text-orange-400";
-                    } else if (statusText.includes("Passed") || statusText.includes("Passed App")) {
+                    } else if (statusText.includes("Passed")) {
                         borderColor = "border-l-green-500";
                         badgeColor = "bg-green-900/50 text-green-400";
                     }
 
                     let traceHtml = "";
-                    if (data.logs.trace) {
-                        
-                        // 🌟 1. Render RAG Pipeline Data
+                    if (data.logs?.trace) {
+                        // 1. RAG Pipeline
                         if (data.logs.trace.rag_pipeline) {
                             const chunks = data.logs.trace.rag_pipeline.chunks_injected || [];
                             const rejectedChunks = data.logs.trace.rag_pipeline.chunks_rejected || [];
@@ -513,22 +518,21 @@
                                     </div>
                                     <div class="mt-2">
                                         <div class="text-[8px] text-slate-500 uppercase font-mono mb-1 flex items-center gap-1">
-                                            <i data-lucide="eye" class="w-2 h-2"></i> Injected Data Payload:
+                                            <i data-lucide="eye" class="w-2.5 h-2.5"></i> Injected Data Payload:
                                         </div>
-                                        <pre class="bg-black/40 p-2 rounded text-[8px] text-purple-300/70 border border-slate-800 italic whitespace-pre-wrap max-h-40 overflow-y-auto">${chunks.join('\n\n')}</pre>
+                                        <pre class="bg-black/40 p-2 rounded text-[8px] text-purple-300/70 border border-slate-800 italic whitespace-pre-wrap max-h-40 overflow-y-auto">${escapeHtml(chunks.join('\n\n'))}</pre>
                                     </div>`;
                             }
 
-                            // Show chunks that ChromaDB rejected due to high distance (irrelevance)
                             let rejectedHtml = "";
                             if (rejectedChunks.length > 0) {
-                                let rejectedList = rejectedChunks.map(c => `[Distance: ${c.distance}] ${c.text}`).join('\n\n');
+                                const rejectedList = rejectedChunks.map(c => `[Distance: ${c.distance}] ${c.text}`).join('\n\n');
                                 rejectedHtml = `
                                     <div class="mt-2 border-t border-red-900/30 pt-2">
                                         <div class="text-[8px] text-red-400/80 uppercase font-mono mb-1 flex items-center gap-1">
-                                            <i data-lucide="filter" class="w-2 h-2"></i> Rejected Data (Distance > 0.50):
+                                            <i data-lucide="filter" class="w-2.5 h-2.5"></i> Rejected Data (Distance > 0.50):
                                         </div>
-                                        <pre class="bg-black/40 p-2 rounded text-[8px] text-red-300/50 border border-red-900/30 italic whitespace-pre-wrap max-h-40 overflow-y-auto">${rejectedList}</pre>
+                                        <pre class="bg-black/40 p-2 rounded text-[8px] text-red-300/50 border border-red-900/30 italic whitespace-pre-wrap max-h-40 overflow-y-auto">${escapeHtml(rejectedList)}</pre>
                                     </div>`;
                             }
 
@@ -547,44 +551,48 @@
                                 </div>`;
                         }
 
-                        // 2. Render AI Gateway routing decision
+                        // 2. AI Gateway Routing Decision
                         if (data.logs.trace.ai_gateway && data.logs.trace.ai_gateway.routed_to) {
+                            const traceId = data.logs.trace.ai_gateway.portkey_trace_id;
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
                                     <div class="text-[9px] text-blue-400 font-bold mb-1 uppercase tracking-tighter italic">🚦 2. AI Gateway (Model Routed):</div>
-                                    <div class="bg-black/60 p-2 rounded text-[9px] text-blue-300 border border-slate-800">Routed payload to: <b>${data.logs.trace.ai_gateway.routed_to}</b></div>
+                                    <div class="bg-black/60 p-2 rounded text-[9px] text-blue-300 border border-slate-800 space-y-1">
+                                        <div>Routed payload to: <b>${escapeHtml(data.logs.trace.ai_gateway.routed_to)}</b></div>
+                                        ${traceId && traceId !== "N/A" ? `<div class="text-[8px] text-slate-400">Gateway Trace ID: <span class="text-blue-200 select-all">${escapeHtml(traceId)}</span></div>` : ""}
+                                    </div>
                                 </div>`;
                         }
 
-                        // 3. Render MCP Tool Executions (e.g. database query inputs/outputs)
+                        // 3. Remote MCP Tool Executions via AI Gateway
                         if (data.logs.trace.mcp_execution && data.logs.trace.mcp_execution.length > 0) {
+                            const mcpGwUrl = data.logs.trace.ai_gateway?.mcp_gateway_url;
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
-                                    <div class="text-[9px] text-teal-400 font-bold mb-1 uppercase tracking-tighter italic">🔌 3. MCP Execution (Tool Called):</div>
-                                    <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-teal-300 border border-slate-800 leading-tight">${JSON.stringify(data.logs.trace.mcp_execution, null, 2)}</pre>
+                                    <div class="text-[9px] text-teal-400 font-bold mb-1 uppercase tracking-tighter italic">🔌 3. Remote MCP Execution (via AI Gateway):</div>
+                                    ${mcpGwUrl ? `<div class="text-[8px] text-teal-400/70 mb-1 truncate">Endpoint: ${escapeHtml(mcpGwUrl)}</div>` : ""}
+                                    <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-teal-300 border border-slate-800 leading-tight">${escapeHtml(JSON.stringify(data.logs.trace.mcp_execution, null, 2))}</pre>
                                 </div>`;
                         }
-                        
-                        // 4. Render LLM Raw Text Output
+
+                        // 4. LLM Raw Text Output
                         if (data.logs.trace.llm_generation) {
                             traceHtml += `
                                 <div class="mt-2 border-t border-slate-700/50 pt-2">
                                     <div class="text-[9px] text-zinc-400 font-bold mb-1 uppercase tracking-tighter italic">💬 4. LLM Raw Generation:</div>
-                                    <div class="bg-black/60 p-2 rounded text-[9px] text-zinc-300 border border-slate-800 max-h-32 overflow-y-auto whitespace-pre-wrap">${data.logs.trace.llm_generation.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                                    <div class="bg-black/60 p-2 rounded text-[9px] text-zinc-300 border border-slate-800 max-h-32 overflow-y-auto whitespace-pre-wrap">${escapeHtml(data.logs.trace.llm_generation)}</div>
                                 </div>`;
                         }
                     }
 
-                    // --- [🔍 AIRS SCAN RESULT RENDERING] ---
-                    // 5. ASSEMBLE FULL LOG PANEL & RENDER SECURITY OUTCOMES
-                    // This block visualizes the JSON generated by Prisma AIRS SDK or Gateway hooks
+                    // 5. Prisma AIRS Security Scan Outcome
                     const logHtml = `
                         <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 text-slate-300 mb-4 shadow-xl border-l-4 ${borderColor} transition-all hover:bg-slate-800/60">
                             <div class="flex justify-between text-[9px] text-blue-400 mb-2 border-b border-slate-700/50 pb-1 font-bold">
-                                <span>SESSION: ${sessionId.toUpperCase()}</span>
+                                <span>SESSION: ${escapeHtml(sessionId.toUpperCase())}</span>
                                 <span>${new Date().toLocaleTimeString()}</span>
                             </div>
-                            
+
                             ${traceHtml}
 
                             <div class="mt-2 border-t border-slate-700/50 pt-2">
@@ -593,32 +601,37 @@
                                         🛡️ 5. Prisma AIRS Security Scan
                                     </div>
                                     <span class="px-2 py-0.5 rounded text-[9px] font-bold ${badgeColor} shadow-sm">
-                                        ${statusText}
+                                        ${escapeHtml(statusText)}
                                     </span>
                                 </div>
-                                
-                                ${data.logs.intercepted_text ? `
+
+                                ${data.logs?.intercepted_text ? `
                                 <div class="mb-2">
                                     <div class="text-[8px] text-red-400 uppercase font-bold mb-1 flex items-center gap-1">
                                         <i data-lucide="shield-alert" class="w-2.5 h-2.5"></i> Intercepted Payload:
                                     </div>
-                                    <div class="bg-red-950/40 p-2 rounded text-[9px] text-red-200 border border-red-900/50 max-h-32 overflow-y-auto whitespace-pre-wrap">${data.logs.intercepted_text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                                    <div class="bg-red-950/40 p-2 rounded text-[9px] text-red-200 border border-red-900/50 max-h-32 overflow-y-auto whitespace-pre-wrap">${escapeHtml(data.logs.intercepted_text)}</div>
                                 </div>` : ""}
 
-                                <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${data.logs.raw_response}</pre>
+                                <pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-slate-400 border border-slate-800 leading-tight">${escapeHtml(data.logs?.raw_response || "{}")}</pre>
                             </div>
                         </div>`;
-                    
-                    // Inject the assembled trace into the Right Sidebar
+
                     logContainer.insertAdjacentHTML('afterbegin', logHtml);
+                    lucide.createIcons();
                 }
+
+                // Refresh sidebar MCP/Gateway health after lazy tool sync
+                checkAirsHealth();
             } catch (err) {
                 if (document.getElementById(loadId)) document.getElementById(loadId).remove();
                 appendMessage('bot', "⚠️ Backend connection error.");
+            } finally {
+                submitBtn.disabled = false;
+                msgInput.focus();
             }
         };
 
-        // Initialize application state on page load
         window.addEventListener('DOMContentLoaded', () => {
             fetchModels();
             checkAirsHealth();
