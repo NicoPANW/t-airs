@@ -5,10 +5,11 @@ fastapi==0.165.0
 mcp==2.3.0
 httpx2==2.16.2
 uvloop==0.22.1
-uvicorn==0.53
+uvicorn==0.54
 requests==2.34.2
 Jinja2==3.1.6
 python-multipart==0.0.32
 openai==3.57.0
 chromadb==1.5.9
 sentence-transformers==6.3.0
+starlette==1.10.0
